@@ -1,20 +1,23 @@
 
 # Carlos Linares
 # 
-# Script para empezar a trabajar con Jen Cruz on los datos de 2021
+# Script para hacer modelos de población con los datos de 2021.
+
 # 
 # #
 # libraries 
 library(tidyverse)
 library(lubridate)
 library(magrittr)
+library(elevatr)
+
 # Data load-------------####
 
 bat2021<-read.csv('data_analysis/bat2021_v2.csv',check.names = T) # we load the data we created in the clean up script. This data has several variables added to a clean up raw data is the product of clean_up script
 
 # make dates-------------
 bat2021$datetime<-ymd_hms(bat2021$datetime) # makes dates as dates 
-bat2021$noche<-ymd(bat2021$noche)# makes dates as dates
+bat2021$noche<-ymd(bat2021$noche)# makes noche as date. noche is the date for all the calls that come from the same night instead of having half one day and the others the other day.
 bat2021$jday<-yday(bat2021$noche)
 bat2021$wk<-week(bat2021$noche)# we need to calculate a week column.
 bat2021$yr<-year(bat2021$noche) #year added for when we will have multiple years.
@@ -30,8 +33,11 @@ bat1<- bat2021 %>% # bat matrix
   ungroup()
 
 # Predictors matrix
+moon_pred<-read.csv('data_analysis/moon_pred.csv')
+
+
 bat_pred<- bat2021 %>% 
-  group_by(site, jday, SppAccp) %>% 
+  group_by(site,SppAccp,jday) %>% 
   select(phase,dlt.sunset,trmt_bin,wk,yr) %>% 
   ungroup()
 
