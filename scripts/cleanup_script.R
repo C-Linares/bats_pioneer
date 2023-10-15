@@ -262,6 +262,18 @@ bat2021_v2$trmt_bin<- ifelse(bat2021_v2$treatmt== "lit", 1, 0) #this makes that 
 write.csv(bat2021_v2,file = 'data_analysis/bat2021_v2.csv') 
 write.csv(bat2019_v2,file = "data_analysis/bat2019_v2.csv")
 
+
+# here we add the lat long for each site to the bat2021_v2
+sts<-read.csv('data_analysis/sites_coordinates.csv')
+bat2021_v2<-read.csv('data_analysis/bat2021_v2.csv')
+
+bat2021_v2<-subset(bat2021_v2, select = -c(lat,lon))#drop the bat2021_v2 lat and lon to update
+bat2021_v2<-left_join(bat2021_v2,sts)
+
+# elevation added to points
+
+
+
 # now we need a temperature... where do I get the temperature? Apparently there is the PRISM data that could be useful. 
 
 
