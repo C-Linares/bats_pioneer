@@ -270,19 +270,44 @@ bat2021_v2<-read.csv('data_analysis/bat2021_v2.csv')
 bat2021_v2<-subset(bat2021_v2, select = -c(lat,lon))#drop the bat2021_v2 lat and lon to update
 bat2021_v2<-left_join(bat2021_v2,sts)
 
-# elevation added to points NOT WORKING???????????????????????????????
+#------elevation -------
+#added elevation to points worked 10/15/2023
 
-library(elevatr)
+library(raster)
+library(rgdal)
 sts<-read.csv('data_analysis/sites_coordinates.csv')
-t<-sts[-1]
-t<-SpatialPointsDataFrame(coords = )
-# t<-sts %>% dplyr::select(lon,lat)
-get_elev_point(locations = t, prj = 4326,src = "aws")
+dem<-raster('data_analysis/elev/USGS_13_n44w114_20130911.tif')
+coordinates<-data.frame(lon=sts$lon, lat=sts$lat)
+coordinates_sp <- SpatialPoints(coordinates, proj4string = CRS(proj4string(dem)))
+sts$elevation <- extract(dem, coordinates_sp)
+
+
 
 # now we need a temperature... where do I get the temperature? Apparently there is the PRISM data that could be useful. 
 
 
 
 # percentage of riparian area?
+# We will use NDVI data.
 
+ndvi_2021<-raster('data_analysis/NDVI/MYD13Q1.A2021185.h09v04.061.2021202231848.hdf',crs=)
+coordinates_sp <- SpatialPoints(coordinates, proj4string = CRS(proj4string(ndvi_2021)))
 
+buffer_distance <-100
+
+# Create a buffer around the point
+buffer <- raster::buffer(coordinates_sp, width = buffer_distance)
+
+# Extract the NDVI values for the buffer
+ndvi_values <- extract(ndvi_2021, buffer)
+
+dvi_stats <- lapply(ndvi_values, function(x) {
+  if (length(x) > 0) {
+    # Calculate mean NDVI within the buffer
+    mean_ndvi <- mean(x, na.rm = TRUE)
+    return(mean_ndvi)
+  } else {
+    # If no NDVI values were found within the buffer, return NA
+    return(NA)
+  }
+})
