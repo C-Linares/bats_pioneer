@@ -270,9 +270,14 @@ bat2021_v2<-read.csv('data_analysis/bat2021_v2.csv')
 bat2021_v2<-subset(bat2021_v2, select = -c(lat,lon))#drop the bat2021_v2 lat and lon to update
 bat2021_v2<-left_join(bat2021_v2,sts)
 
-# elevation added to points
+# elevation added to points NOT WORKING???????????????????????????????
 
-
+library(elevatr)
+sts<-read.csv('data_analysis/sites_coordinates.csv')
+t<-sts[-1]
+t<-SpatialPointsDataFrame(coords = )
+# t<-sts %>% dplyr::select(lon,lat)
+get_elev_point(locations = t, prj = 4326,src = "aws")
 
 # now we need a temperature... where do I get the temperature? Apparently there is the PRISM data that could be useful. 
 

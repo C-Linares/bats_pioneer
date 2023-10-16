@@ -45,8 +45,8 @@ bat_pred<- bat2021 %>%
 
 bat_js<- bat2021 %>% 
   group_by(site,SppAccp) %>% # I don't include year because it is a single year 
-  count(wk) %>% 
-  pivot_wider(names_from = c(wk, values_from = n) %>%
+  count(wk) %>%
+  pivot_wider(names_from = wk, values_from = n) %>%
   ungroup()
 
 t<- bat_pred %>% 
