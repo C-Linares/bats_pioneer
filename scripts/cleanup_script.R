@@ -244,7 +244,7 @@ bat2021_v2$dlt.sunset.hrs<-time_length(bat2021_v2$datetime- bat2021_v2$sunset, "
 check1<-subset(bat2021_v2,subset = bat2021_v2$dlt.sunset<0) #491 bat detection occurred before sunset. 
 
 
-# now we add the lit and dark sites.
+# lit and dark sites -----------------
 
 stnames<-unique(bat2021_v2$site)
 litcond<-c("lit", "dark")
@@ -268,10 +268,10 @@ sts<-read.csv('data_analysis/sites_coordinates.csv')
 bat2021_v2<-read.csv('data_analysis/bat2021_v2.csv')
 
 bat2021_v2<-subset(bat2021_v2, select = -c(lat,lon))#drop the bat2021_v2 lat and lon to update
-bat2021_v2<-left_join(bat2021_v2,sts)
+bat2021_v2<-left_join(bat2021_v2,sts) # adds the correct lat and long coordinates for the sites. 
 
 #------elevation -------
-#added elevation to points worked 10/15/2023
+#added elevation to points worked 10/15/2023 but apparently the 
 
 library(raster)
 library(rgdal)
@@ -281,7 +281,12 @@ coordinates<-data.frame(lon=sts$lon, lat=sts$lat)
 coordinates_sp <- SpatialPoints(coordinates, proj4string = CRS(proj4string(dem)))
 sts$elevation <- extract(dem, coordinates_sp)
 
+# we add elevation to the bat data.
 
+# bat2021_v2<-read.csv('data_analysis/bat2021_v2.csv')
+bat2021_v2<-left_join(bat2021_v2, sts, by="site")
+
+write.csv(bat2021_v2,file = 'data_analysis/bat2021_v2.csv') # we update the data base
 
 # now we need a temperature... where do I get the temperature? Apparently there is the PRISM data that could be useful. 
 
