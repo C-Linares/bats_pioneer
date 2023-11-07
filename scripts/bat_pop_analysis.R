@@ -22,7 +22,8 @@ bat2021$datetime <- ymd_hms(bat2021$datetime) # makes dates as dates
 bat2021$noche <-
   ymd(bat2021$noche)# makes noche as date. noche is the date for all the calls that come from the same night instead of having half one day and the others the other day.
 bat2021$jday <- yday(bat2021$noche)
-bat2021$wk <- week(bat2021$noche)# we need to calculate a week column.
+bat2021$wk <-
+  week(bat2021$noche)# we need to calculate a week column.
 bat2021$yr <-
   year(bat2021$noche) #year added for when we will have multiple years.
 
@@ -44,19 +45,34 @@ bat_js <- bat2021 %>%
   ungroup()
 
 
+
+write.csv(bat_js,file = 'data_analysis/bat_pop_analysis/bat_js.csv') 
+
 # site level cov -------------
 
 s.l.c <- bat2021 %>% dplyr::distinct(site,treatmt,elevation)
 
+write.csv(s.l.c,file = 'data_analysis/bat_pop_analysis/slc.csv') 
+
 # obs cov ----------------
+
+# moon phase not changes by site so we just need one by site. 
+
+
 
 moon_pred<-read.csv('data_analysis/moon_pred.csv') #loads the data from the moon_pred script
 
-t<- moon_pred %>%  # this does not work at all...
-  select(site, wk,phase) %>% 
-  group_by(site) %>% 
-  pivot_wider(names_from = wk, values_from = phase) %>% 
-  ungroup()
+obs.cov<- moon_pred %>%  # now there's NA's that I am not sure where they come from
+  select(site,phase,wk, l.illum, fraction) %>% 
+  group_by(site, wk) %>% 
+  summarize(av_phase= mean(phase)) %>% 
+  pivot_wider(names_from = wk, values_from = av_phase)
+
+
+t<-moon_pred %>% select(site, phase, wk, l.illum) %>% 
+  group_by(site,wk) %>% 
+  summarise(av_m.ill=mean(l.illum)) %>% 
+  pivot_wider(names_from = wk, values_from = av_m.ill)
 
 
 
@@ -69,9 +85,7 @@ t<- moon_pred %>%  # this does not work at all...
 
 
 
-
-
-#some PLOTS ##-----------#####
+#  PLOTS ----------
 
 ggplot(bat1, aes(jday, n, fill = treatmt)) +
   geom_col() +

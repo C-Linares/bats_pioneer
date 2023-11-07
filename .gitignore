@@ -3,4 +3,4 @@
 .RData
 .Ruserdata
 # Ignore the data base files as these are large files. 
-/data
+/data_analysis
