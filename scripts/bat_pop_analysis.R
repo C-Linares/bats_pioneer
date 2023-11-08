@@ -69,7 +69,7 @@ obs.cov<- moon_pred %>%  # now there's NA's that I am not sure where they come f
   pivot_wider(names_from = wk, values_from = av_phase)
 
 
-t<-moon_pred %>% select(site, phase, wk, l.illum) %>% 
+obs.cov2<-moon_pred %>% select(site, phase, wk, l.illum) %>% 
   group_by(site,wk) %>% 
   summarise(av_m.ill=mean(l.illum)) %>% 
   pivot_wider(names_from = wk, values_from = av_m.ill)
