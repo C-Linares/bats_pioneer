@@ -16,14 +16,23 @@ library(jagsUI)
 # this is the data from bat_pop_analysis script and was cleaned in the cleanup_script
 
 js21<-read.csv('data_analysis/bat_pop_analysis/bat_js.csv')
+lano_js<-read.csv('data_analysis/bat_pop_analysis/lano_js.csv')
 
 #sites
-I<-length(unique(js21$site))
+I<-length(unique(lano_js$site))
 
 #visits
-j<-10 # the number of weeks 
+J<-10 # the number of weeks 
 
 # what variables we scale?
+# site level covariates
+
+s.l.c<-read.csv('data_analysis/bat_pop_analysis/slc.csv') 
+
+# obs covariates
+
+obs.cov<- read.csv('data_analysis/bat_pop_analysis/obs.cov.csv')
+
 
 
 
@@ -134,7 +143,7 @@ params <- c(  'int.det' #intercept for detection
 )
 
 #initial values defined as max counts
-Nst <- apply( closeddf, 1, max, na.rm = TRUE ) # modify to be batj for one sp
+Nst <- apply( lano_js, 1, max, na.rm = TRUE ) # modify to be batj for one sp
 
 #replace 0s with 1
 Nst[which(Nst== 0 )] <- 1
@@ -149,7 +158,7 @@ inits <- function(){ list( beta = rnorm( B ),
                            N = Nst ) }
 
 #define data that will go in the model
-str( win.data <- list( y_obs = as.matrix( closeddf ), # modify to bat x one sp
+str( win.data <- list( y_obs = as.matrix( lano_js ), # modify to bat x one sp
                        #number of sites, surveys, det predictors, and abund preds
                        I = I, J = J, A = A, B = B, #S = S, s=species later 
                        #site level habitat predictors

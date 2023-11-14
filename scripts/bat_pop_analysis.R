@@ -37,16 +37,40 @@ bat1 <- bat2021 %>%
   count(SppAccp, jday, hr) %>%
   ungroup()
 
-
 bat_js <- bat2021 %>%
   group_by(site, SppAccp) %>% # I don't include year because it is a single year
   count(wk) %>%
   pivot_wider(names_from = wk, values_from = n) %>%
   ungroup()
 
+t <- bat_js[bat_js$SppAccp == "Lano", ]
 
+# we filter by just one sp.
+# what species has the more calls. 
+
+ggplot(bat2021,aes(x=SppAccp, fill=treatmt))+
+  geom_bar()
+  
+# we filter by Mylu Lano and Myvo
+lano <- bat2021[bat2021$SppAccp == "Lano",]
+filtered_data <-
+  lano[(lano$site == "IRON03") &
+         (lano$wk == 25),] # I checked to see if the NA in Lano were actually missing values and to miss calculations
+
+
+lano_js<-lano %>% 
+  group_by(site) %>% 
+  count(wk) %>% 
+  pivot_wider(names_from = wk, values_from = n) %>% 
+  ungroup()
+  
 
 write.csv(bat_js,file = 'data_analysis/bat_pop_analysis/bat_js.csv') 
+
+#write single species df
+
+write.csv(lano_js,file = 'data_analysis/bat_pop_analysis/lano_js.csv') 
+
 
 # site level cov -------------
 
@@ -75,6 +99,7 @@ obs.cov2<-moon_pred %>% select(site, phase, wk, l.illum) %>%
   pivot_wider(names_from = wk, values_from = av_m.ill)
 
 
+write.csv(obs.cov,file = 'data_analysis/bat_pop_analysis/obs.cov.csv') 
 
 
 
