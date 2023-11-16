@@ -16,7 +16,30 @@ library(jagsUI)
 # this is the data from bat_pop_analysis script and was cleaned in the cleanup_script
 
 js21<-read.csv('data_analysis/bat_pop_analysis/bat_js.csv')
-lano_js<-read.csv('data_analysis/bat_pop_analysis/lano_js.csv')
+lano_js <-
+  read.csv('data_analysis/bat_pop_analysis/lano_js.csv', header = T, col.names = nombres)
+
+#remove the first col from lano because it is not useful. 
+lano_js<-lano_js[,-1]
+names(lano_js)
+nombres <- # was trying to change the name of the columns
+  c("",
+    "site",
+    "25",
+    "26",
+    "27",
+    "28",
+    "29",
+    "30",
+    "31",
+    "32",
+    "33",
+    "34")
+
+
+#rename week columns as numbers just numbers 
+
+
 
 #sites
 I<-length(unique(lano_js$site))
@@ -28,11 +51,11 @@ J<-10 # the number of weeks
 # site level covariates
 
 s.l.c<-read.csv('data_analysis/bat_pop_analysis/slc.csv') 
-
+s.l.c<-s.l.c[-1]
 # obs covariates
 
 obs.cov<- read.csv('data_analysis/bat_pop_analysis/obs.cov.csv')
-
+obs.cov<-obs.cov[-1]
 
 
 
@@ -148,9 +171,9 @@ Nst <- apply( lano_js, 1, max, na.rm = TRUE ) # modify to be batj for one sp
 #replace 0s with 1
 Nst[which(Nst== 0 )] <- 1
 
-#how many ecological predictors that are fixed effects
+#how many ecological predictors that are fixed effects (s.l.c)
 B <- 2
-#how many detection predictors that are fixed effects
+#how many detection predictors that are fixed effects (obs.cov)
 A <- 1
 #define initial parameter values
 inits <- function(){ list( beta = rnorm( B ),
