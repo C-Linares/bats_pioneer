@@ -43,27 +43,22 @@ bat_js <- bat2021 %>%
   pivot_wider(names_from = wk, values_from = n) %>%
   ungroup()
 
-t <- bat_js[bat_js$SppAccp == "Lano", ]
+lano_js <- bat_js[bat_js$SppAccp == "Lano",] # filter data to just Lano.
+lano_js <-
+  lano_js[, c(-1, -2, -12)] # remove site, sp, last week because it has few data points.
+
+t<- lano_js[is.na(lano_js)]<-0
 
 # we filter by just one sp.
-# what species has the more calls. 
+# what species has the more calls. Lano 
 
 ggplot(bat2021,aes(x=SppAccp, fill=treatmt))+
   geom_bar()
   
-# we filter by Mylu Lano and Myvo
-lano <- bat2021[bat2021$SppAccp == "Lano",]
-filtered_data <-
-  lano[(lano$site == "IRON03") &
-         (lano$wk == 25),] # I checked to see if the NA in Lano were actually missing values and to miss calculations
 
 
-lano_js<-lano %>% 
-  group_by(site) %>% 
-  count(wk) %>% 
-  pivot_wider(names_from = wk, values_from = n) %>% 
-  ungroup()
-  
+
+#rename week columns as numbers just numbers 
 
 write.csv(bat_js,file = 'data_analysis/bat_pop_analysis/bat_js.csv') 
 
@@ -139,3 +134,30 @@ hist(moon_pred$fraction) # values are sparcer.
 hist(bat2021$dlt.sunset) # time since sunset 
 hist(bat2021$SppAccp)
 
+
+
+
+
+
+
+
+
+
+# junk ----------
+# 
+
+
+
+lano <- bat2021[bat2021$SppAccp == "Lano",]
+filtered_data <-
+  lano[(lano$site == "IRON03") &
+         (lano$wk == 25),] # I checked to see if the NA in Lano were actually missing values and to miss calculations
+
+lano_js<-lano %>% 
+  group_by(site) %>% 
+  count(wk) %>% 
+  pivot_wider(names_from = wk, values_from = n) %>% 
+  ungroup()
+
+lano_js<-lano_js[,-1] # remove col one that has just consecutive numbers
+names(lano_js)

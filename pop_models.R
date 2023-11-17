@@ -17,28 +17,7 @@ library(jagsUI)
 
 js21<-read.csv('data_analysis/bat_pop_analysis/bat_js.csv')
 lano_js <-
-  read.csv('data_analysis/bat_pop_analysis/lano_js.csv', header = T, col.names = nombres)
-
-#remove the first col from lano because it is not useful. 
-lano_js<-lano_js[,-1]
-names(lano_js)
-nombres <- # was trying to change the name of the columns
-  c("",
-    "site",
-    "25",
-    "26",
-    "27",
-    "28",
-    "29",
-    "30",
-    "31",
-    "32",
-    "33",
-    "34")
-
-
-#rename week columns as numbers just numbers 
-
+  read.csv('data_analysis/bat_pop_analysis/lano_js.csv')
 
 
 #sites
