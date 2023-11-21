@@ -47,7 +47,8 @@ lano_js <- bat_js[bat_js$SppAccp == "Lano",] # filter data to just Lano.
 lano_js <-
   lano_js[, c(-1, -2, -12)] # remove site, sp, last week because it has few data points.
 
-t<- lano_js[is.na(lano_js)]<-0
+lano_js <- replace(lano_js, is.na(lano_js), 0) # remove site column
+
 
 # we filter by just one sp.
 # what species has the more calls. Lano 
@@ -60,18 +61,21 @@ ggplot(bat2021,aes(x=SppAccp, fill=treatmt))+
 
 #rename week columns as numbers just numbers 
 
-write.csv(bat_js,file = 'data_analysis/bat_pop_analysis/bat_js.csv') 
+write.csv(bat_js,file = 'data_analysis/bat_pop_analysis/bat_js.csv',
+          row.names = F) 
 
 #write single species df
 
-write.csv(lano_js,file = 'data_analysis/bat_pop_analysis/lano_js.csv') 
+write.csv(lano_js,file = 'data_analysis/bat_pop_analysis/lano_js.csv', row.names = F) 
 
 
 # site level cov -------------
 
-s.l.c <- bat2021 %>% dplyr::distinct(site,treatmt,elevation)
+s.l.c <- bat2021 %>% dplyr::distinct(site,elevation,trmt_bin)
+s.l.c<-s.l.c[,-1] # remove sites column
 
-write.csv(s.l.c,file = 'data_analysis/bat_pop_analysis/slc.csv') 
+write.csv(s.l.c,file = 'data_analysis/bat_pop_analysis/slc.csv',
+          row.names = F) 
 
 # obs cov ----------------
 
@@ -87,6 +91,9 @@ obs.cov<- moon_pred %>%  # now there's NA's that I am not sure where they come f
   summarize(av_phase= mean(phase)) %>% 
   pivot_wider(names_from = wk, values_from = av_phase)
 
+obs.cov <- replace(obs.cov, is.na(obs.cov), 0)
+
+obs.cov<- obs.cov[,-c(1,11)] # remove site and last col to be equa to the lano_js
 
 obs.cov2<-moon_pred %>% select(site, phase, wk, l.illum) %>% 
   group_by(site,wk) %>% 
@@ -94,7 +101,8 @@ obs.cov2<-moon_pred %>% select(site, phase, wk, l.illum) %>%
   pivot_wider(names_from = wk, values_from = av_m.ill)
 
 
-write.csv(obs.cov,file = 'data_analysis/bat_pop_analysis/obs.cov.csv') 
+write.csv(obs.cov,file = 'data_analysis/bat_pop_analysis/obs.cov.csv',
+          row.names = F) 
 
 
 

@@ -30,11 +30,11 @@ J<-10 # the number of weeks
 # site level covariates
 
 s.l.c<-read.csv('data_analysis/bat_pop_analysis/slc.csv') 
-s.l.c<-s.l.c[-1]
+s.l.c<-s.l.c[-1] # remove site col
 # obs covariates
 
 obs.cov<- read.csv('data_analysis/bat_pop_analysis/obs.cov.csv')
-obs.cov<-obs.cov[-1]
+obs.cov<-obs.cov[-c(1,10)] # remove site col
 
 
 
