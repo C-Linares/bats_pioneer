@@ -187,3 +187,13 @@ mean( m1$mean$fit ) / mean( m1$mean$fit.new )
 #Bayesian pvalue
 plot( m1$sims.list$fit, m1$sims.list$fit.new )
 ###### end m1 ########
+###### 
+###### 
+
+
+# trying JagsUI to check the syntax of the model.
+
+library(jagsUI)
+jagsUI()
+m1<-"m1.txt"
+jagsUI(model.file = "m1.txt",n.iter = 1000,parameters.to.save = params, data = lano_js, n.chains = 3,)
