@@ -17,8 +17,9 @@ library(jagsUI)
 
 js21<-read.csv('data_analysis/bat_pop_analysis/bat_js.csv')
 lano_js <-
-  read.csv('data_analysis/bat_pop_analysis/lano_js.csv')
+  read.csv('data_analysis/bat_pop_analysis/lano_js.csv') # checkar que esten en el mismo orden para todo slc and obscov por ejemplo sort colnames 
 
+# make sure that everything is on the same order for data frame meaning the sites 1:13
 
 #sites
 I<-length(unique(lano_js$site))
@@ -35,6 +36,10 @@ s.l.c<-s.l.c[-1] # remove site col
 
 obs.cov<- read.csv('data_analysis/bat_pop_analysis/obs.cov.csv')
 obs.cov<-obs.cov[-c(1,10)] # remove site col
+
+
+# remember to standardize the elevation and moon illumination. 
+
 
 
 
@@ -82,7 +87,7 @@ cat( "
                           int.lam + 
                  # fixed effects of sagebrush and cheatgrass Fixed for me are vegetation and the light treatment?????
     
-                        beta[1]*s.l.c[i,2] + ## this pred is treatment and we add ##elevation and later vegetation add each of the site level pred
+                        beta[1]*s.l.c[i,1]+ beta[2]*s.l.c[i,2] ## this pred is treatment and we add ##elevation and later vegetation add each of the site level pred
                        
     }
       #observation model
@@ -103,24 +108,24 @@ cat( "
                   
         #Model evaluation: We calculate Chi-squared discrepancy
         
-        #start with expected abundance
-        eval[i,j] <- p[i,j] * N[i]
-        #compare vs observed counts
-        E[i,j] <- pow( ( y_obs[i,j] - eval[i,j] ), 2 ) /
-                  ( eval[i,j] + 0.001 )
-        # Generate replicate data and compute fit stats
-        #expected counts
-        y_hat[ i, j ] ~ dbin( p[i,j], N[i] )
-        #compare vs expected counts
-        E.new[i,j] <- pow( ( y_hat[i,j] - eval[i,j] ), 2 ) /
-                  ( eval[i,j] + 0.001 )
+        # #start with expected abundance
+        # eval[i,j] <- p[i,j] * N[i]
+        # #compare vs observed counts
+        # E[i,j] <- pow( ( y_obs[i,j] - eval[i,j] ), 2 ) /
+        #           ( eval[i,j] + 0.001 )
+        # # Generate replicate data and compute fit stats
+        # #expected counts
+        # y_hat[ i, j ] ~ dbin( p[i,j], N[i] )
+        # #compare vs expected counts
+        # E.new[i,j] <- pow( ( y_hat[i,j] - eval[i,j] ), 2 ) /
+        #           ( eval[i,j] + 0.001 )
       
     } #close J
     } #close I
         
     #derived estimates of model fit
-    fit <- sum( E[,] )
-    fit.new <- sum( E.new[,] )
+#    fit <- sum( E[,] )
+#    fit.new <- sum( E.new[,] )
     
     } #model close
      
@@ -140,8 +145,8 @@ params <- c(  'int.det' #intercept for detection
               , 'p' #estimate of detection probability
               , 'y_hat' #predicted observations
               , 'N' #estimates of abundance
-              , 'fit' #estimate of fit for observed data
-              , 'fit.new' #estimate of fit for predicted data
+#              , 'fit' #estimate of fit for observed data
+#              , 'fit.new' #estimate of fit for predicted data
 )
 
 #initial values defined as max counts
