@@ -12,36 +12,49 @@
 library(tidyverse)
 library(jagsUI)
 
-# load data
+###### load data#########
 # this is the data from bat_pop_analysis script and was cleaned in the cleanup_script
 
-js21<-read.csv('data_analysis/bat_pop_analysis/bat_js.csv')
-lano_js <-
-  read.csv('data_analysis/bat_pop_analysis/lano_js.csv') # checkar que esten en el mismo orden para todo slc and obscov por ejemplo sort colnames 
-
+#js21<-read.csv('data_analysis/bat_pop_analysis/bat_js.csv')
+#lano_js <- read.csv('data_analysis/bat_pop_analysis/lano_js.csv') # checkar que esten en el mismo orden para todo slc and obscov por ejemplo sort colnames 
+lano_js <- read.csv('lano_js.csv')
 # make sure that everything is on the same order for data frame meaning the sites 1:13
 
-#sites
-I<-length(unique(lano_js$site))
-
-#visits
-J<-10 # the number of weeks 
-
-# what variables we scale?
-# site level covariates
-
-s.l.c<-read.csv('data_analysis/bat_pop_analysis/slc.csv') 
-s.l.c<-s.l.c[-1] # remove site col
+#s.l.c<-read.csv('data_analysis/bat_pop_analysis/slc.csv') 
+s.l.c<-read.csv('slc.csv') 
+#s.l.c<-s.l.c[-1] # remove site col
 # obs covariates
 
-obs.cov<- read.csv('data_analysis/bat_pop_analysis/obs.cov.csv')
-obs.cov<-obs.cov[-c(1,10)] # remove site col
+#obs.cov<- read.csv('data_analysis/bat_pop_analysis/obs.cov.csv')
+obs.cov<- read.csv('obs.cov.csv' )
+#obs.cov<-obs.cov[-c(1,10)] # remove site col
+#######
+### genetic functions#######
+#genetic function to standardise covariates using Gelman's suggestion:
+standardise <- function( xmat, stdevs = 2, marg = c( 1, 2, 3 ) ) { 
+  mean.xmat = mean( as.vector( xmat ), na.rm = TRUE )
+  sd.xmat = sd( as.vector( xmat ), na.rm = TRUE ) 
+  std.xmat = apply( xmat, marg, function( x ){
+    ( x - mean.xmat ) / (stdevs * sd.xmat ) } )
+  return( std.xmat )
+}
+######
+########prep data for analysis #########
+#genetic variables
+#sites
+I <- dim( lano_js)[1]
 
+#visits
+J <- dim(lano_js)[2] #10 # the number of weeks 
+
+#reorder response
+lano_js <- lano_js[,sort(colnames(lano_js))]
 
 # remember to standardize the elevation and moon illumination. 
+obs.cov.std <- standardise( as.matrix(obs.cov), marg = c(1,2))
 
-
-
+s.l.c.std <- s.l.c
+s.l.c.std[,"elevation"] <- scale( s.l.c.std[,"elevation"] )
 
 
 ############## Specify model in bugs language:  #####################
@@ -76,7 +89,9 @@ cat( "
       }
       
       #prior for abundance model intercept 
-      int.lam ~ dgamma( 0.01, 0.01 ) # this is a vague 
+      #int.lam ~ dgamma( 0.01, 0.01 ) # this is a vague 
+      int.lam ~ dnorm(  0, 0.01 ) 
+      
     # ecological model of abundance
     for( i in 1:I ){
       #relative abundance modelled as a Poisson distribution 
@@ -86,8 +101,8 @@ cat( "
       log( lambda[ i ] ) <- #intercept for abundance 
                           int.lam + 
                  # fixed effects of sagebrush and cheatgrass Fixed for me are vegetation and the light treatment?????
-    
-                        beta[1]*s.l.c[i,1]+ beta[2]*s.l.c[i,2] ## this pred is treatment and we add ##elevation and later vegetation add each of the site level pred
+                        beta[1] * s.l.c[i,1] + #elevation
+                        beta[2] * s.l.c[i,2] ## light
                        
     }
       #observation model
@@ -101,31 +116,31 @@ cat( "
     
                   #quadratic effect of time of day # I don't have a quadratic effect of time should we remove this too?????? I just modified it with my own 
     
-                  alpha * obs.cov[i,j] 
+                  alpha * obs.cov[i,j] #moon ilumination
     
         #observed counts distributed as a Binomial:
         y_obs[ i, j ] ~ dbin( p[i,j], N[i] )  # remember to change it when feeding the data so batjs= y_obs or visceversa. 
                   
         #Model evaluation: We calculate Chi-squared discrepancy
         
-        # #start with expected abundance
-        # eval[i,j] <- p[i,j] * N[i]
-        # #compare vs observed counts
-        # E[i,j] <- pow( ( y_obs[i,j] - eval[i,j] ), 2 ) /
-        #           ( eval[i,j] + 0.001 )
-        # # Generate replicate data and compute fit stats
-        # #expected counts
-        # y_hat[ i, j ] ~ dbin( p[i,j], N[i] )
-        # #compare vs expected counts
-        # E.new[i,j] <- pow( ( y_hat[i,j] - eval[i,j] ), 2 ) /
-        #           ( eval[i,j] + 0.001 )
+        #start with expected abundance
+        eval[i,j] <- p[i,j] * N[i]
+        #compare vs observed counts
+        E[i,j] <- pow( ( y_obs[i,j] - eval[i,j] ), 2 ) /
+                  ( eval[i,j] + 0.001 )
+        # Generate replicate data and compute fit stats
+        #expected counts
+        y_hat[ i, j ] ~ dbin( p[i,j], N[i] )
+        #compare vs expected counts
+        E.new[i,j] <- pow( ( y_hat[i,j] - eval[i,j] ), 2 ) /
+                  ( eval[i,j] + 0.001 )
       
     } #close J
     } #close I
         
     #derived estimates of model fit
-#    fit <- sum( E[,] )
-#    fit.new <- sum( E.new[,] )
+    fit <- sum( E[,] )
+    fit.new <- sum( E.new[,] )
     
     } #model close
      
@@ -145,8 +160,8 @@ params <- c(  'int.det' #intercept for detection
               , 'p' #estimate of detection probability
               , 'y_hat' #predicted observations
               , 'N' #estimates of abundance
-#              , 'fit' #estimate of fit for observed data
-#              , 'fit.new' #estimate of fit for predicted data
+              , 'fit' #estimate of fit for observed data
+              , 'fit.new' #estimate of fit for predicted data
 )
 
 #initial values defined as max counts
@@ -167,18 +182,18 @@ inits <- function(){ list( beta = rnorm( B ),
 #define data that will go in the model
 str( win.data <- list( y_obs = as.matrix( lano_js ), # modify to bat x one sp
                        #number of sites, surveys, det predictors, and abund preds
-                       I = I, J = J, A = A, B = B, #S = S, s=species later 
+                       I = I, J = J, B = B, # A = A,S = S, s=species later 
                        #site level habitat predictors
-                       s.l.c = s.l.c,
+                       s.l.c = s.l.c.std[,c("elevation","trmt_bin")],
                        #observation predictors:
-                       obs.cov = obs.cov
+                       obs.cov = obs.cov.std
 
 ) )
 
 #call JAGS and summarize posteriors:
 m1 <- autojags( win.data, inits = inits, params, modelname, #
                 n.chains = 5, n.thin = 10, n.burnin = 20000,
-                iter.increment = 10000, max.iter = 500000, 
+                iter.increment = 10000, max.iter = 100000, 
                 Rhat.limit = 1.05,
                 save.all.iter = FALSE, parallel = TRUE ) 
 
