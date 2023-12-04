@@ -2,7 +2,7 @@
 # Carlos Linares
 # 
 # Population modelling for 2021 data.
-# Script para hacer modelos de población con los datos de 2021.
+# Script para limpiar los datos y usarlos en modelos de población con los datos de 2021.
 
 # 
 # #

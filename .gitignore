@@ -3,4 +3,6 @@
 .RData
 .Ruserdata
 # Ignore the data base files as these are large files. 
-/data_analysis
+/data_for_analysis
+notes.docx
+bats_pioneer.Rproj
