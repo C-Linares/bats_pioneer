@@ -1,0 +1,75 @@
+---
+title: "Notes on project"
+output:
+  word_document: default
+  html_notebook: default
+editor_options:
+  chunk_output_type: inline
+---
+
+10/14/2023
+
+Agreagar lat and log to the bat2021_v2 database.
+
+Then, the predictors matrix for the population analysis section is calculated.
+
+------------------------------------------------------------------------
+
+10/15/2023
+
+I tried copying the lat and log but there seems to be a problem as points are not plotting correctly. There might be problems with the coordinates. Update: I tried again and the elevatr package loaded and worked. However, I didn't display any elevation.\
+I tried the package raster and plotted the DEM for Idaho and was able to obtain elevation for each site.
+
+\
+For the population analysis I want to include moon phase, moon illumination, elevation, riparian veg.
+
+The riparian vegetation I will calculate with the NDVI. Unfortunately, is not working as it is. I am using  a code that is in the cleanup script. ChatGPT helped me generate it, but still not working well.
+
+11/17/2023
+
+Per recommendation of Jen I created the matrix lano_js that should be use to run the model in the script pop_model. We will be using just a single species data set for testing right now. To the file lano_js we remove last week and the site column. We also made 0 data because we didn't wanted.
+
+I just noticed that when I write a file with the write.csv function there's a there's a new index column created that has a number for each row. How to prevent this?
+
+write.csv(iris, file = "iris.csv", row.names = FALSE)
+
+you have to set the row.names=false argument.
+
+11/20/2023\
+I ran the data work but got an error anyway.
+
+```{r}
+urn-in + Update 1 (30000)Error in checkForRemoteErrors(val) :
+
+  5 nodes produced errors; first error:
+
+Error parsing model file:
+
+syntax error on line 44 near "}"
+```
+
+I think there's something wrong with the model when we feed it to JAGS.
+
+we fixed this.
+
+11/29/2023
+
+I talked to Jen Cruz, and she mentioned I have to be careful with the things that I include in the GitHub. For example, I should not trace the R project where I am working. I should just use trace the changes in the scripts. According to her tracing the project could break cause trouble in the future.  
+
+------------------------------------------------------------------------
+
+12/4/2023
+
+-   I worked on the bat_pop_analysis.R script. I have organized the Lano, slc, and obs. cov, so they have no site column, and they are arranged in ascending order of week.
+
+-   I created this R mark notebook to take notes of the thing here instead of a Word document.
+
+-   Created obs.cov2 for moon. illumination
+
+------------------------------------------------------------------------
+
+12/05/2023
+
+-   started building the plotting code.
+
+-   

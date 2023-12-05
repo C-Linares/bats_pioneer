@@ -1,8 +1,11 @@
 
-# Carlos Linares
+# Script: bat_pot_analysis.R
+# The purpose of this script is to prepare the data for modeling. 
 # 
-# Population modelling for 2021 data.
-# Script para limpiar los datos y usarlos en modelos de población con los datos de 2021.
+# Carlos Linares 2023
+# 
+
+
 
 # 
 # #
@@ -15,17 +18,23 @@ library(lubridate)
 
 # Data load-------------####
 
-bat2021<-read.csv('data_analysis/bat2021_v2.csv',check.names = T) # we load the data we created in the clean up script. This data has several variables added to a clean up raw data is the product of clean_up script
+bat2021<-read.csv('data_for_analysis/bat2021_v2.csv',check.names = T) # we load the data we created in the clean up script. This data has several variables added to a clean up raw data is the product of clean_up script
+
 
 # make dates-------------
 bat2021$datetime <- ymd_hms(bat2021$datetime) # makes dates as dates
 bat2021$noche <-
-  ymd(bat2021$noche)# makes noche as date. noche is the date for all the calls that come from the same night instead of having half one day and the others the other day.
+  ymd(bat2021$noche)# makes noche as date. 
+
+#noche is the date for all the calls that come from the same sampling night.
+
 bat2021$jday <- yday(bat2021$noche)
 bat2021$wk <-
   week(bat2021$noche)# we need to calculate a week column.
 bat2021$yr <-
   year(bat2021$noche) #year added for when we will have multiple years.
+
+summary(bat2021)
 
 #sites
 unique(bat2021$site)# tell us what sites we have
@@ -36,19 +45,26 @@ bat1 <- bat2021 %>%
   group_by(site, treatmt) %>%
   count(SppAccp, jday, hr) %>%
   ungroup()
+summary(bat1)
+
+#we filter by just one sp.
 
 bat_js <- bat2021 %>%
   group_by(site, SppAccp) %>% # I don't include year because it is a single year
   count(wk) %>%
   pivot_wider(names_from = wk, values_from = n) %>%
   ungroup()
+summary(bat_js)
+
+bat_js<-bat_js[,sort(colnames(bat_js))] # sort the cols
+
+# bat_js[is.na(bat_js$"32"), ]  # this helps see where the NAs are coming from
 
 lano_js <- bat_js[bat_js$SppAccp == "Lano",] # filter data to just Lano.
-lano_js <-
-  lano_js[, c(-1, -2, -12)] # remove site, sp, last week because it has few data points.
+lano_js <-lano_js %>%  select(!c("34", "site", "SppAccp")) # remove site, sp, and the last week because it has  data for just one site.
 
-lano_js <- replace(lano_js, is.na(lano_js), 0) # remove site column
-
+lano_js <- replace(lano_js, is.na(lano_js), 0) # NAs to zeros 
+lano_js <- lano_js[,sort(colnames(lano_js))] # sort the cols
 
 # we filter by just one sp.
 # what species has the more calls. Lano 
@@ -58,51 +74,57 @@ ggplot(bat2021,aes(x=SppAccp, fill=treatmt))+
   
 
 
-
 #rename week columns as numbers just numbers 
 
-write.csv(bat_js,file = 'data_analysis/bat_pop_analysis/bat_js.csv',
+write.csv(bat_js,file = 'data_analysis/bat_prep_analysis/bat_js.csv',
           row.names = F) 
 
 #write single species df
 
-write.csv(lano_js,file = 'data_analysis/bat_pop_analysis/lano_js.csv', row.names = F) 
+write.csv(lano_js,file = 'data_for_analysis/bat_prep_analysis/lano_js.csv', row.names = F) 
 
 
-# site level cov -------------
+# site level cov. -------------
+# pending veg, temp and rain.
 
 s.l.c <- bat2021 %>% dplyr::distinct(site,elevation,trmt_bin)
 s.l.c<-s.l.c[,-1] # remove sites column
 
-write.csv(s.l.c,file = 'data_analysis/bat_pop_analysis/slc.csv',
+write.csv(s.l.c,file = 'data_analysis/bat_prep_analysis/slc.csv',
           row.names = F) 
 
 # obs cov ----------------
 
-# moon phase not changes by site so we just need one by site. 
+
+moon_pred <-
+  read.csv('data_for_analysis/moon_pred.csv') #loads the data from the moon_pred script
+
+moon_pred <- moon_pred %>%  select(!c("X.1", "X"))# removes random row col names added when writing the file.
 
 
-
-moon_pred<-read.csv('data_analysis/moon_pred.csv') #loads the data from the moon_pred script
-
-obs.cov<- moon_pred %>%  # now there's NA's that I am not sure where they come from
+obs.cov<- moon_pred %>%  # now there's NA's that we might need to double check.
   select(site,phase,wk, l.illum, fraction) %>% 
   group_by(site, wk) %>% 
   summarize(av_phase= mean(phase)) %>% 
   pivot_wider(names_from = wk, values_from = av_phase)
 
-obs.cov <- replace(obs.cov, is.na(obs.cov), 0)
+obs.cov <- replace(obs.cov, is.na(obs.cov), 0) # replace NAs with 0
 
-obs.cov<- obs.cov[,-c(1,11)] # remove site and last col to be equa to the lano_js
+obs.cov<- obs.cov %>%  select(!c("site", "34")) # remove site and last week like lano_js
 
-obs.cov2<-moon_pred %>% select(site, phase, wk, l.illum) %>% 
-  group_by(site,wk) %>% 
-  summarise(av_m.ill=mean(l.illum)) %>% 
-  pivot_wider(names_from = wk, values_from = av_m.ill)
+obs.cov2 <- moon_pred %>% select(site, phase, wk, l.illum) %>% # making another obs.cov with illumination
+  group_by(site, wk) %>%
+  summarise(av_m.ill = mean(l.illum)) %>%
+  pivot_wider(names_from = wk, values_from = av_m.ill) %>% 
+ungroup()
 
-
-write.csv(obs.cov,file = 'data_analysis/bat_pop_analysis/obs.cov.csv',
+obs.cov2<- replace(obs.cov2, is.na(obs.cov2),0)
+obs.cov<- obs.cov2 %>% select(!c("site","34")) # removes site and week 34 columns
+         
+write.csv(obs.cov,file = 'data_for_analysis/bat_pop_analysis/obs.cov.csv',
           row.names = F) 
+write.csv(obs.cov2,file = 'data_for_analysis/bat_pop_analysis/obs.cov2.csv',
+          row.names = F)
 
 
 

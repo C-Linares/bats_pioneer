@@ -60,7 +60,7 @@ moon_pred$wk<-week(moon_pred$noche)
 
 
 
-# write.csv(moon_pred,file = 'data_analysis/moon_pred.csv') # ran once in case of needing to rewrite the data
+write.csv(moon_pred,file = 'data_analysis/moon_pred.csv', row.names = F) # ran once in case of needing to rewrite the data
 
 
 

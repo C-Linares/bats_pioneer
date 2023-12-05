@@ -2,7 +2,7 @@
 
 ##     created by Carlos Linares            ##
 ##     
-##     Purpose: Replicate analysis from the 
+##     Purpose: Replicate analysis from Dr.Jen Cruz from the repositories
 ##     https://github.com/quantitativeconservationlab/AppPopnEco/blob/master/CountBayesAnalysis.R
 ##     
 ##     and https://github.com/quantitativeconservationlab/AppPopnEco/blob/master/CountBayesPlotting.R
@@ -16,18 +16,23 @@ library(jagsUI)
 # this is the data from bat_pop_analysis script and was cleaned in the cleanup_script
 
 #js21<-read.csv('data_analysis/bat_pop_analysis/bat_js.csv')
-#lano_js <- read.csv('data_analysis/bat_pop_analysis/lano_js.csv') # checkar que esten en el mismo orden para todo slc and obscov por ejemplo sort colnames 
-lano_js <- read.csv('lano_js.csv')
+lano_js <- read.csv('data_for_analysis/bat_pop_analysis/lano_js.csv') # checkar que esten en el mismo orden para todo slc and obscov por ejemplo sort colnames 
+#
+
+# lano_js <- read.csv('lano_js.csv')
 # make sure that everything is on the same order for data frame meaning the sites 1:13
 
-#s.l.c<-read.csv('data_analysis/bat_pop_analysis/slc.csv') 
-s.l.c<-read.csv('slc.csv') 
+s.l.c<-read.csv('data_for_analysis/bat_pop_analysis/slc.csv') 
+# s.l.c<-read.csv('slc.csv') 
 #s.l.c<-s.l.c[-1] # remove site col
 # obs covariates
 
-#obs.cov<- read.csv('data_analysis/bat_pop_analysis/obs.cov.csv')
-obs.cov<- read.csv('obs.cov.csv' )
+obs.cov<- read.csv('data_for_analysis/bat_pop_analysis/obs.cov.csv')
+# obs.cov<- read.csv('obs.cov.csv' )
 #obs.cov<-obs.cov[-c(1,10)] # remove site col
+
+
+
 #######
 ### genetic functions#######
 #genetic function to standardise covariates using Gelman's suggestion:
@@ -48,7 +53,7 @@ I <- dim( lano_js)[1]
 J <- dim(lano_js)[2] #10 # the number of weeks 
 
 #reorder response
-lano_js <- lano_js[,sort(colnames(lano_js))]
+# lano_js <- lano_js[,sort(colnames(lano_js))] I did in the bat_prep_analysis.R
 
 # remember to standardize the elevation and moon illumination. 
 obs.cov.std <- standardise( as.matrix(obs.cov), marg = c(1,2))
@@ -210,10 +215,3 @@ plot( m1$sims.list$fit, m1$sims.list$fit.new )
 ###### 
 ###### 
 
-
-# trying JagsUI to check the syntax of the model.
-
-library(jagsUI)
-jagsUI()
-m1<-"m1.txt"
-jagsUI(model.file = "m1.txt",n.iter = 1000,parameters.to.save = params, data = lano_js, n.chains = 3,)

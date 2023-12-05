@@ -1,9 +1,9 @@
 
-# this script is for cleaning the data bases for the bat data in 2019 and 2021
+# This script is for cleaning the data bases for the bat acoustic data Years processed: 2019(not pioneer data), 2021, 2022(pending),2023(pending) 
 
 # aims:
  
-# clean unecessary variables. 
+# Compile all the output files and contruct a single data base. 
 
 # create a table with the meaning of each of the columns outputed from SonoBat
 
