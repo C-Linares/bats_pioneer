@@ -70,6 +70,17 @@ I talked to Jen Cruz, and she mentioned I have to be careful with the things tha
 
 12/05/2023
 
--   started building the plotting code.
+-   started building the plotting code. got a margina plot for elevation but not for light or dark.
 
--   
+-   need to calculate weather variables.
+
+-   need to calculate NDVI
+
+- I meet with Jen she mentioned that the models did not converged so I increase the max number of iterations to one million. 
+the results still not converged...
+
+-----------------------------------------------------------------------------
+
+12/06/2023
+
+- I need to run the 

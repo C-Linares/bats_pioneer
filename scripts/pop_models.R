@@ -85,7 +85,7 @@ cat( "
        #priors for detection coefficients:
       #define as a slightly informative prior
       #for( a in 1:A){
-        alpha ~ dnorm( 0, 0.2 ) T(-7, 7 ) # when we add more obs cov we need to modify and remember to keep one dataframe per covariate
+        alpha ~ dnorm( 0, 0.2 ) T(-7, 7 ) # when we add more obs cov we need to modify and remember to keep one dataframe per covariate index alpha[a]
       #}
       #priors for abundance coefficients:
       for( b in 1:B ){
@@ -94,7 +94,7 @@ cat( "
       }
       
       #prior for abundance model intercept 
-      #int.lam ~ dgamma( 0.01, 0.01 ) # this is a vague 
+      #int.lam ~ dgamma( 0.01, 0.01 ) # this is a vague prior 
       int.lam ~ dnorm(  0, 0.01 ) 
       
     # ecological model of abundance
@@ -116,13 +116,14 @@ cat( "
         #model for probability of detection
         logit( p[i,j] ) <- #intercept for detection 
                           int.det + 
-                  #random intercept for observer effect
+                  #random intercept for site effect
                   eps.det[ i ] + # this makes them random effects.  
     
                   #quadratic effect of time of day # I don't have a quadratic effect of time should we remove this too?????? I just modified it with my own 
     
                   alpha * obs.cov[i,j] #moon ilumination
-    
+                     # alpha[1] * obs.cov[i,j] + alpha[2]*obs.cov2[i,j]#moon ilumination
+
         #observed counts distributed as a Binomial:
         y_obs[ i, j ] ~ dbin( p[i,j], N[i] )  # remember to change it when feeding the data so batjs= y_obs or visceversa. 
                   
@@ -196,11 +197,22 @@ str( win.data <- list( y_obs = as.matrix( lano_js ), # modify to bat x one sp
 ) )
 
 #call JAGS and summarize posteriors:
-m1 <- autojags( win.data, inits = inits, params, modelname, #
+m1 <- autojags( win.data, inits = inits, params, modelname, 
                 n.chains = 5, n.thin = 10, n.burnin = 20000,
-                iter.increment = 10000, max.iter = 100000, 
+                iter.increment = 10000, max.iter = 1000000,  
                 Rhat.limit = 1.05,
                 save.all.iter = FALSE, parallel = TRUE ) 
+
+
+m1 <- autojags( win.data, inits = inits, params, modelname, 
+                n.chains = 5, n.thin = 10, n.burnin = 100000,# increased the burn in
+                iter.increment = 10000, max.iter = 1000000,  
+                Rhat.limit = 1.05,
+                save.all.iter = FALSE, parallel = TRUE ) 
+
+update(m1, parameters.to.save=NULL, n.adapt=NULL, # left the burn in and then change to 2 iterations. 
+       4000000, n.thin=NULL, modules=NULL, factories=NULL, DIC=NULL, 
+       codaOnly=FALSE, verbose=TRUE) 
 
 #view results 
 summary(m1)
@@ -215,3 +227,15 @@ plot( m1$sims.list$fit, m1$sims.list$fit.new )
 ###### 
 ###### 
 
+
+#------------------------ppcheck-------------------
+#
+
+pp.check(m1, observed = 'fit',simulated = 'fit.new')
+
+#-------------------rhat--------------------------
+
+library(coda)
+mcmc_samples <- coda.samples(m1, variable.names = params)
+rhats <- gelman.diag(mcmc_samples)
+print(rhats)

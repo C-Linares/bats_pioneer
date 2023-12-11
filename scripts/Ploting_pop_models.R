@@ -114,7 +114,7 @@ ggplot( alpha.df, aes( y = Value, x = Predictor, fill = Predictor ) ) +
   #set plotting theme 
   theme_classic( base_size = 17 ) + 
   #add label for y axis
-  ylab( 'Standardized effect size' ) +
+  ylab( 'Standardized effect size' ) + # add xlab 
   #plot distribution
   geom_violin( trim = FALSE, fill = '#A4A4A4', 
                size = 0.5 ) +
@@ -130,20 +130,20 @@ ggplot( alpha.df, aes( y = Value, x = Predictor, fill = Predictor ) ) +
 # For abundance submodel first:####
 # Start by creating our datasets to predict over
 # how many values do we use:
-n <- 100
+n <- 100# just for the line to be smoth
 #define a vector of ones for intercept
 int <- rep( 1, n )
 # Use the observed values to define range of predictor: # what is this for me?
 elevation <- seq( min( s.l.c[,"elevation"]),max(  s.l.c[,"elevation"]),
                   length.out = n )
 #standardize predictors:
-elevation.std <- scale( elevation ) # I already standardized the data is this correct?????
+elevation.std <- scale( elevation ) # we should use the  standardize we use when modeling 
 
-#extract relevant fixed coefficient from abundance submodel results
+#extract relevant fixed coefficient from abundance sub-model results
 fixedabund <- cbind( mr$sims.list$int.lam, mr$sims.list$beta[,2] ) 
 
 #estimate predicted abundance 
-predabund <- exp( fixedabund %*% t( cbind( int, elevation.std ) ))# I don't have 
+predabund <- exp( fixedabund %*% t( cbind( int, elevation.std ) ))
 #calculate mean abundance
 mabund <- apply( predabund, MARGIN = 2, FUN = mean )
 #calculate 95% Credible intervals for abundance
@@ -162,9 +162,13 @@ colnames(abunddf )[1:3] <- c(  "Mean", "lowCI", "highCI" )
 ggplot( abunddf, aes( x = elevation, y = Mean) ) +
   theme_classic( base_size = 17) +
   ylab( "Relative abundance" ) +
-  xlab( "Sagebrush (%)" ) +
+  xlab( "elevation" ) +
   geom_line( size = 1.5) +
   geom_ribbon( alpha = 0.3, aes( ymin = lowCI, ymax = highCI ) )
+
+
+
+# how to make it for the light variable. 
 
 
 ##### detection marginal effects ######
@@ -172,6 +176,13 @@ ggplot( abunddf, aes( x = elevation, y = Mean) ) +
 # what are the min max times:
 lano_js %>% select( X25 ,X26, X27,X28, X29, X30, X31, X32, X33 ) %>% #a time for each week?
   summarise_all(list(min, max))
+
+min(obs.cov)
+max(obs.cov)
+
+# just do it the same way you did for elevation.
+
+
 #use them to define your bounds:
 Time <- round(seq( 0, 360, length.out = n ),0) ## what should be my bounds?
 time.std <- scale( Time )
