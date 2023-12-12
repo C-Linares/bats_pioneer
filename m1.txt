@@ -19,7 +19,7 @@
        #priors for detection coefficients:
       #define as a slightly informative prior
       #for( a in 1:A){
-        alpha ~ dnorm( 0, 0.2 ) T(-7, 7 ) # when we add more obs cov we need to modify and remember to keep one dataframe per covariate
+        alpha ~ dnorm( 0, 0.2 ) T(-7, 7 ) # when we add more obs cov we need to modify and remember to keep one dataframe per covariate index alpha[a]
       #}
       #priors for abundance coefficients:
       for( b in 1:B ){
@@ -28,7 +28,7 @@
       }
       
       #prior for abundance model intercept 
-      #int.lam ~ dgamma( 0.01, 0.01 ) # this is a vague 
+      #int.lam ~ dgamma( 0.01, 0.01 ) # this is a vague prior 
       int.lam ~ dnorm(  0, 0.01 ) 
       
     # ecological model of abundance
@@ -50,13 +50,14 @@
         #model for probability of detection
         logit( p[i,j] ) <- #intercept for detection 
                           int.det + 
-                  #random intercept for observer effect
+                  #random intercept for site effect
                   eps.det[ i ] + # this makes them random effects.  
     
                   #quadratic effect of time of day # I don't have a quadratic effect of time should we remove this too?????? I just modified it with my own 
     
                   alpha * obs.cov[i,j] #moon ilumination
-    
+                     # alpha[1] * obs.cov[i,j] + alpha[2]*obs.cov2[i,j]#moon ilumination
+
         #observed counts distributed as a Binomial:
         y_obs[ i, j ] ~ dbin( p[i,j], N[i] )  # remember to change it when feeding the data so batjs= y_obs or visceversa. 
                   

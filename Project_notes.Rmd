@@ -76,11 +76,17 @@ I talked to Jen Cruz, and she mentioned I have to be careful with the things tha
 
 -   need to calculate NDVI
 
-- I meet with Jen she mentioned that the models did not converged so I increase the max number of iterations to one million. 
-the results still not converged...
+-   I meet with Jen she mentioned that the models did not converged so I increase the max number of iterations to one million. the results still not converged...
 
------------------------------------------------------------------------------
+------------------------------------------------------------------------
 
 12/06/2023
 
-- I need to run the 
+-   I need to build the weather data base to run the pop models.
+-   Problems with the model :\
+    ![m1 diag plot](figures/m1_diag_plot.png){width="848"}
+
+-There are several peaks for density plot. This means there's problems with identifiability because there are multiple plots in the posterior?\
+-the chains are not in the same space. This means they are getting stuck in the same spot right?
+
+When I increased to two million the Rhat values decreased? does this mean we are approaching convergence?
