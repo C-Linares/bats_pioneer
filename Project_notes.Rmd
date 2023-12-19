@@ -90,3 +90,13 @@ I talked to Jen Cruz, and she mentioned I have to be careful with the things tha
 -the chains are not in the same space. This means they are getting stuck in the same spot right?
 
 When I increased to two million the Rhat values decreased? does this mean we are approaching convergence?
+
+------------------------------------------------------------------------
+
+12/19/2023
+
+meeting with Jen:
+
+-   The model is still not converging. We change the random intercept for abundance from site to week. It seems there is great variability in bat activity between weeks (see lano_js.csv). One solution might be to select certain weeks to be the ones that we analyze. Another solution is to add an extra level to the model to account for availability.
+
+-   

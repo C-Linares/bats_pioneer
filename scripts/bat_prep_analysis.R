@@ -26,7 +26,7 @@ bat2021$datetime <- ymd_hms(bat2021$datetime) # makes dates as dates
 bat2021$noche <-
   ymd(bat2021$noche)# makes noche as date. 
 
-#noche is the date for all the calls that come from the same sampling night.
+# noche is the date for all the calls that come from the same sampling night.
 
 bat2021$jday <- yday(bat2021$noche)
 bat2021$wk <-
@@ -34,7 +34,7 @@ bat2021$wk <-
 bat2021$yr <-
   year(bat2021$noche) #year added for when we will have multiple years.
 
-summary(bat2021)
+summary(bat2021) # there are no NAs in this database
 
 #sites
 unique(bat2021$site)# tell us what sites we have
@@ -49,16 +49,16 @@ summary(bat1)
 
 #we filter by just one sp.
 
+
 bat_js <- bat2021 %>%
   group_by(site, SppAccp) %>% # I don't include year because it is a single year
-  count(wk) %>%
+  count(wk, .drop = FALSE) %>%  #  we might have to include the arument .drop=false to count the NAs and the zeros
   pivot_wider(names_from = wk, values_from = n) %>%
   ungroup()
 summary(bat_js)
 
 bat_js<-bat_js[,sort(colnames(bat_js))] # sort the cols
-
-# bat_js[is.na(bat_js$"32"), ]  # this helps see where the NAs are coming from
+bat_js<-replace(bat_js, is.na(bat_js),0)
 
 lano_js <- bat_js[bat_js$SppAccp == "Lano",] # filter data to just Lano.
 lano_js <-lano_js %>%  select(!c("34", "site", "SppAccp")) # remove site, sp, and the last week because it has  data for just one site.

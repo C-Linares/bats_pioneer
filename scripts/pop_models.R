@@ -73,9 +73,9 @@ cat( "
       int.det <- log( mean.det / ( 1 - mean.det ) )
       mean.det ~ dbeta( 4, 4 )
       
-     #random intercept for site
-      for( i in 1:I ){
-        eps.det[i] ~ dnorm( 0, pres.det ) T(-7, 7)
+     #random intercept for week
+      for( j in 1:J ){
+        eps.det[j] ~ dnorm( 0, pres.det ) T(-7, 7)
       }
       #associated variance of random intercepts:     
       pres.det <- 1/ ( sigma.det * sigma.det )
@@ -116,8 +116,8 @@ cat( "
         #model for probability of detection
         logit( p[i,j] ) <- #intercept for detection 
                           int.det + 
-                  #random intercept for site effect
-                  eps.det[ i ] + # this makes them random effects.  
+                  #random intercept for site effect update: make it by week 
+                  eps.det[ j ] + # this makes them random effects.  
     
                   #quadratic effect of time of day # I don't have a quadratic effect of time should we remove this too?????? I just modified it with my own 
     
@@ -197,7 +197,7 @@ str( win.data <- list( y_obs = as.matrix( lano_js ), # modify to bat x one sp
 ) )
 
 #call JAGS and summarize posteriors:
-m1 <- autojags( win.data, inits = inits, params, modelname, 
+m1 <- autojags( win.data, inits = inits, params, modelname,  # run v1 and should be ok 12/19/2023
                 n.chains = 5, n.thin = 10, n.burnin = 20000,
                 iter.increment = 10000, max.iter = 1000000,  
                 Rhat.limit = 1.05,

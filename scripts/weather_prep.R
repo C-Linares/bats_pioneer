@@ -7,7 +7,7 @@
 # 
 
 #------------  load library 
-#
+
 library(tidyverse)
 library(magrittr)
 library(data.table)
@@ -38,9 +38,9 @@ wetdb <- wetdb %>% select(-"Millimeters")# remove empty colum
 
 # -- calculate the mean temp and rain -----
 
-wtemp <- wetdb %>%
+mtempwind<- wetdb %>%
   group_by(wk) %>%
-  summarize(mean_tem = mean(Celsius), mean_wind = mean(m.s))# there are NA's I don't know from where.
+  summarize(mean_tem = mean(Celsius, na.rm = T), mean_wind = mean(m.s, na.rm = T))# there are NA's I don't know from where. I know now that we need to include the na.rm=T argument so there are no 
 
 # Filter and save rows with NAs
 na_rows <- wetdb[!complete.cases(wetdb), ]
