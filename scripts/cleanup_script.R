@@ -35,7 +35,7 @@ colSums(is.na(bat2019_raw))
 
 keep<- c("Path","Filename","HiF","LoF", "SppAccp", "Prob", "calls.sec", "X1st")
 
-bat2019_v1 <- bat2019_raw %>% select(all_of(keep)) # removes uncecessary columns 
+bat2019_v1 <- bat2019_raw %>% select(all_of(keep)) # removes unnecessary columns 
 
 bat2019_v1[bat2019_v1==""]<- NA # makes the empty spaces NAs
 
@@ -316,3 +316,25 @@ dvi_stats <- lapply(ndvi_values, function(x) {
     return(NA)
   }
 })
+
+
+
+
+
+#---- comparing the 2021 data produce with the v3 and v4 of the 
+#
+#Issue: it seems like the origina data base has more data than the new one. I am not getting all the sonobat files 
+
+
+a<-fread('data_for_analysis/bats2021_update.csv',drop = "V1")
+b<-fread('data_for_analysis/data2021_db_only/bats2021.csv')
+
+setkey(a,"Path")
+setkey(b,"Path")
+
+# Find rows present in only one of the data frames
+diff_rows <- a[!b]
+diff_rows <- rbind(diff_rows, b[!a], fill=T)  # Combine differences from both sides
+
+library(DT)
+datatable(diff_rows)
