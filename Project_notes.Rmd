@@ -105,4 +105,12 @@ meeting with Jen:
 
 -   I ran into a problem with the data from 2021 for bats. The raw data produced with the script build data base v3 and v4. Currently the 2021 data has only 13 sites. It should be 14 because one site is missing entirely from the data base. I intended to update the data base with new code to get all the data points. Unfortunately it seems I am not collecting all the output files from Sonobat (Data_CumulativeSonoBatch_v420). I am in the process of compiling them but making a list of all the txt files using the function list.files() take a long time. So I am using the function dir_ls() from the fs package.
 
--   
+------------------------------------------------------------------------
+
+01/23/2023
+
+In the code build_data_base_v4 I was able to see what what happening with the bat 2021 data.
+  - some files have not been analyzed with sonobat and are missing from the database
+  - once all the .txt files in the 2021 folder are compiled, there are two ways of getting the data out.   
+    - sonofiles1<- sm3dirs[grepl("_CumulativeSonoBatch_v420.txt", sm3dirs)]
+    - sonofiles2<- sm3dirs[grepl("SonoBatch_v420.txt", sm3dirs)] # this one doubles the data as it also get all the cumulativesonobatch files. I will be using the first one.
