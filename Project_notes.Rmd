@@ -109,8 +109,19 @@ meeting with Jen:
 
 01/23/2023
 
-In the code build_data_base_v4 I was able to see what what happening with the bat 2021 data.
-  - some files have not been analyzed with sonobat and are missing from the database
-  - once all the .txt files in the 2021 folder are compiled, there are two ways of getting the data out.   
-    - sonofiles1<- sm3dirs[grepl("_CumulativeSonoBatch_v420.txt", sm3dirs)]
-    - sonofiles2<- sm3dirs[grepl("SonoBatch_v420.txt", sm3dirs)] # this one doubles the data as it also get all the cumulativesonobatch files. I will be using the first one.
+In the code build_data_base_v4 I was able to see what what happening with the bat 2021 data. - some files have not been analyzed with sonobat and are missing from the database - once all the .txt files in the 2021 folder are compiled, there are two ways of getting the data out.\
+- sonofiles1\<- sm3dirs[grepl("\_CumulativeSonoBatch_v420.txt", sm3dirs)] - sonofiles2\<- sm3dirs[grepl("SonoBatch_v420.txt", sm3dirs)] \# this one doubles the data as it also get all the cumulativesonobatch files. I will be using the first one.
+
+-   Also, we need to start using the column marked as 1st for species present in the recordings. This provides us with more data to work with compared to just the SpAccp column.
+
+------------------------------------------------------------------------
+
+1/25/2024
+
+I am still running Sonobat on some 2021 data and it needs to be run in all 2023 part b data.
+
+I will start building the 2022 data base for bats.
+
+-   I need to check what days were for each site. I need to check what dates where sampled for insects with bucket traps.
+
+-   I need to check the variation of bat calls per species by week

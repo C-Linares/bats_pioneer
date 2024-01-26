@@ -323,7 +323,7 @@ dvi_stats <- lapply(ndvi_values, function(x) {
 
 #---- comparing the 2021 data produce with the v3 and v4 of the 
 #
-#Issue: it seems like the origina data base has more data than the new one. I am not getting all the sonobat files 
+#Issue: it seems like the original data base has more data than the new one. I am not getting all the sonobat files 
 
 
 a<-fread('data_for_analysis/bats2021_update.csv',drop = "V1")
@@ -338,3 +338,47 @@ diff_rows <- rbind(diff_rows, b[!a], fill=T)  # Combine differences from both si
 
 library(DT)
 datatable(diff_rows)
+
+
+
+#  2022 sonobat data  -----------------------------------------------------
+
+# load data.
+
+bat2022_raw<-read.csv('data_for_analysis/data2022_db_only/bats2022.csv')
+ 
+keep<- c("Path","Filename","HiF","LoF", "SppAccp", "Prob", "calls.sec", "X1st", "X2nd")# cols to keep
+
+bat2022_v1 <- bat2022_raw %>% select(all_of(keep)) # removes unnecessary columns 
+
+colSums(is.na(bat2022_raw))# the raw file apparently has no NA's
+
+bat2022_v1[bat2022_v1==""]<- NA # makes the empty spaces NA's
+
+bat2022_v2 <- bat2022_v1 %>%  filter(!is.na(X1st )) # removes NAs
+
+
+# time extraction ---------------------------------------------------------
+
+# Function to extract date-time information
+extract_date_time <- function(file_path) {
+  date_time <- gsub(".*__(\\d{8}_\\d{6})\\.wav", "\\1", file_path)
+  date_time_dt <- ymd_hms(date_time)
+  return(date_time_dt)
+}
+
+fecha_tiemp <- gsub(".*__(\\d{8}_\\d{6})\\.wav", "\\1", bat2022_v2$Path)
+
+# Apply the function to the entire data frame
+bat2022_v2$date_time <- sapply(bat2022_v2$Path, extract_date_time)
+
+
+
+bat2022_v2 <- bat2022_v2 %>%
+  mutate(
+    time_column = as.POSIXct(sub(".+_(\\d{2})(\\d{2})(\\d{2})\\.wav", "\\1:\\2:\\3", filepath), format = "%H:%M:%S")
+  )
+
+bat2022_v2$Path[1]
+bat2022_v2$Filename[1]
+
