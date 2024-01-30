@@ -341,7 +341,7 @@ datatable(diff_rows)
 
 
 
-#  2022 sonobat data  -----------------------------------------------------
+#  2022 Sonobat data  -----------------------------------------------------
 
 # load data.
 
@@ -358,27 +358,29 @@ bat2022_v1[bat2022_v1==""]<- NA # makes the empty spaces NA's
 bat2022_v2 <- bat2022_v1 %>%  filter(!is.na(X1st )) # removes NAs
 
 
+# sites 2022 -------------------------------------------------------------------
+
+sites<-str_extract(bat2022_raw$Filename, "^[A-Za-z]{3,4}\\d{2}")
+
+
 # time extraction ---------------------------------------------------------
-
-# Function to extract date-time information
-extract_date_time <- function(file_path) {
-  date_time <- gsub(".*__(\\d{8}_\\d{6})\\.wav", "\\1", file_path)
-  date_time_dt <- ymd_hms(date_time)
-  return(date_time_dt)
-}
-
-fecha_tiemp <- gsub(".*__(\\d{8}_\\d{6})\\.wav", "\\1", bat2022_v2$Path)
-
-# Apply the function to the entire data frame
-bat2022_v2$date_time <- sapply(bat2022_v2$Path, extract_date_time)
-
 
 
 bat2022_v2 <- bat2022_v2 %>%
-  mutate(
-    time_column = as.POSIXct(sub(".+_(\\d{2})(\\d{2})(\\d{2})\\.wav", "\\1:\\2:\\3", filepath), format = "%H:%M:%S")
-  )
+  mutate(date_time = ymd_hms(str_extract(Filename, "\\d{8}_\\d{6}"), tz = "America/Denver"))
 
-bat2022_v2$Path[1]
-bat2022_v2$Filename[1]
+# bat2022_v2$t <- str_extract(string = bat2022_v2$Filename,pattern = "\\d{8}_\\d{6}") # gets the date and time string
+# bat2022_v2$date_time<- ymd_hms(bat2022_v2$t,tz ="America/Denver") # creates a data time
 
+bat2022_v2<-bat2022_v2[,-10] # remove the t col 
+
+# make hour 
+
+bat2022_v2$hr<-hour(bat2022_v2$date_time)
+
+# create a data for the night. 
+
+bat2022_v2$noche <-
+  if_else(bat2022_v2$hr < 9, # if it is less than 9 put the date of the previous day
+          true =  (date(bat2022_v2$date_time) - ddays(1)),
+          false = date(bat2022_v2$date_time))

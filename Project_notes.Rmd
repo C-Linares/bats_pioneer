@@ -120,8 +120,18 @@ In the code build_data_base_v4 I was able to see what what happening with the ba
 
 I am still running Sonobat on some 2021 data and it needs to be run in all 2023 part b data.
 
-I will start building the 2022 data base for bats.
+I will start building the 2022 database for bats.
 
 -   I need to check what days were for each site. I need to check what dates where sampled for insects with bucket traps.
 
 -   I need to check the variation of bat calls per species by week
+
+------------------------------------------------------------------------
+
+1/29/2023
+
+-   I created bat2022_v2. It has the species and the dates. we need to calculate the moon.
+
+-   I also realized that I should calculate the date for the raw data. That way, I could know how many hours each recording was working.
+
+-   **IMPORTANT**: the batraw2022 database has data for iron 1 to 6. We need to fix this one too.
