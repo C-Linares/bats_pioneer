@@ -56,27 +56,16 @@ bat2021_v2 <- bat2021_v2 %>%
   mutate(date_time = ymd_hms(str_extract(Filename, "\\d{8}_\\d{6}"), tz = "America/Denver"))
 
 bat2021_v2$hrs<- hour(bat2021_v2$date_time)
-#We want to extract the data and time from the Filename and Path columns. There must be a more efficient way fo doing this but I don't know how to. 
 
-bat2021_v2$Filename<- as.character(bat2021_v2$Filename) # we make them character. 
-bat2021_v2$Path<- as.character(bat2021_v2$Path)         # we make them character.
+#We want to extract the data and time from the Filename and Path columns. There must be a more efficient way fo doing this but I don't know how to. 
 
 bat2019_v2$Filename<-as.character(bat2019_v2$Filename)
 bat2019_v2$Path<- as.character(bat2019_v2$Path)
 
-bat2021_v2$date <-
-  unlist(lapply(strsplit(bat2021_v2$Filename, "_"), function(x)
-    # this splits the string by _ and give us the date[5]
-    x[5]))
 
 bat2019_v2$date<-
   unlist(lapply(strsplit(bat2019_v2$Filename, "_"), function(x)
     x[5]))
-
-bat2021_v2$hms_sp <-
-  unlist(lapply(strsplit(bat2021_v2$Filename, "_"), function(x)   # not necessary any more. 
-    # this splits the string by _ and give us the time-species[6]
-    x[6]))
 
 bat2019_v2$hms_sp<-
   unlist(lapply(strsplit(bat2019_v2$Filename, "_"), function(x)
@@ -84,21 +73,12 @@ bat2019_v2$hms_sp<-
     x[6]))
 
 
-bat2021_v2$hms <-
-  unlist(lapply(strsplit(bat2021_v2$hms_sp, "-"), function(x) # possibly not needed any more. 
-    # this splits the string by _ and give us the time[6]
-    x[1]))
-
 bat2019_v2$hms<-
   unlist(lapply(strsplit(bat2019_v2$hms_sp,"\\."), function(x)
     x[1]))
 
-# bat2021_v2$hms2 <-
-#   unlist(lapply(strsplit(bat2021_v2$hms, "1"), function(x)
-#     # this splits the string by _ and give us the time[6]
-#     x[1]))
-
 # site 2021 ---------------------------------------------------------------
+
 bat2021_v2$site<-str_extract(bat2021_v2$Filename, "^[A-Za-z]{3,4}\\d{2}")
 
 # site_info <- regmatches(bat2021_v2$Filename, regexpr("[A-Za-z]\\d{2}", bat2021_v2$Filename)) an other way to do it
@@ -125,7 +105,8 @@ unique(bat2021_v2$site) # we are missing viz03 and long02
 
 
 
-#checking Nas
+# checking NAs 2021 2029 --------------------------------------------------
+
 na_rows <- bat2021_v2[is.na(bat2021_v2$hrs) | is.na(bat2021_v2$X1st), ] # shows the NA rows
 
 nas2019<- bat2019_v2$hms[!complete.cases(bat2019_v2)] # other way of doing the same for the above file. 
@@ -135,40 +116,14 @@ nas2019<- bat2019_v2$hms[!complete.cases(bat2019_v2)] # other way of doing the s
 bat2021_v2<-bat2021_v2 %>% select(-Path, -Filename, -hms_sp)
 bat2019_v2<- bat2019_v2 %>% select(-Path, -Filename, -hms_sp)
 
-# we need a column that assigns the the data of of the night. For example if we have 6pm-4am recording then the night should be the date of the start of the recording. 
 
-# First date as date with lubridate 
-
-bat2021_v2$date<-ymd(bat2021_v2$date)
-
-bat2019_v2$date<-ymd(bat2019_v2$date)
-
-# hms as numeric or actual hour? I am struggling with what is the best way. It seems like I need to create a new variable that is date and time together in a single column. 
-
-bat2021_v2$datetime<- paste(bat2021_v2$date, bat2021_v2$hms) %>% 
-  ymd_hms() 
-
-bat2019_v2$datetime<- paste(bat2019_v2$date, bat2019_v2$hms) %>% 
-  ymd_hms()
-
-# bat2021_v2$hms2<- as.numeric(bat2021_v2$hms) # this does not work 
-# bat2021_v2$hms2<- hms::as_hms(bat2021_v2$hms2) # this does not work
-
-which(is.na(bat2021_v2)) # shows the location of the NAs 
-
-# here we make an hour column.
-
-bat2021_v2$hr<-lubridate::hour(bat2021_v2$datetime)
-bat2021_v2$min<-lubridate::minute(bat2021_v2$datetime)
-
-bat2019_v2$hr<-lubridate::hour(bat2019_v2$datetime)
-bat2019_v2$min<-lubridate::minute(bat2019_v2$datetime)
-# if hms<090000 then date-1
+# Noche  ------------------------------------------------------------------
 
 bat2021_v2$noche <-
-  if_else(bat2021_v2$hr < 9, # if it is less than 9 put the date of the previous day
-          true =  (bat2021_v2$date - ddays(1)),
-          false = bat2021_v2$date) # this created the "noche" column that is the date for the night of the start of the recording.
+  if_else(bat2021_v2$hrs < 9, # if it is less than 9 put the date of the previous day
+          true =  (date(bat2021_v2$date_time) - ddays(1)),
+          false = date(bat2021_v2$date_time))
+
 
 bat2019_v2$noche <-
   if_else(bat2019_v2$hr < 9,
@@ -182,10 +137,20 @@ bat2019_v2$noche <-
 
 str(bat2021_v2)
 
-effort<- bat2021_v2 %>% 
-  group_by(site, noche) %>% 
-  summarise(stard= min(datetime), endd= max(datetime)) %>% 
-  mutate(n.hrs= time_length(endd-stard, unit="hours"))
+effort <- bat2021_v2 %>%
+  group_by(site, noche) %>%
+  summarise(stard = min(date_time), endd = max(date_time)) %>%
+  mutate(n.hrs = time_length(endd - stard, unit = "hours"))
+
+effort_days <- bat2021_v2 %>%
+  group_by(site) %>%
+  summarise(
+    stard = min(date_time),
+    endd = max(date_time),
+    n.days = as.numeric(difftime(max(date_time), min(date_time), units = "days"))
+  )
+
+
 
 # drop unnecessary variables to join with bat2021_v2
 
@@ -393,3 +358,64 @@ bat2022_v2$noche <-
   if_else(bat2022_v2$hr < 9, # if it is less than 9 put the date of the previous day
           true =  (date(bat2022_v2$date_time) - ddays(1)),
           false = date(bat2022_v2$date_time))
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# trash -------------------------------------------------------------------
+
+
+# we need a column that assigns the the data of of the night. For example if we have 6pm-4am recording then the night should be the date of the start of the recording. 
+
+
+# First date as date with lubridate 
+
+bat2021_v2$date<-ymd(bat2021_v2$date)
+
+bat2019_v2$date<-ymd(bat2019_v2$date)
+
+# hms as numeric or actual hour? I am struggling with what is the best way. It seems like I need to create a new variable that is date and time together in a single column. 
+
+bat2021_v2$datetime<- paste(bat2021_v2$date, bat2021_v2$hms) %>% 
+  ymd_hms() 
+
+bat2019_v2$datetime<- paste(bat2019_v2$date, bat2019_v2$hms) %>% 
+  ymd_hms()
+
+# bat2021_v2$hms2<- as.numeric(bat2021_v2$hms) # this does not work 
+# bat2021_v2$hms2<- hms::as_hms(bat2021_v2$hms2) # this does not work
+
+which(is.na(bat2021_v2)) # shows the location of the NAs 
+
+# here we make an hour column.
+
+bat2021_v2$hr<-lubridate::hour(bat2021_v2$datetime)
+bat2021_v2$min<-lubridate::minute(bat2021_v2$datetime)
+
+bat2019_v2$hr<-lubridate::hour(bat2019_v2$datetime)
+bat2019_v2$min<-lubridate::minute(bat2019_v2$datetime)
+# if hms<090000 then date-1
+
+bat2021_v2$noche <-
+  if_else(bat2021_v2$hr < 9, # if it is less than 9 put the date of the previous day
+          true =  (bat2021_v2$date - ddays(1)),
+          false = bat2021_v2$date) # this created the "noche" column that is the date for the night of the start of the recording.

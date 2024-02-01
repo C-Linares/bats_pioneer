@@ -135,3 +135,21 @@ I will start building the 2022 database for bats.
 -   I also realized that I should calculate the date for the raw data. That way, I could know how many hours each recording was working.
 
 -   **IMPORTANT**: the batraw2022 database has data for iron 1 to 6. We need to fix this one too.
+
+    ------------------------------------------------------------------------
+
+1/30/2023
+
+-   I will fix the issue with the batraw2022 data, so we have the data for all the sites. One possible issue is that we need to run more sites with Sonobat.
+
+-   I also realize I need to check some call data data to corroborate these are properly ID correctly.
+
+-   I can run some Sonobat data through kaleidoscope to see how these compare.
+
+------------------------------------------------------------------------
+
+1/31/2024
+
+-   I updated the code for the 2021 data but and I believe all audio files have been ran trough Sonobat.
+
+-   
