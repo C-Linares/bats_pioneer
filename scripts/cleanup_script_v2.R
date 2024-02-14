@@ -25,7 +25,7 @@ library(suncalc) # calculate sunset and sunrise.
 # load 2021 2019 ----------------------------------------------------------
 
 
-bat2021_raw<- read.csv(file = 'data_for_analysis/data2021_db_only/bats2021.csv', header = T)
+bat2021_raw<- read.csv(file = 'data_for_analysis/data2021_db_only/bats2021_v4.csv', header = T)
 bat2019_raw<- read.csv(file = 'data2019_db_only/bats2019.csv', header = T, check.names = T)
 
 # we check there's no NAs
@@ -35,7 +35,7 @@ colSums(is.na(bat2019_raw))
 
 #clean up data
 
-keep<- c("Path","Filename","HiF","LoF", "SppAccp", "Prob", "calls.sec", "X1st")
+keep<- c("Path","Filename","HiF","LoF", "SppAccp", "Prob","X.Spp","X1st", "X.Prob")
 
 bat2019_v1 <- bat2019_raw %>% select(all_of(keep)) # removes unnecessary columns 
 
@@ -81,15 +81,17 @@ bat2019_v2$hms<-
 
 bat2021_v2$site<-str_extract(bat2021_v2$Filename, "^[A-Za-z]{3,4}\\d{2}")
 
-# site_info <- regmatches(bat2021_v2$Filename, regexpr("[A-Za-z]\\d{2}", bat2021_v2$Filename)) an other way to do it
+# site_info <- regmatches(bat2021_v2$Filename, regexpr("[A-Za-z]\\d{2}", bat2021_v2$Filename)) another way to do it
 
 
 bat2019_v2$site<-
   unlist(lapply(strsplit(bat2019_v2$Path, "\\\\"), function(x) # how to do this
     x[5]))
   
+unique(bat2021_v2$site)
 
 # here we fix some problems with the sites misspellings
+
 
 bat2021_v2$site = ifelse(bat2021_v2$site %in% c("LON01-"),"LON01", bat2021_v2$site)
 
@@ -158,10 +160,14 @@ effort <- effort %>% select("site","noche", "n.hrs")
 
 t<- left_join(x = bat2021_v2, y = effort, by= c("noche","site"))
 
+
+
+# suncal ------------------------------------------------------------------
+
 ###-------------------
 # now we need times since sunset. I calculated these by the camp site coordinates and not each site coordinates
-
 # we calculate sunset = sun disappears below the horizon. 
+# 
 sun<-getSunlightTimes(date = seq.Date(from = as.Date("2021-06-22"),to = as.Date("2021-08-24"), by=1),
                       keep = c("sunrise", "sunriseEnd", "sunset", "sunsetStart"),
                       lat = 43.5479918,
@@ -213,9 +219,9 @@ toutc<- c("sunrise","sunriseEnd","sunset","sunsetStart")
 
 
 bat2021_v2$sunset<-ymd_hms(bat2021_v2$sunset,tz="UTC")
-bat2021_v2$dlt.sunset.hrs<-time_length(bat2021_v2$datetime- bat2021_v2$sunset, "hours") 
+bat2021_v2$dlt.sunset.hrs<-time_length(bat2021_v2$date_time- bat2021_v2$sunset, "hours") 
 # check for negative times in the dlt.sunset col
-check1<-subset(bat2021_v2,subset = bat2021_v2$dlt.sunset<0) #491 bat detection occurred before sunset. 
+check1<-subset(bat2021_v2,subset = bat2021_v2$dlt.sunset<0) #491 bat detection occurred before sunset. now 234 with new data
 
 
 # lit and dark sites -----------------
@@ -233,13 +239,13 @@ bat2021_v2$trmt_bin<- ifelse(bat2021_v2$treatmt== "lit", 1, 0) #this makes that 
 
 # we write the data until we get the data for temperature
 
-write.csv(bat2021_v2,file = 'data_analysis/bat2021_v2.csv') 
-write.csv(bat2019_v2,file = "data_analysis/bat2019_v2.csv")
+write.csv(bat2021_v2,file = 'data_for_analysis/bat2021_v2.csv') 
+write.csv(bat2019_v2,file = "data_for_analysis/bat2019_v2.csv")
 
 
 # here we add the lat long for each site to the bat2021_v2
-sts<-read.csv('data_analysis/sites_coordinates.csv')
-bat2021_v2<-read.csv('data_analysis/bat2021_v2.csv')
+sts<-read.csv('data_for_analysis/sites_coordinates.csv')
+bat2021_v2<-read.csv('data_for_analysis/bat2021_v2.csv')
 
 bat2021_v2<-subset(bat2021_v2, select = -c(lat,lon))#drop the bat2021_v2 lat and lon to update
 bat2021_v2<-left_join(bat2021_v2,sts) # adds the correct lat and long coordinates for the sites. 

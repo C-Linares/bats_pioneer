@@ -1,6 +1,6 @@
 
 # Script: bat_pot_analysis.R
-# The purpose of this script is to prepare the data for modeling. 
+# The purpose of this script is to prepare the data before modeling. 
 # 
 # Carlos Linares 2023
 # 

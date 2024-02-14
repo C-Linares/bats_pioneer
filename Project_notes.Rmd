@@ -159,4 +159,12 @@ I will start building the 2022 database for bats.
 After these two weeks I realized that for 2021 we have two sites failed (long02, and Viz4).\
 It also seems like the old table fro 2021 data had lots more data and I don't know why. It might be possible that we merged tables we didn't wanted.
 
-Next step check the updated table and ask. How many files there are and how many nights of data we have for each site. It could be possible not all sm3 were on at all time.
+Next step check the updated table and ask. How many files there are and how many nights of data we have for each site. It could be possible not all sm3 were on at all time.\
+
+------------------------------------------------------------------------
+
+Ok I think the Sonobat files made with v420 and v4.4.5 once they are merged the columns might not align and might mes up the merging of files and thus creating a full data file.
+
+solution: proceed as for now and continue running all the files through sonobat to run them all using just sonobat v4.4.5
+
+I am working with the cleanup_script_v2 to be able to check the data and see what sites have data and how many data points we have. I will also include the from two columns the sppaccp and the \~spp. this way we will increase the data we have.
