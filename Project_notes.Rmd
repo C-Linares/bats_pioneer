@@ -150,6 +150,13 @@ I will start building the 2022 database for bats.
 
 1/31/2024
 
--   I updated the code for the 2021 data but and I believe all audio files have been ran trough Sonobat.
+-   I updated the code for the 2021 data but and I believe not all audio files have been ran trough Sonobat.
 
--   
+    ------------------------------------------------------------------------
+
+02/13/2024
+
+After these two weeks I realized that for 2021 we have two sites failed (long02, and Viz4).\
+It also seems like the old table fro 2021 data had lots more data and I don't know why. It might be possible that we merged tables we didn't wanted.
+
+Next step check the updated table and ask. How many files there are and how many nights of data we have for each site. It could be possible not all sm3 were on at all time.
