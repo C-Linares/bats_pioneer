@@ -168,3 +168,10 @@ Ok I think the Sonobat files made with v420 and v4.4.5 once they are merged the 
 solution: proceed as for now and continue running all the files through sonobat to run them all using just sonobat v4.4.5
 
 I am working with the cleanup_script_v2 to be able to check the data and see what sites have data and how many data points we have. I will also include the from two columns the sppaccp and the \~spp. this way we will increase the data we have.
+
+------------------------------------------------------------------------
+
+2/21/2024
+
+I am trying to update the files for bat2021 data base. I am missing data for viz03. the build_database script is not building the database properly and skips files even there are a sonobat files for that site. \
+I am trying to fix that aspec so I can start working with Jen again.

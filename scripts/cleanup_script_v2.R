@@ -35,7 +35,7 @@ colSums(is.na(bat2019_raw))
 
 #clean up data
 
-keep<- c("Path","Filename","HiF","LoF", "SppAccp", "Prob","X.Spp","X1st", "X.Prob")
+keep<- c("Path","Filename","HiF","LoF", "SppAccp", "Prob","X.Spp", "X.Prob","X1st")
 
 bat2019_v1 <- bat2019_raw %>% select(all_of(keep)) # removes unnecessary columns 
 
@@ -103,7 +103,10 @@ bat2021_v2$site = ifelse(bat2021_v2$site %in% c("VIS01"),"VIZ01", bat2021_v2$sit
 
 bat2021_v2$site = ifelse(bat2021_v2$site %in% c("VIS04"),"VIZ04", bat2021_v2$site)
 
-unique(bat2021_v2$site) # we are missing viz03 and long02
+bat2021_v2$site = ifelse(bat2021_v2$site %in% c("VIS03"),"VIZ03", bat2021_v2$site)
+
+
+unique(bat2021_v2$site) # we are missing and long02 and viz03 sites are present in the data but not in this database I need to rebuild the data base. 
 
 
 
@@ -142,7 +145,7 @@ str(bat2021_v2)
 effort <- bat2021_v2 %>%
   group_by(site, noche) %>%
   summarise(stard = min(date_time), endd = max(date_time)) %>%
-  mutate(n.hrs = time_length(endd - stard, unit = "hours"))
+  mutate(n.hrs = time_length(endd - stard, unit = "hours")) 
 
 effort_days <- bat2021_v2 %>%
   group_by(site) %>%
@@ -243,9 +246,13 @@ write.csv(bat2021_v2,file = 'data_for_analysis/bat2021_v2.csv')
 write.csv(bat2019_v2,file = "data_for_analysis/bat2019_v2.csv")
 
 
+
+# sites lat long ----------------------------------------------------------
+
+
 # here we add the lat long for each site to the bat2021_v2
 sts<-read.csv('data_for_analysis/sites_coordinates.csv')
-bat2021_v2<-read.csv('data_for_analysis/bat2021_v2.csv')
+# bat2021_v2<-read.csv('data_for_analysis/bat2021_v2.csv')
 
 bat2021_v2<-subset(bat2021_v2, select = -c(lat,lon))#drop the bat2021_v2 lat and lon to update
 bat2021_v2<-left_join(bat2021_v2,sts) # adds the correct lat and long coordinates for the sites. 
