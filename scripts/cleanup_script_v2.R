@@ -106,9 +106,7 @@ bat2021_v2$site = ifelse(bat2021_v2$site %in% c("VIS04"),"VIZ04", bat2021_v2$sit
 bat2021_v2$site = ifelse(bat2021_v2$site %in% c("VIS03"),"VIZ03", bat2021_v2$site)
 
 
-unique(bat2021_v2$site) # we are missing and long02 and viz03 sites are present in the data but not in this database I need to rebuild the data base. 
-
-
+unique(bat2021_v2$site) # we are missing long02 
 
 # checking NAs 2021 2029 --------------------------------------------------
 
@@ -118,7 +116,7 @@ nas2019<- bat2019_v2$hms[!complete.cases(bat2019_v2)] # other way of doing the s
 
 # remover extra columns not needed. 
 
-bat2021_v2<-bat2021_v2 %>% select(-Path, -Filename, -hms_sp)
+bat2021_v2<-bat2021_v2 %>% select(-Path, -Filename)
 bat2019_v2<- bat2019_v2 %>% select(-Path, -Filename, -hms_sp)
 
 
@@ -147,6 +145,10 @@ effort <- bat2021_v2 %>%
   summarise(stard = min(date_time), endd = max(date_time)) %>%
   mutate(n.hrs = time_length(endd - stard, unit = "hours")) 
 
+
+# here we remove the NAs for the date time. 
+bat2021_v2 <- bat2021_v2[complete.cases(bat2021_v2$date_time), ]
+
 effort_days <- bat2021_v2 %>%
   group_by(site) %>%
   summarise(
@@ -157,13 +159,16 @@ effort_days <- bat2021_v2 %>%
 
 
 
+table(bat2021_v2$site,bat2021_v2$SppAccp) #how many rows pe
+
 # drop unnecessary variables to join with bat2021_v2
 
 effort <- effort %>% select("site","noche", "n.hrs") 
 
-t<- left_join(x = bat2021_v2, y = effort, by= c("noche","site"))
+bat2021_v2<- left_join(x = bat2021_v2, y = effort, by= c("noche","site"))
+bat2021_v2<- left_join(x = bat2021_v2, y = effort_days, by= c("site"))
 
-
+bat2021_v2<-bat2021_v2 %>% select(-stard, -endd)
 
 # suncal ------------------------------------------------------------------
 
@@ -226,6 +231,14 @@ bat2021_v2$dlt.sunset.hrs<-time_length(bat2021_v2$date_time- bat2021_v2$sunset, 
 # check for negative times in the dlt.sunset col
 check1<-subset(bat2021_v2,subset = bat2021_v2$dlt.sunset<0) #491 bat detection occurred before sunset. now 234 with new data
 
+# joining sppacc and ~spp -------------------------------------------------
+
+# to increase the data available, we will mixed the spp accp with the 
+
+t<-paste(bat2021_v2$SppAccp, bat2021_v2$X.Spp,)
+bat2021_v2 <- mutate(bat2021_v2, Sp.plus = coalesce(SppAccp, X.Spp))
+
+
 
 # lit and dark sites -----------------
 
@@ -242,7 +255,7 @@ bat2021_v2$trmt_bin<- ifelse(bat2021_v2$treatmt== "lit", 1, 0) #this makes that 
 
 # we write the data until we get the data for temperature
 
-write.csv(bat2021_v2,file = 'data_for_analysis/bat2021_v2.csv') 
+write.csv(bat2021_v2,file = 'data_for_analysis/bat2021_v3.csv') # updated the bat2021 data base. 
 write.csv(bat2019_v2,file = "data_for_analysis/bat2019_v2.csv")
 
 
@@ -251,7 +264,7 @@ write.csv(bat2019_v2,file = "data_for_analysis/bat2019_v2.csv")
 
 
 # here we add the lat long for each site to the bat2021_v2
-sts<-read.csv('data_for_analysis/sites_coordinates.csv')
+ sts<-read.csv('data_for_analysis/sites_coordinates.csv')
 # bat2021_v2<-read.csv('data_for_analysis/bat2021_v2.csv')
 
 bat2021_v2<-subset(bat2021_v2, select = -c(lat,lon))#drop the bat2021_v2 lat and lon to update
@@ -273,9 +286,12 @@ sts$elevation <- extract(dem, coordinates_sp)
 # bat2021_v2<-read.csv('data_analysis/bat2021_v2.csv')
 bat2021_v2<-left_join(bat2021_v2, sts, by="site")
 
-write.csv(bat2021_v2,file = 'data_analysis/bat2021_v2.csv') # we update the data base
+write.csv(bat2021_v2,file = 'data_analysis/bat2021_v3.csv') # we update the data base
 
 # now we need a temperature... where do I get the temperature? Apparently there is the PRISM data that could be useful. 
+
+
+
 
 
 

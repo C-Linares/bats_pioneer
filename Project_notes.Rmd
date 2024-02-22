@@ -173,5 +173,15 @@ I am working with the cleanup_script_v2 to be able to check the data and see wha
 
 2/21/2024
 
-I am trying to update the files for bat2021 data base. I am missing data for viz03. the build_database script is not building the database properly and skips files even there are a sonobat files for that site. \
-I am trying to fix that aspec so I can start working with Jen again.
+I am trying to update the files for bat2021 data base. I am missing data for viz03. the build_database script is not building the database properly and skips files even there are a sonobat files for that site.\
+I am trying to fix that so I can start working with Jen again.
+
+Ok, I updated the database for 2021 and created bats2021_v5.csv in the pioneerlights project. I updated the cleanup_script_v2 and now has the lates data file. I will be working on this next.
+
+I merged the data from cols Accpspp and \~spp into the column Spp.plus. We need to see how this compares now.
+
+```         
+table(bat2021_v2$site,bat2021_v2$SppAccp) #how many rows pe
+```
+
+the previos code helps visualice this
