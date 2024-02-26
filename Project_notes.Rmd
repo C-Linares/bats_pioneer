@@ -167,13 +167,13 @@ Ok I think the Sonobat files made with v420 and v4.4.5 once they are merged the 
 
 solution: proceed as for now and continue running all the files through sonobat to run them all using just sonobat v4.4.5
 
-I am working with the cleanup_script_v2 to be able to check the data and see what sites have data and how many data points we have. I will also include the from two columns the sppaccp and the \~spp. this way we will increase the data we have.
+I am working with the cleanup_script_v2 to be able to check the data and see what sites have data and how many data points we have. I will also include the from two columns the sppaccp and the \~spp. this way we will increase the data we have.\
 
 ------------------------------------------------------------------------
 
 2/21/2024
 
-I am trying to update the files for bat2021 data base. I am missing data for viz03. the build_database script is not building the database properly and skips files even there are a sonobat files for that site.\
+I am trying to update the files for bat2021 data base. I am missing data for viz03. the build_database script is not building the database properly and skips files even there are a Sonobat files for that site.\
 I am trying to fix that so I can start working with Jen again.
 
 Ok, I updated the database for 2021 and created bats2021_v5.csv in the pioneerlights project. I updated the cleanup_script_v2 and now has the lates data file. I will be working on this next.
@@ -185,3 +185,19 @@ table(bat2021_v2$site,bat2021_v2$SppAccp) #how many rows pe
 ```
 
 the previos code helps visualice this
+
+creating the new Sp.plus col adds more data to 2021\
+table(is.na(bat2021_v2\$Sp.plus)) FALSE TRUE 180555 189779 \> table(is.na(bat2021_v2\$SppAccp)) FALSE TRUE 112713 257621
+
+------------------------------------------------------------------------
+
+02/26/2024
+
+I am trying to work with the 2021 data set. There are some issues with the data apparently there are some rows that did not work well. I need to figure out what is going on. \
+table(is.na(bat2021_v2\$date_time))
+
+FALSE TRUE
+
+370334 69
+
+there are 69 instances where the data was not able to parse. I think this is a problem because of the output sonobat give us.

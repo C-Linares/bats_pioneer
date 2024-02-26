@@ -35,7 +35,7 @@ colSums(is.na(bat2019_raw))
 
 #clean up data
 
-keep<- c("Path","Filename","HiF","LoF", "SppAccp", "Prob","X.Spp", "X.Prob","X1st")
+keep<- c(".id","Path","Filename","HiF","LoF", "SppAccp", "Prob","X.Spp", "X.Prob","X1st")
 
 bat2019_v1 <- bat2019_raw %>% select(all_of(keep)) # removes unnecessary columns 
 
@@ -53,7 +53,7 @@ bat2021_v2[bat2021_v2==""]<- NA # makes the empty spaces NAs
 # time extraction 2021 2019 ---------------------------------------------------------
 
 bat2021_v2 <- bat2021_v2 %>%
-  mutate(date_time = ymd_hms(str_extract(Filename, "\\d{8}_\\d{6}"), tz = "America/Denver"))
+  mutate(date_time = ymd_hms(str_extract(Filename, "\\d{8}_\\d{6}"), tz = "America/Denver")) 
 
 bat2021_v2$hrs<- hour(bat2021_v2$date_time)
 
@@ -116,7 +116,7 @@ nas2019<- bat2019_v2$hms[!complete.cases(bat2019_v2)] # other way of doing the s
 
 # remover extra columns not needed. 
 
-bat2021_v2<-bat2021_v2 %>% select(-Path, -Filename)
+bat2021_v2<-bat2021_v2 %>% select(-Path, -Filename, -.id)
 bat2019_v2<- bat2019_v2 %>% select(-Path, -Filename, -hms_sp)
 
 
@@ -235,7 +235,6 @@ check1<-subset(bat2021_v2,subset = bat2021_v2$dlt.sunset<0) #491 bat detection o
 
 # to increase the data available, we will mixed the spp accp with the 
 
-t<-paste(bat2021_v2$SppAccp, bat2021_v2$X.Spp,)
 bat2021_v2 <- mutate(bat2021_v2, Sp.plus = coalesce(SppAccp, X.Spp))
 
 
@@ -270,58 +269,8 @@ write.csv(bat2019_v2,file = "data_for_analysis/bat2019_v2.csv")
 bat2021_v2<-subset(bat2021_v2, select = -c(lat,lon))#drop the bat2021_v2 lat and lon to update
 bat2021_v2<-left_join(bat2021_v2,sts) # adds the correct lat and long coordinates for the sites. 
 
-#------elevation -------
-#added elevation to points worked 10/15/2023 but apparently the 
 
-library(raster)
-library(rgdal)
-sts<-read.csv('data_analysis/sites_coordinates.csv')
-dem<-raster('data_analysis/elev/USGS_13_n44w114_20130911.tif')
-coordinates<-data.frame(lon=sts$lon, lat=sts$lat)
-coordinates_sp <- SpatialPoints(coordinates, proj4string = CRS(proj4string(dem)))
-sts$elevation <- extract(dem, coordinates_sp)
-
-# we add elevation to the bat data.
-
-# bat2021_v2<-read.csv('data_analysis/bat2021_v2.csv')
-bat2021_v2<-left_join(bat2021_v2, sts, by="site")
-
-write.csv(bat2021_v2,file = 'data_analysis/bat2021_v3.csv') # we update the data base
-
-# now we need a temperature... where do I get the temperature? Apparently there is the PRISM data that could be useful. 
-
-
-
-
-
-
-# percentage of riparian area?
-# We will use NDVI data.
-
-ndvi_2021<-raster('data_analysis/NDVI/MYD13Q1.A2021185.h09v04.061.2021202231848.hdf',crs=)
-coordinates_sp <- SpatialPoints(coordinates, proj4string = CRS(proj4string(ndvi_2021)))
-
-buffer_distance <-100
-
-# Create a buffer around the point
-buffer <- raster::buffer(coordinates_sp, width = buffer_distance)
-
-# Extract the NDVI values for the buffer
-ndvi_values <- extract(ndvi_2021, buffer)
-
-dvi_stats <- lapply(ndvi_values, function(x) {
-  if (length(x) > 0) {
-    # Calculate mean NDVI within the buffer
-    mean_ndvi <- mean(x, na.rm = TRUE)
-    return(mean_ndvi)
-  } else {
-    # If no NDVI values were found within the buffer, return NA
-    return(NA)
-  }
-})
-
-
-
+write.csv(bat2021_v2,file = 'data_for_analysis/bat2021_v3.csv') # updated the bat2021 data base. 
 
 
 #---- comparing the 2021 data produce with the v3 and v4 of the 
