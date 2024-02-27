@@ -84,7 +84,7 @@ I talked to Jen Cruz, and she mentioned I have to be careful with the things tha
 
 -   I need to build the weather data base to run the pop models.
 -   Problems with the model :\
-    ![m1 diag plot](figures/m1_diag_plot.png){width="848"}
+    ![m1 diag plot](figures/m1_diag_plot.png){width="957"}
 
 -There are several peaks for density plot. This means there's problems with identifiability because there are multiple plots in the posterior?\
 -the chains are not in the same space. This means they are getting stuck in the same spot right?
@@ -202,4 +202,5 @@ FALSE TRUE
 
 there are 69 instances where the data was not able to parse. I think this is a problem because of the output Sonobat give us.
 
-Ok now I am exploring the data set to see if we can get more data from the columns X1st and Xspp. It seems like XSpp has too many convinations. In contrast, X1st is not entirely sure to work because we are not "confidente" the calls identify there are the actual calls.
+Ok now I am exploring the data set to see if we can get more data from the columns X1st and Xspp. It seems like XSpp has too many conbinations. In contrast, X1st is not entirely sure to work because we are not "confident" the calls identify there are the actual calls. \
+I am not sure the matrix are build properly for when I tally calls by week. I believe there might be an error when counting NAs.

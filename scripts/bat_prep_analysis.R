@@ -54,8 +54,8 @@ summary(bat1)
 
 
 bat_js <- bat2021 %>%
-  group_by(site, Sp.plus) %>% # I don't include year because it is a single year
-  count(wk, .drop = FALSE) %>%  #  we might have to include the arument .drop=false to count the NAs and the zeros
+  group_by(site, SppAccp) %>% # I don't include year because it is a single year
+  count(wk, .drop = FALSE) %>%  # we might have to include the argument .drop=false to count the NAs and the zeros
   pivot_wider(names_from = wk, values_from = n) %>%
   ungroup()
 summary(bat_js)
@@ -68,6 +68,9 @@ lano_js <-lano_js %>%  select(!c("34", "site", "SppAccp")) # remove site, sp, an
 
 lano_js <- replace(lano_js, is.na(lano_js), 0) # NAs to zeros 
 lano_js <- lano_js[,sort(colnames(lano_js))] # sort the cols
+
+mylu_js <-bat_js[bat_js$SppAccp == "Mylu",]
+
 
 # we filter by just one sp.
 # what species has the more calls. Lano 

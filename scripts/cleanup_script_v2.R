@@ -26,7 +26,7 @@ library(suncalc) # calculate sunset and sunrise.
 
 
 bat2021_raw<- read.csv(file = 'data_for_analysis/data2021_db_only/bats2021_v4.csv')
-bat2019_raw<- read_csv(file = 'data2019_db_only/bats2019.csv', header = T, check.names = T)
+bat2019_raw<- read.csv(file = 'data2019_db_only/bats2019.csv', header = T, check.names = T)
 
 # we check there's no NAs
 
