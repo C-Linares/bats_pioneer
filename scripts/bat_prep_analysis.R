@@ -18,11 +18,14 @@ library(lubridate)
 
 # Data load-------------####
 
-bat2021<-read.csv('data_for_analysis/bat2021_v2.csv',check.names = T) # we load the data we created in the clean up script. This data has several variables added to a clean up raw data is the product of clean_up script
-
+bat2021<-read.csv('data_for_analysis/bat2021_v3.csv',header = T,stringsAsFactors = F) # we load the data we created in the clean up script. This data has several variables added to a clean up raw data is the product of clean_up script
+table(is.na(bat2021$date_time))
 
 # make dates-------------
-bat2021$datetime <- ymd_hms(bat2021$datetime) # makes dates as dates
+bat2021$date_time <- ymd_hms(bat2021$date_time,tz = "America/Denver") # makes dates as dates
+failed_rows <- is.na(bat2021$date_time)
+failed_dates <- bat2021[failed_rows, ]
+
 bat2021$noche <-
   ymd(bat2021$noche)# makes noche as date. 
 
@@ -43,7 +46,7 @@ unique(bat2021$site)# tell us what sites we have
 
 bat1 <- bat2021 %>%
   group_by(site, treatmt) %>%
-  count(SppAccp, jday, hr) %>%
+  count(SppAccp, jday, hrs,drop=F) %>%
   ungroup()
 summary(bat1)
 
@@ -51,7 +54,7 @@ summary(bat1)
 
 
 bat_js <- bat2021 %>%
-  group_by(site, SppAccp) %>% # I don't include year because it is a single year
+  group_by(site, Sp.plus) %>% # I don't include year because it is a single year
   count(wk, .drop = FALSE) %>%  #  we might have to include the arument .drop=false to count the NAs and the zeros
   pivot_wider(names_from = wk, values_from = n) %>%
   ungroup()

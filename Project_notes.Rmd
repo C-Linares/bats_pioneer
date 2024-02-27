@@ -200,4 +200,6 @@ FALSE TRUE
 
 370334 69
 
-there are 69 instances where the data was not able to parse. I think this is a problem because of the output sonobat give us.
+there are 69 instances where the data was not able to parse. I think this is a problem because of the output Sonobat give us.
+
+Ok now I am exploring the data set to see if we can get more data from the columns X1st and Xspp. It seems like XSpp has too many convinations. In contrast, X1st is not entirely sure to work because we are not "confidente" the calls identify there are the actual calls.

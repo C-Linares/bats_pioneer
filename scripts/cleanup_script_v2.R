@@ -25,8 +25,8 @@ library(suncalc) # calculate sunset and sunrise.
 # load 2021 2019 ----------------------------------------------------------
 
 
-bat2021_raw<- read.csv(file = 'data_for_analysis/data2021_db_only/bats2021_v4.csv', header = T)
-bat2019_raw<- read.csv(file = 'data2019_db_only/bats2019.csv', header = T, check.names = T)
+bat2021_raw<- read.csv(file = 'data_for_analysis/data2021_db_only/bats2021_v4.csv')
+bat2019_raw<- read_csv(file = 'data2019_db_only/bats2019.csv', header = T, check.names = T)
 
 # we check there's no NAs
 
@@ -43,7 +43,8 @@ bat2019_v1[bat2019_v1==""]<- NA # makes the empty spaces NAs
 
 bat2019_v2 <- bat2019_v1 %>%  filter(!is.na(SppAccp)) # removes NAs 
 
-bat2021_v2 <- bat2021_raw %>% select(all_of(keep)) # removes uncecessary columns 
+bat2021_v2 <- bat2021_raw %>% select(all_of(keep)) # this stoped working if yhou load the raster package
+# bat2021_v2 <- bat2021_raw[, keep, drop = FALSE]
 
 bat2021_v2[bat2021_v2==""]<- NA # makes the empty spaces NAs
 
@@ -54,6 +55,18 @@ bat2021_v2[bat2021_v2==""]<- NA # makes the empty spaces NAs
 
 bat2021_v2 <- bat2021_v2 %>%
   mutate(date_time = ymd_hms(str_extract(Filename, "\\d{8}_\\d{6}"), tz = "America/Denver")) 
+
+bat2021_v2 <- bat2021_v2 %>%
+  mutate(
+    date_time = tryCatch( # this puts an NA when the date failed to parce. 
+      ymd_hms(str_extract(Filename, "\\d{8}_\\d{6}"), tz = "America/Denver"),
+      error = function(e) NA  # Set to NA if an error occurs
+    )
+  )
+
+rows_with_na <- subset(bat2021_v2, is.na(date_time))
+
+bat2021_v2 <- bat2021_v2[complete.cases(bat2021_v2$date_time), ] # remove NAs from the date_time col
 
 bat2021_v2$hrs<- hour(bat2021_v2$date_time)
 
@@ -116,7 +129,7 @@ nas2019<- bat2019_v2$hms[!complete.cases(bat2019_v2)] # other way of doing the s
 
 # remover extra columns not needed. 
 
-bat2021_v2<-bat2021_v2 %>% select(-Path, -Filename, -.id)
+bat2021_v2<-bat2021_v2 %>% select(-Path, -Filename)
 bat2019_v2<- bat2019_v2 %>% select(-Path, -Filename, -hms_sp)
 
 
@@ -138,23 +151,21 @@ bat2019_v2$noche <-
 #we need to calculate the number of hrs each site was working. 
 # we will do this by getting difference between the first recording by site and the last one for that day. that will give us an estimate for the number of hrs each recording was working
 
-str(bat2021_v2)
 
 effort <- bat2021_v2 %>%
   group_by(site, noche) %>%
   summarise(stard = min(date_time), endd = max(date_time)) %>%
-  mutate(n.hrs = time_length(endd - stard, unit = "hours")) 
+  mutate(eff.hrs = time_length(endd - stard, unit = "hours")) 
 
 
-# here we remove the NAs for the date time. 
-bat2021_v2 <- bat2021_v2[complete.cases(bat2021_v2$date_time), ]
+
 
 effort_days <- bat2021_v2 %>%
   group_by(site) %>%
   summarise(
     stard = min(date_time),
     endd = max(date_time),
-    n.days = as.numeric(difftime(max(date_time), min(date_time), units = "days"))
+    eff.days = as.numeric(difftime(max(date_time), min(date_time), units = "days"))
   )
 
 
@@ -270,7 +281,7 @@ bat2021_v2<-subset(bat2021_v2, select = -c(lat,lon))#drop the bat2021_v2 lat and
 bat2021_v2<-left_join(bat2021_v2,sts) # adds the correct lat and long coordinates for the sites. 
 
 
-write.csv(bat2021_v2,file = 'data_for_analysis/bat2021_v3.csv') # updated the bat2021 data base. 
+write.csv(bat2021_v2,file = 'data_for_analysis/bat2021_v3.csv',) # updated the bat2021 data base. 
 
 
 #---- comparing the 2021 data produce with the v3 and v4 of the 
@@ -361,6 +372,8 @@ bat2022_v2$noche <-
 
 # trash -------------------------------------------------------------------
 
+# here we remove the NAs for the date time. 
+bat2021_v2 <- bat2021_v2[complete.cases(bat2021_v2$date_time), ]
 
 # we need a column that assigns the the data of of the night. For example if we have 6pm-4am recording then the night should be the date of the start of the recording. 
 
