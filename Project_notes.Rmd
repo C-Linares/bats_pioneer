@@ -9,7 +9,7 @@ editor_options:
 
 10/14/2023
 
-Agreagar lat and log to the bat2021_v2 database.
+Add lat and log to the bat2021_v2 database.
 
 Then, the predictors matrix for the population analysis section is calculated.
 
@@ -193,7 +193,7 @@ table(is.na(bat2021_v2\$Sp.plus)) FALSE TRUE 180555 189779 \> table(is.na(bat202
 
 02/26/2024
 
-I am trying to work with the 2021 data set. There are some issues with the data apparently there are some rows that did not work well. I need to figure out what is going on. \
+I am trying to work with the 2021 data set. There are some issues with the data apparently there are some rows that did not work well. I need to figure out what is going on.\
 table(is.na(bat2021_v2\$date_time))
 
 FALSE TRUE
@@ -202,5 +202,11 @@ FALSE TRUE
 
 there are 69 instances where the data was not able to parse. I think this is a problem because of the output Sonobat give us.
 
-Ok now I am exploring the data set to see if we can get more data from the columns X1st and Xspp. It seems like XSpp has too many conbinations. In contrast, X1st is not entirely sure to work because we are not "confident" the calls identify there are the actual calls. \
+Ok now I am exploring the data set to see if we can get more data from the columns X1st and Xspp. It seems like XSpp has too many conbinations. In contrast, X1st is not entirely sure to work because we are not "confident" the calls identify there are the actual calls.\
 I am not sure the matrix are build properly for when I tally calls by week. I believe there might be an error when counting NAs.
+
+------------------------------------------------------------------------
+
+2/28/2024
+
+I crated a new bat species observations by week file for Myly. I think there's still a lot of variability between weeks on the number of calls. there's one week where the calls go from 17 to 1261. That might be too much variability for the model to handle.

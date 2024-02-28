@@ -22,7 +22,7 @@ bat2021<-read.csv('data_for_analysis/bat2021_v3.csv',header = T,stringsAsFactors
 table(is.na(bat2021$date_time))
 
 # make dates-------------
-bat2021$date_time <- ymd_hms(bat2021$date_time,tz = "America/Denver") # makes dates as dates
+bat2021$date_time <- lubridate::ymd_hms(bat2021$date_time,tz = "America/Denver") # makes dates as dates
 failed_rows <- is.na(bat2021$date_time)
 failed_dates <- bat2021[failed_rows, ]
 
@@ -69,17 +69,32 @@ lano_js <-lano_js %>%  select(!c("34", "site", "SppAccp")) # remove site, sp, an
 lano_js <- replace(lano_js, is.na(lano_js), 0) # NAs to zeros 
 lano_js <- lano_js[,sort(colnames(lano_js))] # sort the cols
 
-mylu_js <-bat_js[bat_js$SppAccp == "Mylu",]
-
+mylu_js <- bat_js[bat_js$SppAccp == "Mylu", ]
+mylu_js <- mylu_js[!is.na(mylu_js$SppAccp), ]
+mylu_js <- replace(mylu_js, is.na(mylu_js), 0) # NAs to zeros 
+mylu_js <-mylu_js %>%  select(!c("34", "site", "SppAccp"))
 
 # we filter by just one sp.
-# what species has the more calls. Lano 
+# what species has the more calls. Lano Mylu
+table(bat2021$SppAccp)
 
 ggplot(bat2021,aes(x=SppAccp, fill=treatmt))+
   geom_bar()
   
 
+# funtion to filter bat data ----------------------------------------------
 
+filter_and_clean_data <- function(data, species) {
+  filtered_data <- data %>%
+    filter(SppAccp == species) %>%
+    drop_na(SppAccp) %>%
+    mutate(across(where(is.numeric), ~if_else(is.na(.), 0, .))) %>%
+    select(-c("34", "site", "SppAccp"))
+  
+  return(filtered_data)
+}
+
+myvo_js<-filter_and_clean_data(bat_js, "Myvo")
 #rename week columns as numbers just numbers 
 
 write.csv(bat_js,file = 'data_analysis/bat_prep_analysis/bat_js.csv',
@@ -87,7 +102,8 @@ write.csv(bat_js,file = 'data_analysis/bat_prep_analysis/bat_js.csv',
 
 #write single species df
 
-write.csv(lano_js,file = 'data_for_analysis/bat_prep_analysis/lano_js.csv', row.names = F) 
+write.csv(lano_js,file = 'data_for_analysis/bat_pop_analysis/lano_js.csv', row.names = F) 
+write.csv(mylu_js,file = 'data_for_analysis/bat_pop_analysis/mylu_js.csv', row.names = F) 
 
 
 # site level cov. -------------
