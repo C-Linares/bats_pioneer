@@ -39,6 +39,16 @@ bat2021$yr <-
 
 summary(bat2021) # there are no NAs in this database
 
+
+# Sp.plus cleanup  --------------------------------------------------------
+# lets talk to jesse about this one.
+
+table(bat2021$Sp.plus)
+table(unique(bat2021$Sp.plus))
+t <- mutate(bat2021, Sp.plus = coalesce(SppAccp, X1st))
+
+
+
 #sites
 unique(bat2021$site)# tell us what sites we have
 
@@ -59,6 +69,7 @@ bat_js <- bat2021 %>%
   pivot_wider(names_from = wk, values_from = n) %>%
   ungroup()
 summary(bat_js)
+
 
 bat_js<-bat_js[,sort(colnames(bat_js))] # sort the cols
 bat_js<-replace(bat_js, is.na(bat_js),0)
