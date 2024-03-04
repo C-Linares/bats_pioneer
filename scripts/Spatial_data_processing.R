@@ -7,8 +7,8 @@
 
 library(raster)
 library(rgdal)
-sts<-read.csv('data_analysis/sites_coordinates.csv')
-dem<-raster('data_analysis/elev/USGS_13_n44w114_20130911.tif')
+sts<-read.csv('data_for_analysis/sites_coordinates.csv')
+dem<-raster('data_for_analysis/elev/USGS_13_n44w114_20130911.tif')
 coordinates<-data.frame(lon=sts$lon, lat=sts$lat)
 coordinates_sp <- SpatialPoints(coordinates, proj4string = CRS(proj4string(dem)))
 sts$elevation <- extract(dem, coordinates_sp)
@@ -18,7 +18,7 @@ sts$elevation <- extract(dem, coordinates_sp)
 # bat2021_v2<-read.csv('data_analysis/bat2021_v2.csv')
 bat2021_v2<-left_join(bat2021_v2, sts, by="site")
 
-write.csv(bat2021_v2,file = 'data_analysis/bat2021_v3.csv') # we update the data base
+write.csv(sts,file = 'data_for_analysis/elev/elev.csv') # write the elevation
 
 
 
@@ -29,8 +29,26 @@ write.csv(bat2021_v2,file = 'data_analysis/bat2021_v3.csv') # we update the data
 # percentage of riparian area?
 # We will use NDVI data.
 
-ndvi_2021<-raster('data_analysis/NDVI/MYD13Q1.A2021185.h09v04.061.2021202231848.hdf',crs=)
+ndvi_2021<-raster('data_for_analysis/NDVI/MYD13Q1.A2021185.h09v04.061.2021202231848.hdf') #Modis vegetation index product
+
+
+# Pioneer light site coordinates
 coordinates_sp <- SpatialPoints(coordinates, proj4string = CRS(proj4string(ndvi_2021)))
+plot(coordinates_sp)
+coordinates(sts)<-c("x","y")
+
+# get the crs from the objects.
+crsndvi<-crs(ndvi_2021)
+crs_points<-crs(coordinates_sp)
+identical(crs_points,crsndvi)
+
+points_values <- extract(ndvi_2021, coordinates_sp)
+
+
+plot(ndvi_2021, col = rainbow(100))
+legend("topright", legend = "MODISVegetation Index")
+title(main = "Vegetation Index Map")
+points(coordinates_sp$x, coordinates_sp$y, col = "red", pch = 20)
 
 buffer_distance <-100
 
