@@ -13,7 +13,7 @@ library(waldo)#compare objects in R
 #---- load data ---
 # here we load the 2021 bat data to get the species names.
 
-bat2021<-read.csv('data_for_analysis/bat2021_v2.csv',check.names = T)
+bat2021<-read.csv('data_for_analysis/bat2021_v3.csv',check.names = T)
 
 species<-unique(bat2021$SppAccp)
 

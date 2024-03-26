@@ -165,6 +165,9 @@ write.csv(obs.cov2,file = 'data_for_analysis/bat_pop_analysis/obs.cov2.csv',
 
 
 
+# kpro_ data --------------------------------------------------------------
+
+
 
 
 

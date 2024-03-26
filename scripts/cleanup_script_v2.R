@@ -68,7 +68,7 @@ rows_with_na <- subset(bat2021_v2, is.na(date_time))
 
 bat2021_v2 <- bat2021_v2[complete.cases(bat2021_v2$date_time), ] # remove NAs from the date_time col
 
-bat2021_v2$hrs<- hour(bat2021_v2$date_time)
+bat2021_v2$hrs<- hour(bat2021_v2$date_time) #extract the hour. 
 
 #We want to extract the data and time from the Filename and Path columns. There must be a more efficient way fo doing this but I don't know how to. 
 
@@ -155,7 +155,8 @@ bat2019_v2$noche <-
 effort <- bat2021_v2 %>%
   group_by(site, noche) %>%
   summarise(stard = min(date_time), endd = max(date_time)) %>%
-  mutate(eff.hrs = time_length(endd - stard, unit = "hours")) 
+  mutate(eff.hrs = time_length(endd - stard, unit = "hours")) %>% 
+  mutate(wk=week(noche))
 
 
 
@@ -168,6 +169,7 @@ effort_days <- bat2021_v2 %>%
     eff.days = as.numeric(difftime(max(date_time), min(date_time), units = "days"))
   )
 
+write.csv(effort,file = 'data_for_analysis/effort2021.csv',)
 
 
 table(bat2021_v2$site,bat2021_v2$SppAccp) #how many rows pe
