@@ -412,3 +412,44 @@ bat2021_v2$noche <-
   if_else(bat2021_v2$hr < 9, # if it is less than 9 put the date of the previous day
           true =  (bat2021_v2$date - ddays(1)),
           false = bat2021_v2$date) # this created the "noche" column that is the date for the night of the start of the recording.
+
+
+
+
+# kpro clean up -----------------------------------------------------------
+
+
+kpro2021_raw<- read.csv(file = 'data_for_analysis/2021_kpro_raw/bats2021_kpro_v1.csv',header = T)
+
+keep<- c(".id","INDIR","OUTDIR","FOLDER","IN.FILE","DURATION","DATE","TIME","HOUR","AUTO.ID.")
+
+kpro2021_raw <- kpro2021_raw %>% select(all_of(keep))
+
+
+
+# site 
+
+kpro2021_raw$site<-str_extract(kpro2021_raw$OUTDIR, "[A-Za-z]{3,4}\\d{2}")
+
+unique(kpro2021_raw$site) # we have all sites
+
+# date week
+
+kpro2021_raw$DATE<-lubridate::ymd(kpro2021_raw$DATE)
+
+# noche/night
+
+kpro2021_raw$noche <-
+  if_else(kpro2021_raw$HOUR < 9, # if it is less than 9 put the date of the previous day
+          true =  (date(kpro2021_raw$DATE) - ddays(1)),
+          false = date(kpro2021_raw$DATE))
+#week
+kpro2021_raw$wk<- week(kpro2021_raw$noche)
+
+
+# write the data. 
+
+write.csv(kpro2021_raw, file='data_for_analysis/kpro2021_v1.csv' )
+
+
+

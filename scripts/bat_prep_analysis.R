@@ -14,7 +14,6 @@ library(tidyverse)
 library(lubridate)
 library(magrittr)
 library(elevatr)
-library(lubridate)
 
 # Data load-------------####
 
@@ -167,6 +166,64 @@ write.csv(obs.cov2,file = 'data_for_analysis/bat_pop_analysis/obs.cov2.csv',
 
 # kpro_ data --------------------------------------------------------------
 
+# load
+
+kpro_2021_bat<-read.csv(file = 'data_for_analysis/kpro2021_v1.csv')
+
+kpro_2021_bat$jday<-lubridate::yday(kpro_2021_bat$DATE)
+
+
+
+# building matrix of days 
+sites<-unique(kpro_2021_bat$site)
+
+for (sites in i:length(sites)){
+  print(sites)
+}
+
+effort_days <- kpro_2021_bat %>%
+  group_by(site) %>%
+  summarise(
+    stard = min(noche),
+    endd = max(noche),
+    eff.days = as.numeric(difftime(max(noche), min(noche), units = "days"))
+  )
+
+bmat <- kpro_2021_bat %>%
+  group_by(site, AUTO.ID.) %>% # I don't include year because it is a single year
+  count(wk, .drop = FALSE) %>%  # we might have to include the argument .drop=false to count the NAs and the zeros
+  pivot_wider(names_from = wk, values_from = n) %>%
+  ungroup()
+summary(bat_js)
+
+
+
+bmat2 <- kpro_2021_bat %>%
+  group_by(site, AUTO.ID.) %>% # 
+  count(jday,wk, .drop = FALSE) %>%  # this is per day and week 
+  pivot_wider(names_from = c(jday,wk), values_from = n) %>%
+  ungroup()
+
+# by species 
+
+no_id <- bmat2[bmat2$AUTO.ID. == "NoID",] # filter data to just Lano.
+
+byspecies <- function(data, species) {
+  filtered_data <- data %>%
+    filter(AUTO.ID. == species) %>%
+    drop_na(AUTO.ID.) %>%
+    mutate(across(where(is.numeric), ~if_else(is.na(.), 0, .))) 
+    # select(-c("34", "site", "SppAccp"))
+  
+  return(filtered_data)
+}
+
+mylu_w<-byspecies(bmat, "MYOLUC") # myly by week
+mylu_d.w<-byspecies(bmat2,"MYOLUC") # mylu by day and week
+
+
+
+# finding true zeros 
 
 
 

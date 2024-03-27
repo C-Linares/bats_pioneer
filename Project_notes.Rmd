@@ -214,3 +214,23 @@ I am not sure the matrix are build properly for when I tally calls by week. I be
 2/28/2024
 
 I crated a new bat species observations by week file for Myly. I think there's still a lot of variability between weeks on the number of calls. there's one week where the calls go from 17 to 1261. That might be too much variability for the model to handle.
+
+------------------------------------------------------------------------
+
+Change approach. We are not using Sonobat, we are using Kaleidoscope. There is definitively differences in the number bat calls found and the species ID. I am trying to build a visualization of the weeks and dates that each recording was working.
+
+we need a matrix of days species and the days thing were working for each species.
+
+| site/species 1 | week1 | week 2 |
+|----------------|-------|--------|
+| 1              | 1     | 1      |
+|                |       |        |
+|                |       |        |
+
+Maybe one by julian day by each species.
+
+| site/species1 | jday1 | jday2 | jda3 | jd4 | jda5 | jda6 |
+|---------------|-------|-------|------|-----|------|------|
+| iron1         | 1     | 1     | 1    | 1   |      |      |
+|               |       |       |      |     |      |      |
+|               |       |       |      |     |      |      |
