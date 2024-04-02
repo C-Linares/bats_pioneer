@@ -172,6 +172,11 @@ kpro_2021_bat<-read.csv(file = 'data_for_analysis/kpro2021_v1.csv')
 
 kpro_2021_bat$jday<-lubridate::yday(kpro_2021_bat$DATE)
 
+kpro_2021_bat$hora<- as.POSIXct(kpro_2021_bat$TIME, format = "%H:%M:%S")
+
+kpro_2021_bat$roun.min <- round(kpro_2021_bat$hora, units = "mins")
+
+
 
 
 # building matrix of days 
@@ -188,6 +193,8 @@ effort_days <- kpro_2021_bat %>%
     endd = max(noche),
     eff.days = as.numeric(difftime(max(noche), min(noche), units = "days"))
   )
+
+
 
 bmat <- kpro_2021_bat %>%
   group_by(site, AUTO.ID.) %>% # I don't include year because it is a single year
@@ -206,9 +213,9 @@ bmat2 <- kpro_2021_bat %>%
 
 # by species 
 
-no_id <- bmat2[bmat2$AUTO.ID. == "NoID",] # filter data to just Lano.
+no_id <- bmat2[bmat2$AUTO.ID. == "NoID",] # filter data to just Unkown calls
 
-byspecies <- function(data, species) {
+byspecies <- function(data, species) { # function that creates one matrix for spp 
   filtered_data <- data %>%
     filter(AUTO.ID. == species) %>%
     drop_na(AUTO.ID.) %>%
@@ -226,6 +233,23 @@ mylu_d.w<-byspecies(bmat2,"MYOLUC") # mylu by day and week
 # finding true zeros 
 
 
+
+
+
+
+# Miller ------------------------------------------------------------------
+
+#How to calculate number of minutes of activity per night?
+
+# Group by site, bat species, date, and minute block, then count the number of rows
+presence_summary <- kpro_2021_bat %>%
+  group_by(site, AUTO.ID., noche, roun.min) %>%
+  summarize(presence_count = n()) %>%
+  ungroup()
+
+species_summary <- presence_summary %>%
+  group_by(AUTO.ID., site,noche) %>%
+  summarize(total_blocks = sum(presence_count))
 
 
 #  PLOTS ----------
