@@ -170,12 +170,20 @@ write.csv(obs.cov2,file = 'data_for_analysis/bat_pop_analysis/obs.cov2.csv',
 
 kpro_2021_bat<-read.csv(file = 'data_for_analysis/kpro2021_v1.csv')
 
-kpro_2021_bat$jday<-lubridate::yday(kpro_2021_bat$DATE)
+kpro_2021_bat$jday<-lubridate::yday(kpro_2021_bat$DATE) # julian day
 
-kpro_2021_bat$hora<- as.POSIXct(kpro_2021_bat$TIME, format = "%H:%M:%S")
+# date time col. 
+datetime<-paste(kpro_2021_bat$DATE, kpro_2021_bat$TIME)#merge date and time
+datetime.parse<-lubridate::ymd_hms(datetime) # parse as date time
+kpro_2021_bat$date_time<-datetime.parse # add to data. 
 
-kpro_2021_bat$roun.min <- round(kpro_2021_bat$hora, units = "mins")
 
+
+
+# kpro_2021_bat$hora<- as.POSIXct(kpro_2021_bat$TIME, format = "%H:%M:%S") # possibly remove. 
+
+# kpro_2021_bat$roun.min <- round(kpro_2021_bat$hora, units = "mins")
+kpro_2021_bat$rmins<-round(kpro_2021_bat$date_time, units="mins") #rounds to the nearest min
 
 
 
@@ -242,11 +250,17 @@ mylu_d.w<-byspecies(bmat2,"MYOLUC") # mylu by day and week
 #How to calculate number of minutes of activity per night?
 
 # Group by site, bat species, date, and minute block, then count the number of rows
-presence_summary <- kpro_2021_bat %>%
-  group_by(site, AUTO.ID., noche, roun.min) %>%
-  summarize(presence_count = n()) %>%
-  ungroup()
+# presence_summary <- kpro_2021_bat %>%
+#   group_by(site, AUTO.ID., noche, roun.min) %>%
+#   summarize(presence_count = n()) %>%
+#   ungroup()
 
+presence_min<-kpro_2021_bat %>% 
+  group_by(site, AUTO.ID., noche, rmins) %>% 
+  summarize(activity_min= n()) %>% 
+  ungroup()
+  
+  
 species_summary <- presence_summary %>%
   group_by(AUTO.ID., site,noche) %>%
   summarize(total_blocks = sum(presence_count))
