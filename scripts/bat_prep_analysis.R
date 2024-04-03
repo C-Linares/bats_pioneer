@@ -211,7 +211,10 @@ bmat <- kpro_2021_bat %>%
   ungroup()
 summary(bat_js)
 
-
+bm <- kpro_2021_bat %>%
+  group_by(site, AUTO.ID.) %>% 
+  count(jday, .drop = FALSE) %>%  # we might have to include the argument .drop=false to count the NAs and the zeros
+  ungroup()
 
 bmat2 <- kpro_2021_bat %>%
   group_by(site, AUTO.ID.) %>% # 
@@ -255,15 +258,54 @@ mylu_d.w<-byspecies(bmat2,"MYOLUC") # mylu by day and week
 #   summarize(presence_count = n()) %>%
 #   ungroup()
 
-presence_min<-kpro_2021_bat %>% 
+presence_min<-kpro_2021_bat %>% #min of activity 
   group_by(site, AUTO.ID., noche, rmins) %>% 
   summarize(activity_min= n()) %>% 
   ungroup()
   
   
-species_summary <- presence_summary %>%
-  group_by(AUTO.ID., site,noche) %>%
-  summarize(total_blocks = sum(presence_count))
+species_summary <- presence_summary %>% # number of minutes by day. 
+  group_by(site, noche, AUTO.ID.) %>%
+  summarize(activity_min = sum(presence_count))
+
+
+#get week and jday
+
+species_summary$wk<-week(species_summary$noche)
+species_summary$jday<-yday(species_summary$noche)
+
+sp_wk <- species_summary %>%
+  group_by(site, AUTO.ID.,wk) %>% # 
+  count(activity_min, .drop = FALSE) %>%  # this is per day and week 
+  pivot_wider(names_from = c(wk), values_from = n()) %>%
+  ungroup()
+
+
+t <- species_summary %>%
+  group_by(site, AUTO.ID., wk) %>%
+  summarize(activity_minutes = sum(activity_min)) %>%
+  pivot_wider(names_from = wk,
+              values_from = activity_minutes) %>% 
+  ungroup()
+
+# Pivot the data to wide format
+wide_data <- summary_data %>%
+  pivot_wider(
+    names_from = wk,
+    values_from = total_activity_minutes,
+    names_prefix = "week_"
+  )
+
+
+
+
+
+
+
+
+
+
+
 
 
 #  PLOTS ----------
@@ -300,12 +342,49 @@ hist(bat2021$SppAccp)
 
 
 
+# plot Activity index -------------------------------------------------------------
 
 
 
 
-# junk ----------
-# 
+ggplot(species_summary, aes(yday(noche), activity_min))+
+  geom_col()+
+  facet_wrap(~ AUTO.ID.,scales = "free")
+
+ggplot(species_summary, aes(yday(noche), activity_min))+
+  geom_col()+
+  facet_wrap(~ site,scales = "free")
+
+ggplot(species_summary, aes(activity_min))+
+  geom_histogram(bins = 30)
+
+ggplot(bm, aes(jday, n))+
+  geom_col()+
+  facet_wrap(~ site,scales = "free")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#junk
+
+
+
+
 
 
 
