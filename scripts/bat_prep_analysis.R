@@ -186,13 +186,8 @@ kpro_2021_bat$date_time<-datetime.parse # add to data.
 kpro_2021_bat$rmins<-round(kpro_2021_bat$date_time, units="mins") #rounds to the nearest min
 
 
-
 # building matrix of days 
-sites<-unique(kpro_2021_bat$site)
 
-for (sites in i:length(sites)){
-  print(sites)
-}
 
 effort_days <- kpro_2021_bat %>%
   group_by(site) %>%
@@ -213,7 +208,7 @@ summary(bat_js)
 
 bm <- kpro_2021_bat %>%
   group_by(site, AUTO.ID.) %>% 
-  count(jday, .drop = FALSE) %>%  # we might have to include the argument .drop=false to count the NAs and the zeros
+  count(jday, .drop = FALSE) %>%  
   ungroup()
 
 bmat2 <- kpro_2021_bat %>%
