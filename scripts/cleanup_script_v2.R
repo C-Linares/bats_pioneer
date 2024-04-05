@@ -43,7 +43,7 @@ bat2019_v1[bat2019_v1==""]<- NA # makes the empty spaces NAs
 
 bat2019_v2 <- bat2019_v1 %>%  filter(!is.na(SppAccp)) # removes NAs 
 
-bat2021_v2 <- bat2021_raw %>% select(all_of(keep)) # this stoped working if yhou load the raster package
+bat2021_v2 <- bat2021_raw %>% select(all_of(keep)) # this stopped working if you load the raster package
 # bat2021_v2 <- bat2021_raw[, keep, drop = FALSE]
 
 bat2021_v2[bat2021_v2==""]<- NA # makes the empty spaces NAs
