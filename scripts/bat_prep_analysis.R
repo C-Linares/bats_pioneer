@@ -168,7 +168,7 @@ write.csv(obs.cov2,file = 'data_for_analysis/bat_pop_analysis/obs.cov2.csv',
 
 # load
 
-kpro_2021_bat<-read.csv(file = 'data_for_analysis/kpro2021_v1.csv')
+kpro_2021_bat<-read.csv(file = 'data_for_analysis/kpro2021_v1.csv') # raw kpro data
 
 kpro_2021_bat$jday<-lubridate::yday(kpro_2021_bat$DATE) # julian day
 
@@ -178,11 +178,6 @@ datetime.parse<-lubridate::ymd_hms(datetime) # parse as date time
 kpro_2021_bat$date_time<-datetime.parse # add to data. 
 
 
-
-
-# kpro_2021_bat$hora<- as.POSIXct(kpro_2021_bat$TIME, format = "%H:%M:%S") # possibly remove. 
-
-# kpro_2021_bat$roun.min <- round(kpro_2021_bat$hora, units = "mins")
 kpro_2021_bat$rmins<-round(kpro_2021_bat$date_time, units="mins") #rounds to the nearest min
 
 
@@ -197,19 +192,30 @@ effort_days <- kpro_2021_bat %>%
     eff.days = as.numeric(difftime(max(noche), min(noche), units = "days"))
   )
 
+effort <- kpro_2021_bat %>%
+  group_by(site, noche) %>%
+  summarise(stard = min(date_time), endd = max(date_time)) %>%
+  mutate(eff.hrs = time_length(endd - stard, unit = "hours")) %>% 
+  mutate(wk=week(noche))
 
-
-bmat <- kpro_2021_bat %>%
+bmat <- kpro_2021_bat %>% # count of calls 
   group_by(site, AUTO.ID.) %>% # I don't include year because it is a single year
   count(wk, .drop = FALSE) %>%  # we might have to include the argument .drop=false to count the NAs and the zeros
   pivot_wider(names_from = wk, values_from = n) %>%
   ungroup()
 summary(bat_js)
 
-bm <- kpro_2021_bat %>%
+bm <- kpro_2021_bat %>% # 
   group_by(site, AUTO.ID.) %>% 
   count(jday, .drop = FALSE) %>%  
   ungroup()
+
+litsites<-c("iron01","iron03","iron05","long01","long03")
+
+
+bm$treatmt<-ifelse(bm$site %in% litsites , "lit", "dark") # this makes a treatment variable.
+
+bm$trmt_bin<- ifelse(bm$treatmt== "lit", 1, 0)
 
 bmat2 <- kpro_2021_bat %>%
   group_by(site, AUTO.ID.) %>% # 
@@ -236,7 +242,7 @@ mylu_d.w<-byspecies(bmat2,"MYOLUC") # mylu by day and week
 
 
 
-# finding true zeros 
+
 
 
 
@@ -263,34 +269,44 @@ species_summary <- presence_summary %>% # number of minutes by day.
   group_by(site, noche, AUTO.ID.) %>%
   summarize(activity_min = sum(presence_count))
 
+#treatment 
+
+litsites<-c("iron01","iron03","iron05","long01","long03")
+
+
+species_summary$treatmt<-ifelse(species_summary$site %in% litsites , "lit", "dark") # this makes a treatment variable.
+
+species_summary$trmt_bin<- ifelse(species_summary$treatmt== "lit", 1, 0)
+
 
 #get week and jday
 
 species_summary$wk<-week(species_summary$noche)
 species_summary$jday<-yday(species_summary$noche)
 
-sp_wk <- species_summary %>%
-  group_by(site, AUTO.ID.,wk) %>% # 
-  count(activity_min, .drop = FALSE) %>%  # this is per day and week 
-  pivot_wider(names_from = c(wk), values_from = n()) %>%
-  ungroup()
+# standardize by effort hrs.
+
+species_summary<-left_join(effort,species_summary, by = c("site","noche","wk"))
+
+# AI standardize by hrs sampled. 
+zeros <- filter(species_summary, eff.hrs <= 0) # some obs have 0 hrs of effort
+
+species_summary$AI.st<-species_summary$activity_min/species_summary$eff.hrs
 
 
-t <- species_summary %>%
+bat.x.wk <- species_summary %>%
   group_by(site, AUTO.ID., wk) %>%
   summarize(activity_minutes = sum(activity_min)) %>%
   pivot_wider(names_from = wk,
               values_from = activity_minutes) %>% 
   ungroup()
 
-# Pivot the data to wide format
-wide_data <- summary_data %>%
-  pivot_wider(
-    names_from = wk,
-    values_from = total_activity_minutes,
-    names_prefix = "week_"
-  )
+# by sp
 
+lit.brw<-byspecies(bat.x.wk,"MYOLUC")
+lit.brw <- lit.brw[, !(names(lit.brw) %in% c("site", "AUTO.ID.","25","34"))]
+
+save(lit.brw, file = "data_for_analysis/bat_pop_analysis/mylu.ai.kpr")
 
 
 
@@ -305,8 +321,18 @@ wide_data <- summary_data %>%
 
 #  PLOTS ----------
 
+ggplot(bat1, aes(jday, n, fill=treatmt))+
+  geom_col()+
+  facet_wrap(~ treatmt)+
+  labs(title="sonobat, #calls")
+
+ggplot(bat1, aes(jday, n, fill=treatmt))+
+  geom_col()+
+  facet_wrap(~ site)+
+  labs(title="sonobat, #calls")
+
 ggplot(bat1, aes(jday, n, fill = treatmt)) +
-  geom_col() +
+  geom_col(position="dodge") +
   facet_wrap( ~ SppAccp, scales = "free")
 
 ggplot(data = bat1, aes(factor(hr, levels = c(
@@ -322,8 +348,6 @@ ggplot(data = bat1, aes(factor(hr, levels = c(
 ggplot(data = bat2021, aes(dlt.sunset, fill=treatmt))+
   geom_histogram(position = "dodge")
 
-ggplot(bat2021, aes(phase, hr)) +
-  geom_histogram()
 
 # graph of predictors -------------
 
@@ -332,30 +356,46 @@ hist(moon_pred$fraction) # values are sparcer.
 hist(bat2021$dlt.sunset) # time since sunset 
 hist(bat2021$SppAccp)
 
+# plot kpro call counts
 
+ggplot(bm, aes(jday, n, fill=treatmt))+
+  geom_col(position = "dodge")+
+  facet_wrap(~ treatmt,)+
+  labs(title = "kpro # calls")
 
+ggplot(bm, aes(jday, n, fill=treatmt))+
+  geom_col(position = "dodge")+
+  facet_wrap(~ site)+
+  labs(title = "kpro # calls")
 
+ggplot(bm, aes(jday, n, fill=treatmt))+
+  geom_col(position = "dodge")+
+  facet_wrap(~ AUTO.ID.,scales = "free")+
+  labs(title = "kpro # calls")
 
 
 # plot Activity index -------------------------------------------------------------
 
+ggplot(species_summary, aes(yday(noche), activity_min, fill=treatmt))+
+  geom_col(position = "dodge")+
+  facet_wrap(~ treatmt,scales = "free")+
+  labs(title="#min active")
 
+ggplot(species_summary, aes(yday(noche), AI.st, fill=treatmt))+
+  geom_col(position = "dodge")+
+  facet_wrap(~ treatmt,scales = "free")+
+  labs(title="#min standardize /eff.hrs")
 
+ggplot(species_summary, aes(yday(noche), activity_min, fill=treatmt))+
+  geom_col(position = "dodge")+
+  facet_wrap(~ site,scales = "free")+
+  labs(title="#min active")
 
-ggplot(species_summary, aes(yday(noche), activity_min))+
-  geom_col()+
-  facet_wrap(~ AUTO.ID.,scales = "free")
+ggplot(species_summary, aes(yday(noche), activity_min, fill=treatmt))+
+  geom_col(position = "dodge")+
+  facet_wrap(~ AUTO.ID.,scales = "free")+
+  labs(title="activity minutes")
 
-ggplot(species_summary, aes(yday(noche), activity_min))+
-  geom_col()+
-  facet_wrap(~ site,scales = "free")
-
-ggplot(species_summary, aes(activity_min))+
-  geom_histogram(bins = 30)
-
-ggplot(bm, aes(jday, n))+
-  geom_col()+
-  facet_wrap(~ site,scales = "free")
 
 
 
