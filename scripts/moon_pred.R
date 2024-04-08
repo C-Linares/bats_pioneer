@@ -11,11 +11,12 @@ library(tidyverse)
 
 #we need the coordinates for the sites
 
-sts<-read.csv("data_analysis/sites_coordinates.csv")
-bat2021<-read.csv('data_analysis/bat2021_v2.csv',check.names = T)
+sts<-read.csv("data_for_analysis/sites_coordinates.csv")
+bat2021<-read.csv('data_for_analysis/bat2021_v2.csv',check.names = T)
+kpro_2021_bat<-read.csv('data_for_analysis/kpro2021_v1.csv')
 #get dates from bat2021
 
-datesite<-bat2021 %>% select(site,noche)
+datesite<-kpro_2021_bat %>% select(site,noche)
 
 # moon illumination, times, and pos ----------------------
 

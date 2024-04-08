@@ -125,7 +125,13 @@ s.l.c<-s.l.c[,-1] # remove sites column
 write.csv(s.l.c,file = 'data_analysis/bat_prep_analysis/slc.csv',
           row.names = F) 
 
-# obs cov ----------------
+slc<-species_summary %>% distinct(site,trmt_bin)
+slc<-slc[,-1]
+write.csv(slc,file = 'data_for_analysis/bat_pop_analysis/slc.csv',row.names = F)
+
+
+
+          # obs cov ----------------
 
 
 moon_pred <-
@@ -306,8 +312,7 @@ bat.x.wk <- species_summary %>%
 lit.brw<-byspecies(bat.x.wk,"MYOLUC")
 lit.brw <- lit.brw[, !(names(lit.brw) %in% c("site", "AUTO.ID.","25","34"))]
 
-save(lit.brw, file = "data_for_analysis/bat_pop_analysis/mylu.ai.kpr")
-
+write.csv(x = lit.brw,file = "data_for_analysis/bat_pop_analysis/mylu.ai.kpr.csv")
 
 
 

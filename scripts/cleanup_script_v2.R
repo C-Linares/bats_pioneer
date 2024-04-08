@@ -230,6 +230,7 @@ moonsun2019 <- left_join(x = moon2019, y = sun2019, "date")
 colnames(moonsun2019)[1]<-"noche"
 
 #join with the rest of data 
+
 bat2021_v2 <- left_join(x = bat2021_v2, y = moonsun, "noche")
 bat2019_v2<- left_join(x=bat2019_v2, y=moonsun2019, "noche")
 
