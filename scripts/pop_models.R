@@ -18,7 +18,7 @@ library(jagsUI)
 #js21<-read.csv('data_analysis/bat_pop_analysis/bat_js.csv')
 lano_js <- read.csv('data_for_analysis/bat_pop_analysis/lano_js.csv') # checkar que esten en el mismo orden para todo slc and obscov por ejemplo sort colnames 
 #
-mylu_js<-read.csv('data_for_analysis/bat_pop_analysis/mylu.ai.kpr.csv')
+lit_brw<-read.csv('data_for_analysis/bat_pop_analysis/lit_brw.csv')
 
 s.l.c<-read.csv('data_for_analysis/bat_pop_analysis/slc.csv') 
 # s.l.c<-read.csv('slc.csv') 

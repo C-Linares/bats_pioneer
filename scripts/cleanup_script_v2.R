@@ -448,9 +448,27 @@ kpro2021_raw$noche <-
 kpro2021_raw$wk<- week(kpro2021_raw$noche)
 
 
+# date time col. 
+datetime<-paste(kpro2021_raw$DATE, kpro2021_raw$TIME)#merge date and time
+datetime.parse<-lubridate::ymd_hms(datetime) # parse as date time
+kpro2021_raw$date_time<-datetime.parse # add to data. 
+
+
+# 
+litsites<-c("iron01","iron03","iron05","long01","long03")
+
+
+kpro2021_raw$treatmt<-ifelse(kpro2021_raw$site %in% litsites , "lit", "dark") # this makes a treatment variable.
+
+kpro2021_raw$trmt_bin<- ifelse(kpro2021_raw$treatmt== "lit", 1, 0)
+
+
+kpro2021_raw$jday<-lubridate::yday(kpro2021_raw$noche) # julian day
+
+
 # write the data. 
 
-write.csv(kpro2021_raw, file='data_for_analysis/kpro2021_v1.csv' )
+write.csv(kpro2021_raw, file='data_for_analysis/kpro2021_v1.csv',  row.names = F)
 
 
 

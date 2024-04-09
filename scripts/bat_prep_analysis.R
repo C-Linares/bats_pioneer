@@ -170,22 +170,22 @@ write.csv(obs.cov2,file = 'data_for_analysis/bat_pop_analysis/obs.cov2.csv',
 
 
 
-# kpro_ data --------------------------------------------------------------
+# kpro_data --------------------------------------------------------------
 
 # load
 
 kpro_2021_bat<-read.csv(file = 'data_for_analysis/kpro2021_v1.csv') # raw kpro data
+kpro_2021_bat$date_time<-ymd_hms(kpro_2021_bat$date_time)
+# kpro_2021_bat$jday<-lubridate::yday(kpro_2021_bat$DATE) # julian day
 
-kpro_2021_bat$jday<-lubridate::yday(kpro_2021_bat$DATE) # julian day
-
-# date time col. 
+#date time col. 
 datetime<-paste(kpro_2021_bat$DATE, kpro_2021_bat$TIME)#merge date and time
 datetime.parse<-lubridate::ymd_hms(datetime) # parse as date time
 kpro_2021_bat$date_time<-datetime.parse # add to data. 
 
 
-kpro_2021_bat$rmins<-round(kpro_2021_bat$date_time, units="mins") #rounds to the nearest min
-
+kpro_2021_bat$rmins<-round(kpro_2021_bat$date_time, units="minute") #rounds to the nearest min
+kpro_2021_bat$rmins<-round_date(kpro_2021_bat$date_time, unit = "minute")
 
 # building matrix of days 
 
@@ -198,18 +198,18 @@ effort_days <- kpro_2021_bat %>%
     eff.days = as.numeric(difftime(max(noche), min(noche), units = "days"))
   )
 
-effort <- kpro_2021_bat %>%
+effort_hrs <- kpro_2021_bat %>%
   group_by(site, noche) %>%
   summarise(stard = min(date_time), endd = max(date_time)) %>%
   mutate(eff.hrs = time_length(endd - stard, unit = "hours")) %>% 
-  mutate(wk=week(noche))
+  mutate(wk=week(noche)) # calculates the week too. 
 
 bmat <- kpro_2021_bat %>% # count of calls 
   group_by(site, AUTO.ID.) %>% # I don't include year because it is a single year
   count(wk, .drop = FALSE) %>%  # we might have to include the argument .drop=false to count the NAs and the zeros
   pivot_wider(names_from = wk, values_from = n) %>%
   ungroup()
-summary(bat_js)
+
 
 bm <- kpro_2021_bat %>% # 
   group_by(site, AUTO.ID.) %>% 
@@ -223,11 +223,15 @@ bm$treatmt<-ifelse(bm$site %in% litsites , "lit", "dark") # this makes a treatme
 
 bm$trmt_bin<- ifelse(bm$treatmt== "lit", 1, 0)
 
-bmat2 <- kpro_2021_bat %>%
+bmat2 <- kpro_2021_bat %>% 
   group_by(site, AUTO.ID.) %>% # 
   count(jday,wk, .drop = FALSE) %>%  # this is per day and week 
   pivot_wider(names_from = c(jday,wk), values_from = n) %>%
   ungroup()
+
+# finding true NAs
+
+
 
 # by species 
 
@@ -259,9 +263,9 @@ mylu_d.w<-byspecies(bmat2,"MYOLUC") # mylu by day and week
 
 #How to calculate number of minutes of activity per night?
 
-# Group by site, bat species, date, and minute block, then count the number of rows
+# # Group by site, bat species, date, and minute block, then count the number of rows
 # presence_summary <- kpro_2021_bat %>%
-#   group_by(site, AUTO.ID., noche, roun.min) %>%
+#   group_by(site, AUTO.ID., noche, rmins) %>%
 #   summarize(presence_count = n()) %>%
 #   ungroup()
 
@@ -271,9 +275,9 @@ presence_min<-kpro_2021_bat %>% #min of activity
   ungroup()
   
   
-species_summary <- presence_summary %>% # number of minutes by day. 
+species_summary <- presence_min %>% # number of minutes by day. 
   group_by(site, noche, AUTO.ID.) %>%
-  summarize(activity_min = sum(presence_count))
+  summarize(activity_min = sum(activity_min))
 
 #treatment 
 
@@ -292,12 +296,12 @@ species_summary$jday<-yday(species_summary$noche)
 
 # standardize by effort hrs.
 
-species_summary<-left_join(effort,species_summary, by = c("site","noche","wk"))
+species_summary<-left_join(effort_hrs,species_summary, by = c("site","noche","wk"))
 
 # AI standardize by hrs sampled. 
 zeros <- filter(species_summary, eff.hrs <= 0) # some obs have 0 hrs of effort
 
-species_summary$AI.st<-species_summary$activity_min/species_summary$eff.hrs
+species_summary$AI.st<-species_summary$activity_min/species_summary$eff.hrs # need to fix the efforst that have less than an hour of effort see(zeros)
 
 
 bat.x.wk <- species_summary %>%
@@ -309,10 +313,10 @@ bat.x.wk <- species_summary %>%
 
 # by sp
 
-lit.brw<-byspecies(bat.x.wk,"MYOLUC")
-lit.brw <- lit.brw[, !(names(lit.brw) %in% c("site", "AUTO.ID.","25","34"))]
+lit_brw<-byspecies(bat.x.wk,"MYOLUC") # made with AI
+lit_brw <- lit.brw[, !(names(lit.brw) %in% c("site", "AUTO.ID.","25","34"))] #filter out cols
 
-write.csv(x = lit.brw,file = "data_for_analysis/bat_pop_analysis/mylu.ai.kpr.csv")
+write.csv(x = lit_brw,file = "data_for_analysis/bat_pop_analysis/lit_brw.csv")
 
 
 
@@ -326,6 +330,7 @@ write.csv(x = lit.brw,file = "data_for_analysis/bat_pop_analysis/mylu.ai.kpr.csv
 
 #  PLOTS ----------
 
+# sonobat output plots
 ggplot(bat1, aes(jday, n, fill=treatmt))+
   geom_col()+
   facet_wrap(~ treatmt)+
@@ -354,49 +359,47 @@ ggplot(data = bat2021, aes(dlt.sunset, fill=treatmt))+
   geom_histogram(position = "dodge")
 
 
-# graph of predictors -------------
-
-hist(moon_pred$phase) # we want to see if there is a good spread
-hist(moon_pred$fraction) # values are sparcer. 
-hist(bat2021$dlt.sunset) # time since sunset 
-hist(bat2021$SppAccp)
 
 # plot kpro call counts
 
-ggplot(bm, aes(jday, n, fill=treatmt))+
+# Filter the bm data set to exclude Noise rows
+filtered_bm <- bm[bm$AUTO.ID. != "Noise", ]
+
+ggplot(filtered_bm, aes(jday, n, fill=treatmt))+
   geom_col(position = "dodge")+
-  facet_wrap(~ treatmt,)+
+  facet_wrap(~ treatmt)+
+  labs(title = "calls all bat sp (kpro output)")
+
+ggplot(filtered_bm, aes(jday, n, fill=treatmt))+
+  geom_col(position = "dodge")+
+  facet_wrap(~ site,scales = "free")+
   labs(title = "kpro # calls")
 
-ggplot(bm, aes(jday, n, fill=treatmt))+
-  geom_col(position = "dodge")+
-  facet_wrap(~ site)+
-  labs(title = "kpro # calls")
-
-ggplot(bm, aes(jday, n, fill=treatmt))+
+ggplot(filtered_bm, aes(jday, n, fill=treatmt))+
   geom_col(position = "dodge")+
   facet_wrap(~ AUTO.ID.,scales = "free")+
   labs(title = "kpro # calls")
 
 
 # plot Activity index -------------------------------------------------------------
+filter.species_summary <- species_summary[species_summary$AUTO.ID. != "Noise", ]
 
-ggplot(species_summary, aes(yday(noche), activity_min, fill=treatmt))+
+ggplot(filter.species_summary, aes(yday(noche), activity_min, fill=treatmt))+
   geom_col(position = "dodge")+
-  facet_wrap(~ treatmt,scales = "free")+
+  facet_wrap(~ treatmt,)+
   labs(title="#min active")
 
-ggplot(species_summary, aes(yday(noche), AI.st, fill=treatmt))+
+ggplot(filter.species_summary, aes(yday(noche), AI.st, fill=treatmt))+
   geom_col(position = "dodge")+
   facet_wrap(~ treatmt,scales = "free")+
   labs(title="#min standardize /eff.hrs")
 
-ggplot(species_summary, aes(yday(noche), activity_min, fill=treatmt))+
+ggplot(filter.species_summary, aes(yday(noche), activity_min, fill=treatmt))+
   geom_col(position = "dodge")+
   facet_wrap(~ site,scales = "free")+
   labs(title="#min active")
 
-ggplot(species_summary, aes(yday(noche), activity_min, fill=treatmt))+
+ggplot(filter.species_summary, aes(yday(noche), activity_min, fill=treatmt))+
   geom_col(position = "dodge")+
   facet_wrap(~ AUTO.ID.,scales = "free")+
   labs(title="activity minutes")
@@ -441,3 +444,13 @@ lano_js<-lano %>%
 
 lano_js<-lano_js[,-1] # remove col one that has just consecutive numbers
 names(lano_js)
+
+
+# graph of predictors -------------
+
+#the following predictors are in a the moon_pred and suncal scripts
+
+# hist(moon_pred$phase) # we want to see if there is a good spread
+# hist(moon_pred$fraction) # values are sparcer. 
+# hist(bat2021$dlt.sunset) # time since sunset 
+# hist(bat2021$SppAccp)
