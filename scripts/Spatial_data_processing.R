@@ -7,6 +7,8 @@
 
 library(raster)
 library(rgdal)
+library(rgeos)# creates buffers
+
 sts<-read.csv('data_for_analysis/sites_coordinates.csv')
 dem<-raster('data_for_analysis/elev/USGS_13_n44w114_20130911.tif')
 coordinates<-data.frame(lon=sts$lon, lat=sts$lat)
@@ -28,21 +30,33 @@ write.csv(sts,file = 'data_for_analysis/elev/elev.csv') # write the elevation
 
 # percentage of riparian area?
 # We will use NDVI data.
+# dowloaded data from :https://search.earthdata.nasa.gov/search/granules?p=C2307290656-LPCLOUD!C2307290656-LPCLOUD&pg[1][v]=t&pg[1][qt]=2021-06-01T00%3A00%3A00.000Z%2C&pg[1][gsk]=start_date&pg[1][m]=download&pg[1][cd]=f&q=NDVI&sb[0]=-115.68164%2C42.80419%2C-112.83398%2C45.33567&as[science_keywords][0]=Biosphere%3AVegetation%3AVegetation%20Index%3ANormalized%20Difference%20Vegetation%20Index%20(Ndvi)&tl=1680503012!3!!&fst0=land%20surface&fst1=Biosphere&fsm1=Vegetation&fs11=Vegetation%20Index&fs21=Normalized%20Difference%20Vegetation%20Index%20(Ndvi)&lat=20.834681452138085&long=-171.7310116952234
 
-ndvi_2021<-raster('data_for_analysis/NDVI/MYD13Q1.A2021185.h09v04.061.2021202231848.hdf') #Modis vegetation index product
+ndvi_2021<-raster('data_for_analysis/NDVI/MYD13Q1.A2021185.h09v04.061.2021202231848.hdf') # Modis vegetation index product
 
+#check projection
+pj<-crs(ndvi_2021)
+# field sites re-projected to raster file size.
 
-# Pioneer light site coordinates
-coordinates_sp <- SpatialPoints(coordinates, proj4string = CRS(proj4string(ndvi_2021)))
-plot(coordinates_sp)
-coordinates(sts)<-c("x","y")
+site.pj <- SpatialPoints(sts[-1], proj4string = crs(ndvi_2021))
+# Extract longitude and latitude coordinates from site.pj
+lon <- coordinates(site.pj)[, 1]
+lat <- coordinates(site.pj)[, 2]
 
-# get the crs from the objects.
-crsndvi<-crs(ndvi_2021)
-crs_points<-crs(coordinates_sp)
-identical(crs_points,crsndvi)
+# Create a new SpatialPoints object with corrected coordinates order
+site_corrected <- SpatialPoints(coords = cbind(lon, lat), proj4string = CRS(proj4string(site.pj)))
 
-points_values <- extract(ndvi_2021, coordinates_sp)
+# Create a buffer around the points with a radius of 100 meters
+buffer <- buffer(site_corrected, width = 100)
+
+# Extract NDVI values within the buffer area
+ndvi_within_buffer <- extract(ndvi_2021, buffer) # this part is not working. I don't know why.
+
+# Calculate mean NDVI value within the buffer
+mean_ndvi <- sapply(ndvi_within_buffer, mean, na.rm = TRUE)
+
+# Print mean NDVI values
+print(mean_ndvi)
 
 
 plot(ndvi_2021, col = rainbow(100))
@@ -50,24 +64,6 @@ legend("topright", legend = "MODISVegetation Index")
 title(main = "Vegetation Index Map")
 points(coordinates_sp$x, coordinates_sp$y, col = "red", pch = 20)
 
-buffer_distance <-100
-
-# Create a buffer around the point
-buffer <- raster::buffer(coordinates_sp, width = buffer_distance)
-
-# Extract the NDVI values for the buffer
-ndvi_values <- extract(ndvi_2021, buffer)
-
-dvi_stats <- lapply(ndvi_values, function(x) {
-  if (length(x) > 0) {
-    # Calculate mean NDVI within the buffer
-    mean_ndvi <- mean(x, na.rm = TRUE)
-    return(mean_ndvi)
-  } else {
-    # If no NDVI values were found within the buffer, return NA
-    return(NA)
-  }
-})
 
 
 
