@@ -184,7 +184,7 @@ datetime.parse<-lubridate::ymd_hms(datetime) # parse as date time
 kpro_2021_bat$date_time<-datetime.parse # add to data. 
 
 
-kpro_2021_bat$rmins<-round(kpro_2021_bat$date_time, units="minute") #rounds to the nearest min
+kpro_2021_bat$rmins<-round(kpro_2021_bat$date_time, units="mins") #rounds to the nearest min
 kpro_2021_bat$rmins<-round_date(kpro_2021_bat$date_time, unit = "minute")
 
 # building matrix of days 
@@ -204,18 +204,22 @@ effort_hrs <- kpro_2021_bat %>%
   mutate(eff.hrs = time_length(endd - stard, unit = "hours")) %>% 
   mutate(wk=week(noche)) # calculates the week too. 
 
+# calls by week
+
 bmat <- kpro_2021_bat %>% # count of calls 
   group_by(site, AUTO.ID.) %>% # I don't include year because it is a single year
   count(wk, .drop = FALSE) %>%  # we might have to include the argument .drop=false to count the NAs and the zeros
   pivot_wider(names_from = wk, values_from = n) %>%
   ungroup()
 
+# calls by day 
 
 bm <- kpro_2021_bat %>% # 
   group_by(site, AUTO.ID.) %>% 
   count(jday, .drop = FALSE) %>%  
   ungroup()
 
+# add treatment 
 litsites<-c("iron01","iron03","iron05","long01","long03")
 
 
@@ -223,19 +227,19 @@ bm$treatmt<-ifelse(bm$site %in% litsites , "lit", "dark") # this makes a treatme
 
 bm$trmt_bin<- ifelse(bm$treatmt== "lit", 1, 0)
 
+# calls by day and week 
 bmat2 <- kpro_2021_bat %>% 
   group_by(site, AUTO.ID.) %>% # 
   count(jday,wk, .drop = FALSE) %>%  # this is per day and week 
-  pivot_wider(names_from = c(jday,wk), values_from = n) %>%
+  # pivot_wider(names_from = c(jday,wk), values_from = n) %>%
   ungroup()
 
 # finding true NAs
 
 
-
 # by species 
 
-no_id <- bmat2[bmat2$AUTO.ID. == "NoID",] # filter data to just Unkown calls
+no_id <- bmat2[bmat2$AUTO.ID. == "NoID",] # filter data to just Unknown calls
 
 byspecies <- function(data, species) { # function that creates one matrix for spp 
   filtered_data <- data %>%
@@ -363,22 +367,27 @@ ggplot(data = bat2021, aes(dlt.sunset, fill=treatmt))+
 # plot kpro call counts
 
 # Filter the bm data set to exclude Noise rows
-filtered_bm <- bm[bm$AUTO.ID. != "Noise", ]
+filtered_bm <- bm[bm$AUTO.ID. != "Noise", ] # if noise is not filtered there is more records for dark sites. 
 
-ggplot(filtered_bm, aes(jday, n, fill=treatmt))+
-  geom_col(position = "dodge")+
+ggplot(filtered_bm, aes(jday, n, col=treatmt))+
+  geom_point()+
   facet_wrap(~ treatmt)+
-  labs(title = "calls all bat sp (kpro output)")
+  labs(title = "n calls all bat sp (kpro output)")+
+  geom_vline(xintercept = 180, linetype = "dashed", color = "red")
 
-ggplot(filtered_bm, aes(jday, n, fill=treatmt))+
-  geom_col(position = "dodge")+
-  facet_wrap(~ site,scales = "free")+
-  labs(title = "kpro # calls")
+ggplot(filtered_bm, aes(jday, n, col=treatmt))+
+  geom_point()+
+  facet_wrap(~ site)+
+  labs(title = "kpro # calls")+
+  geom_vline(xintercept = 180, linetype = "dashed", color = "red")
 
-ggplot(filtered_bm, aes(jday, n, fill=treatmt))+
-  geom_col(position = "dodge")+
+
+ggplot(filtered_bm, aes(jday, n, col=treatmt))+
+  geom_point(alpha=.5)+
   facet_wrap(~ AUTO.ID.,scales = "free")+
-  labs(title = "kpro # calls")
+  labs(title = "kpro # calls")+
+  geom_vline(xintercept = 180, linetype = "dashed", color = "red")
+
 
 
 # plot Activity index -------------------------------------------------------------
@@ -446,11 +455,4 @@ lano_js<-lano_js[,-1] # remove col one that has just consecutive numbers
 names(lano_js)
 
 
-# graph of predictors -------------
 
-#the following predictors are in a the moon_pred and suncal scripts
-
-# hist(moon_pred$phase) # we want to see if there is a good spread
-# hist(moon_pred$fraction) # values are sparcer. 
-# hist(bat2021$dlt.sunset) # time since sunset 
-# hist(bat2021$SppAccp)

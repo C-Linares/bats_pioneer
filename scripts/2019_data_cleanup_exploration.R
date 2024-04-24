@@ -67,8 +67,32 @@ bat2019_v1$noche <-
 
 bat2019_v1$wk<-week(bat2019_v1$noche)
 
+# j day
+
+bat2019_v1$jday<-yday(bat2019_v1$noche)
+
+
+# bat calls per jday
+
 bmat <- bat2019_v1 %>%
-  group_by(site, SppAccp) %>% # I don't include year because it is a single year
-  count(wk, .drop = FALSE) %>%  # we might have to include the argument .drop=false to count the NAs and the zeros
-  pivot_wider(names_from = wk, values_from = n) %>%
+  filter(!is.na(SppAccp)) %>% # remove NAs 
+  group_by(site, SppAccp,jday) %>% 
+  count(SppAccp, .drop = FALSE) %>%  # we include .drop=false to count the NAs and the zeros
+  # pivot_wider(names_from = wk, values_from = n) %>%
   ungroup()
+
+
+
+
+
+# plots -------------------------------------------------------------------
+
+ggplot(bmat, aes(jday, n, group=SppAccp,color=SppAccp))+
+  geom_point()+
+  facet_wrap(~SppAccp)+
+  labs(y="raw call counts",
+       title = "2019 bat data sonobat")+
+  geom_vline(xintercept = 180, linetype = "dashed", color = "red")
+  
+  
+
