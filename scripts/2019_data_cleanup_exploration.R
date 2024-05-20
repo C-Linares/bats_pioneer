@@ -4,7 +4,7 @@
 ##
 ## Purpose of script: we will cleanup and analyze the bat data from 2019 to see if it has similar patterns to 2021-2022
 ##
-## Author: Carlos LInares
+## Author: Carlos Linares
 ##
 ## Date Created: 4/4/2024
 ##
@@ -82,6 +82,10 @@ bmat <- bat2019_v1 %>%
   ungroup()
 
 
+# kpro data --------------------------------------------------------------------
+
+
+bat2019_kpr<- read.csv('')
 
 
 
@@ -95,4 +99,3 @@ ggplot(bmat, aes(jday, n, group=SppAccp,color=SppAccp))+
   geom_vline(xintercept = 180, linetype = "dashed", color = "red")
   
   
-

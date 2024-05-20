@@ -30,13 +30,25 @@ wetdb <- purrr::map_df(wetfls, ~ read.csv(.x, skip = 7)) # new function from pur
 
 wetdb<- setnames(wetdb, old = "X.1", new = "date.time") # change col name to date
 
-wetdb$date.time<- mdy_hms(wetdb$date.time)
+wetdb$date.time<- mdy_hms(wetdb$date.time, tz = "America/Denver")
 
 wetdb$wk<- week(wetdb$date.time)
 
 wetdb <- wetdb %>% select(-"Millimeters")# remove empty colum
 
+# just date column
+
+wetdb$date<- date(wetdb$date.time)
+
 # -- calculate the mean temp and rain -----
+
+daily_averages <- wetdb %>%
+  
+  group_by(date) %>%
+  summarize(
+    avg_temperature = mean(Celsius, na.rm = TRUE),
+    avg_wind_speed = mean(m.s, na.rm = TRUE)
+  )
 
 mtempwind<- wetdb %>%
   group_by(wk) %>%
@@ -44,3 +56,19 @@ mtempwind<- wetdb %>%
 
 # Filter and save rows with NAs
 na_rows <- wetdb[!complete.cases(wetdb), ]
+
+
+#write data
+
+write.csv(wetdb,file = "data_for_analysis/weather/rawweather.csv",row.names = F)
+
+
+
+# figure ------------------------------------------------------------------
+
+ggplot(wetdb, aes(x = date.time, y = Celsius)) +
+  geom_point(color = "blue") +
+  labs(title = "Time Series of Temperature",
+       x = "Date and Time",
+       y = "Temperature (Celsius)") +
+  theme_minimal()
