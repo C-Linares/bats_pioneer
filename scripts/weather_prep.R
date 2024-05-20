@@ -26,11 +26,13 @@ wetdb <- lapply(wetfls, function(wetfls) {
 
 
 wetdb <- purrr::map_df(wetfls, ~ read.csv(.x, skip = 7)) # new function from purr to read multiple files 
+str(wetdb)
+
 # data cleaning --------------
 
 wetdb<- setnames(wetdb, old = "X.1", new = "date.time") # change col name to date
 
-wetdb$date.time<- mdy_hms(wetdb$date.time, tz = "America/Denver")
+wetdb$date.time<- mdy_hm(wetdb$date.time, tz = "America/Denver")
 
 wetdb$wk<- week(wetdb$date.time)
 
@@ -72,3 +74,9 @@ ggplot(wetdb, aes(x = date.time, y = Celsius)) +
        x = "Date and Time",
        y = "Temperature (Celsius)") +
   theme_minimal()
+
+ggplot(daily_averages, aes(x= date, y=avg_temperature ))+
+  geom_point()+
+  labs(title = "time series temp",
+       x="date",
+       y= "temp C")
