@@ -323,7 +323,7 @@ lit_brw <- lit.brw[, !(names(lit.brw) %in% c("site", "AUTO.ID.","25","34"))] #fi
 write.csv(x = lit_brw,file = "data_for_analysis/bat_pop_analysis/lit_brw.csv")
 
 
-
+write.csv(species_summary, file = "data_for_analysis/data_glmm/AI_sp_summary.csv")
 
 
 

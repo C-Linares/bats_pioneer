@@ -34,7 +34,9 @@ library(car)
 
 bm<-read.csv('data_for_analysis/data_glmm/bat_counts.csv', header = T) # bat counts by jday
 bm$jday_scaled<-scale(bm$jday)
-bm$dateytyt<-as_date(bm$jday, origin= "2021-01-01")
+bm$datefromyday<-as_date(bm$jday, origin= "2021-01-01")
+filtered_bm <- bm[bm$AUTO.ID. != "Noise", ] # if noise is not filtered there is more records for dark sites. 
+
 
 btrait<-read.csv('data_for_analysis/Bat_trait.csv', header = T)
 btrait$Species<-toupper(btrait$Species)
