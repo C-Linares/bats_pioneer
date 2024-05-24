@@ -52,6 +52,9 @@ daily_averages <- wetdb %>%
     avg_wind_speed = mean(m.s, na.rm = TRUE)
   )
 
+write.csv(daily_averages, file = "data_for_analysis/weather/dailyavg.csv",row.names = F)
+
+
 mtempwind<- wetdb %>%
   group_by(wk) %>%
   summarize(mean_tem = mean(Celsius, na.rm = T), mean_wind = mean(m.s, na.rm = T))# there are NA's I don't know from where. I know now that we need to include the na.rm=T argument so there are no 
