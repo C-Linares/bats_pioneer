@@ -36,60 +36,77 @@ bm<-read.csv('data_for_analysis/data_glmm/bat_counts.csv', header = T) # bat cou
 bm$jday_scaled<-scale(bm$jday)
 bm$datefromyday<-as_date(bm$jday, origin= "2021-01-01")
 filtered_bm <- bm[bm$AUTO.ID. != "Noise", ] # if noise is not filtered there is more records for dark sites. 
-
+colnames(filtered_bm)[3]<-"sp" # change Auto.ID to sp
 
 btrait<-read.csv('data_for_analysis/Bat_trait.csv', header = T)
-btrait$Species<-toupper(btrait$Species)
+btrait$Species<-toupper(btrait$Species) # makes all caps
 batnames<-read.csv('data_for_analysis/Species_bats.csv')
-colnames(batnames)[3]<-"Species"
+colnames(batnames)[3]<-"sp"
+colnames(btrait)[2]<-"sp"
 
 elev<-read.csv('data_for_analysis/elev/elevation.csv', header = T)
 elev<-elev %>% rename("site" = "name")
 
 ndvi<-read.csv('data_for_analysis/NDVI/NDVI_of_rip2021.csv', header = T)
+ndvi<- ndvi %>% dplyr::select(-c("ele", "time", "magvar", "geoidheigh", "dgpsid") )
+ndvi<-ndvi %>% rename("site" = "name")
+ndvi<-ndvi %>% rename("ndvi_mean" = "X_mean")
+ndvi$site<-tolower(ndvi$site)
+
+
 weather<-read.csv('data_for_analysis/weather/dailyavg.csv', header = T)
 moon<-read.csv('data_for_analysis/moon_pred.csv')
 
   
 
 #merge 
-namestraits<-left_join(btrait, batnames, by= "Species")
-traits<- namestraits %>% dplyr::select(c("Species","Six.letter.species.code","Mass","Aspect","PeakFreq","Loading" ) )
+namestraits<-left_join(btrait, batnames, by= "sp")
+traits<- namestraits %>% dplyr::select(c("sp","Six.letter.species.code","Mass","Aspect","PeakFreq","Loading" ) )
 
-t<-left_join(bm, elev, by="site", )
+
+bm2<-left_join(filtered_bm, elev, by="site" )
+bm2<-left_join(bm2, ndvi, by="site")
+t<-left_join(bm2, traits, by="species") # not working yet
+
+
+# scale data 
+
+bm2$elev_mean_s<- scale(bm2$elev_mean)
+bm2$ndvi_mean_s<- scale(bm2$ndvi_mean)
+bm2$percent_s<-scale(bm2$percent)
 
 # explore data ------------------------------------------------------------
 
 # Plot the distribution of the count data
-ggplot(bm, aes(x = n)) +
+ggplot(filtered_bm, aes(x = n)) +
   geom_histogram(binwidth = 40, fill = "blue", color = "black") +
   theme_minimal() +
   labs(title = "Distribution of Bat Calls", x = "Number of Calls", y = "Frequency")
 
-ggplot(bm, aes(x=jday, y=n, col=treatmt))+
+ggplot(filtered_bm, aes(x=jday, y=n, col=treatmt))+
   geom_point()+
   facet_wrap("site")
 
 
-# model -------------------------------------------------------------------
+# models -------------------------------------------------------------------
 
 # Fit a Poisson model without random effects to check goodness-of-fit
 m1 <- glmer(n ~ (1|site),
-                     data = bm, 
+                     data = bm2, 
                      family = poisson)
 exp(m1@beta)# base line for bats at all sites. 
 
-summary(poisson_model)
+summary(m1)
 
 m1.1<- glmer(n ~ trmt_bin +(1|site),
-           data = bm, 
+           data = bm2, 
            family = poisson)
 exp(m1.1@beta)
 summary(m1.1)
 
 
 m1.2<- glmer(n ~ trmt_bin + jday_scaled+ (1|site),
-                   data = bm, 
+                   data = bm2, 
                    family = poisson)
 
 
@@ -118,7 +135,7 @@ vif(m1.2)
 
 
 library(MASS)
-m1.2_nb <- glmer.nb(n ~ trmt_bin + jday_scaled + (1|site), data = bm)
+m1.2_nb <- glmer.nb(n ~ treatmt +  (1|site), data = bm2)
 summary(m1.2_nb)
 
 plot(fitted(m1.2_nb), residuals(m1.2_nb), main = "Residuals vs Fitted", 
@@ -136,3 +153,26 @@ hist(residuals(m1.2), breaks = 30, main = "Histogram of Residuals",
 plot(fitted(m1.2), sqrt(abs(residuals(m1.2))), main = "Scale-Location Plot",
      xlab = "Fitted values", ylab = "Square Root of |Residuals|")
 abline(h = 0, col = "red")
+
+
+m1.3_nb <- glmer.nb(n ~ treatmt+ ndvi_mean_s +  (1|site), data = bm2)
+summary(m1.3_nb)
+
+plot(fitted(m1.3_nb), residuals(m1.3_nb), main = "Residuals vs Fitted", 
+     xlab = "Fitted values", ylab = "Residuals")
+abline(h = 0, col = "red")
+
+qqnorm(residuals(m1.3_nb), main = "Normal Q-Q Plot")
+qqline(residuals(m1.3_nb), col = "red")
+
+# Histogram of residuals
+hist(residuals(m1.3_nb), breaks = 30, main = "Histogram of Residuals", 
+     xlab = "Residuals")
+
+# Scale-Location Plot
+plot(fitted(m1.3_nb), sqrt(abs(residuals(m1.3_nb))), main = "Scale-Location Plot",
+     xlab = "Fitted values", ylab = "Square Root of |Residuals|")
+abline(h = 0, col = "red")
+
+
+plot_model(m1.3_nb, type = "est", show.values = TRUE, value.offset = 0.3)
