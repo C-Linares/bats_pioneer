@@ -46,9 +46,13 @@ colnames(btrait)[2]<-"sp"
 
 elev<-read.csv('data_for_analysis/elev/elevation.csv', header = T)
 elev<-elev %>% rename("site" = "name")
+elev$site <-tolower(elev$site)
+#Use gsub to replace 'viz' with 'vizc' in the 'site' column of df1
+elev$site <- gsub("viz(\\d{2})", "vizc\\1", elev$site)
+
 
 ndvi<-read.csv('data_for_analysis/NDVI/NDVI_of_rip2021.csv', header = T)
-ndvi<- ndvi %>% dplyr::select(-c("ele", "time", "magvar", "geoidheigh", "dgpsid") )
+ndvi<- ndvi %>% dplyr::select(-c("ele", "time", "magvar", "geoidheigh", "dgpsid") ) # remove unncessary cols
 ndvi<-ndvi %>% rename("site" = "name")
 ndvi<-ndvi %>% rename("ndvi_mean" = "X_mean")
 ndvi$site<-tolower(ndvi$site)
@@ -67,6 +71,7 @@ traits<- namestraits %>% dplyr::select(c("sp","Six.letter.species.code","Mass","
 bm2<-left_join(filtered_bm, elev, by="site" )
 bm2<-left_join(bm2, ndvi, by="site")
 t<-left_join(bm2, traits, by="species") # not working yet
+
 
 
 # scale data 
