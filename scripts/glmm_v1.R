@@ -27,6 +27,7 @@ library(lme4)
 library(sjPlot)
 library(ggeffects)
 library(car)
+library(glmmTMB)
 
 
 # data --------------------------------------------------------------------
@@ -65,20 +66,24 @@ moon<-read.csv('data_for_analysis/moon_pred.csv')
 
 #merge 
 namestraits<-left_join(btrait, batnames, by= "sp")
-traits<- namestraits %>% dplyr::select(c("sp","Six.letter.species.code","Mass","Aspect","PeakFreq","Loading" ) )
+colnames(namestraits)[2]<-"sp4"
+traits<- namestraits %>% dplyr::select(c("sp4","Six.letter.species.code","Mass","Aspect","PeakFreq","Loading" ) )
+colnames(traits)[2]<-"sp"
+rm(namestraits) 
 
+filtered_bm<- left_join(filtered_bm, traits, by="sp")
 
 bm2<-left_join(filtered_bm, elev, by="site" )
 bm2<-left_join(bm2, ndvi, by="site")
-t<-left_join(bm2, traits, by="species") # not working yet
 
 
 
 # scale data 
 
-bm2$elev_mean_s<- scale(bm2$elev_mean)
+bm2$elev_mean_s<- scale(bm2$elev_mean, center = T, scale = T)
 bm2$ndvi_mean_s<- scale(bm2$ndvi_mean)
 bm2$percent_s<-scale(bm2$percent)
+bm2$jday_s<-scale(bm2$jday)
 
 # explore data ------------------------------------------------------------
 
@@ -103,6 +108,8 @@ exp(m1@beta)# base line for bats at all sites.
 
 summary(m1)
 
+
+
 m1.1<- glmer(n ~ trmt_bin +(1|site),
            data = bm2, 
            family = poisson)
@@ -110,10 +117,16 @@ exp(m1.1@beta)
 summary(m1.1)
 
 
-m1.2<- glmer(n ~ trmt_bin + jday_scaled+ (1|site),
+
+m1.2<- glmer(n ~ trmt_bin + jday_scaled+ percent_s +elev_mean_s+  (1|site),
                    data = bm2, 
                    family = poisson)
 
+plot_residuals(m1.2)
+plot_model(m1.2)
+
+exp(m1.2@beta)
+summary(m1.2)
 
 plot(fitted(m1.2), residuals(m1.2), main = "Residuals vs Fitted", 
      xlab = "Fitted values", ylab = "Residuals")
