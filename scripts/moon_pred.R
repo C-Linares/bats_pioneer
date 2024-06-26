@@ -12,13 +12,36 @@ library(tidyverse)
 #we need the coordinates for the sites
 
 sts<-read.csv("data_for_analysis/sites_coordinates.csv")
+sts<-sts[1,]
 
-# bat2021<-read.csv('data_for_analysis/bat2021_v2.csv',check.names = T) this data is not up to date
+
+# load bat data 2021 for dates. 
+
 kpro_2021_bat<-read.csv('data_for_analysis/kpro2021_v1.csv')
-unique(kpro_2021_bat$site)
+bm<-read.csv('data_for_analysis/data_glmm/bat_counts.csv', header = T) # bat counts by jday
+# unique(bm$site)
 #get dates from bat2021
 
-datesite<-kpro_2021_bat %>% select(site,noche)
+datesite<-bm %>% select(site,jday)
+datesite$date<-as_date(bm$jday, origin= "2021-01-01")
+datesite$jday<-NULL
+
+# generate dates from 2021 to 2023 just the summer months. 
+
+start_date <- as.Date("2020-05-01")
+end_date <- as.Date("2023-09-30")
+
+# Generate the sequence of dates
+all_dates <- seq.Date(from = start_date, to = end_date, by = "day")
+# Filter the dates to include only May to September
+dates<- all_dates[format(all_dates, "%m") %in% c("05", "06", "07", "08", "09")]
+dates<-as.data.frame(dates)
+colnames(dates)[1]<-"date"
+
+
+# merge tdates# merge the dates with the site and the coordinates. 
+
+t1<-merge(dates, sts, by=NULL)
 
 # moon illumination, times, and pos ----------------------
 
@@ -33,7 +56,6 @@ moon_pos$date<-as.Date(moon_pos$date)
 t1$date<-as.Date(t1$date)
 moon_times<-unique(getMoonTimes(data = t1))
 
-
 t2 <- as.Date(unique(t1[, 1]), tz = "America/Denver")
 moon_illumination <- getMoonIllumination(date = t2)
 
@@ -41,7 +63,7 @@ moon_illumination <- getMoonIllumination(date = t2)
 moon_pred <- left_join(left_join(moon_pos, moon_times), moon_illumination)
 
 
-moon_pred<-moon_pred %>% select(date, lat, lon, altitude, rise,phase, fraction)
+moon_pred<-moon_pred %>% select(date, lat, lon, altitude, rise,set,phase, fraction, parallacticAngle, angle)
 
 moon_pred$above_horizon <- moon_pred$altitude > 0
 
@@ -49,17 +71,11 @@ moon_pred$above_horizon <- moon_pred$altitude > 0
 #lunar illumination calculated with lunar package
 
 
-attr(moon_pred$date, "tzone") <- "UTC" # make them UTM so the caslculation is ok
+attr(moon_pred$date, "tzone") <- "UTC" # make them UTM so the calculation is ok
+# myshift <- as.numeric(format(moon_pred$Datetime, "%H")) - 12 # read https://stackoverflow.com/questions/71757462/calculate-lunar-illumination-using-the-lunar-package-in-r
+moon_pred$l.illum<-lunar.illumination(moon_pred$noche)
 
-moon_pred$l.illum<-lunar.illumination(moon_pred$date)
-moon_pred<-rename(moon_pred, noche=date)#re rename date as noche so it can be merge with the other tables
 
-# add sites labels back
-moon_pred<-left_join(moon_pred,sts)
-
-#add week 
-
-moon_pred$wk<-week(moon_pred$noche)
 
 # make moon pred 0 if not above the horizon.
 
@@ -69,16 +85,22 @@ moon.adj<-moon_pred %>% mutate(
   l.illum= ifelse(above_horizon==FALSE,0,l.illum)
 )
 
-write.csv(moon_pred,file = 'data_analysis/moon_pred.csv', row.names = F) # ran once in case of needing to rewrite the data
+
+colnames(moon_pred)[1]<-"date"
+
+
+
+
+write.csv(moon_pred,file = 'data_for_analysis/moon_pred.csv', row.names = F) # ran once in case of needing to rewrite the data
 
 
 
 #-----------------plots-----------------
-ggplot(moon_pred, aes(x=altitude, y=phase))+
+ggplot(moon.adj, aes(x=altitude, y=phase))+
   geom_point()+
   geom_vline(xintercept = 0)
 
-ggplot(moon_pred, aes(x=altitude, y=l.illum))+
+ggplot(moon.adj, aes(x=altitude, y=l.illum))+
   geom_point()+
   geom_vline(xintercept = 0)
 

@@ -174,8 +174,10 @@ write.csv(obs.cov2,file = 'data_for_analysis/bat_pop_analysis/obs.cov2.csv',
 
 # load
 
-kpro_2021_bat<-read.csv(file = 'data_for_analysis/kpro2021_v1.csv') # raw kpro data
-kpro_2021_bat$date_time<-ymd_hms(kpro_2021_bat$date_time)
+kpro_2021_bat<-read.csv(file = 'data_for_analysis/kpro2021_v1.csv') # data loading is the product of the script cleanup_script_v2
+
+
+kpro_2021_bat$date_time<-ymd_hms(kpro_2021_bat$date_time) # for some reason 22 fail to parse. 
 # kpro_2021_bat$jday<-lubridate::yday(kpro_2021_bat$DATE) # julian day
 
 #date time col. 
@@ -226,6 +228,9 @@ litsites<-c("iron01","iron03","iron05","long01","long03")
 bm$treatmt<-ifelse(bm$site %in% litsites , "lit", "dark") # this makes a treatment variable.
 
 bm$trmt_bin<- ifelse(bm$treatmt== "lit", 1, 0)
+summary(bm) #check for NAs
+write.csv(bm,file = 'data_for_analysis/data_glmm/bat_counts.csv',
+          row.names = F)
 
 # calls by day and week 
 bmat2 <- kpro_2021_bat %>% 

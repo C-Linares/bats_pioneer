@@ -12,7 +12,7 @@
 ##
 ## ---------------------------
 ##
-## Notes: 
+## Notes: need to anotate what script produced each data set inputed. 
 ##   
 ##
 ## ---------------------------
@@ -34,7 +34,6 @@ library(glmmTMB)
 
 
 bm<-read.csv('data_for_analysis/data_glmm/bat_counts.csv', header = T) # bat counts by jday
-bm$jday_scaled<-scale(bm$jday)
 bm$datefromyday<-as_date(bm$jday, origin= "2021-01-01")
 filtered_bm <- bm[bm$AUTO.ID. != "Noise", ] # if noise is not filtered there is more records for dark sites. 
 colnames(filtered_bm)[3]<-"sp" # change Auto.ID to sp
@@ -57,12 +56,23 @@ ndvi<- ndvi %>% dplyr::select(-c("ele", "time", "magvar", "geoidheigh", "dgpsid"
 ndvi<-ndvi %>% rename("site" = "name")
 ndvi<-ndvi %>% rename("ndvi_mean" = "X_mean")
 ndvi$site<-tolower(ndvi$site)
-
+#Use gsub to replace 'viz' with 'vizc' in the 'site' column of df1
+ndvi$site <- gsub("viz(\\d{2})", "vizc\\1", ndvi$site)
 
 weather<-read.csv('data_for_analysis/weather/dailyavg.csv', header = T)
-moon<-read.csv('data_for_analysis/moon_pred.csv')
+weather$date<-as_date(weather$date)
 
-  
+# moon clean-up
+moon<-read.csv('data_for_analysis/moon_pred.csv')
+# change noche to date
+moon<-moon %>% rename("date" = "noche")
+moon$date<- as_date(moon$date)
+moon$site <-tolower(moon$site)
+
+moon<- moon %>% dplyr::select(-c("X.1","X") ) # remove unncessary cols
+
+
+
 
 #merge 
 namestraits<-left_join(btrait, batnames, by= "sp")
@@ -74,8 +84,20 @@ rm(namestraits)
 filtered_bm<- left_join(filtered_bm, traits, by="sp")
 
 bm2<-left_join(filtered_bm, elev, by="site" )
-bm2<-left_join(bm2, ndvi, by="site")
+bm2 <- left_join(bm2, ndvi, by = "site") %>%
+  select(-c("X", "time", "buff_area.x", "buff_area.y"))
 
+colnames(bm2)[7]<-"date"
+
+bm2$date<-as_date(bm2$date)
+bm2<- left_join(bm2, weather, by="date")
+
+
+t<- left_join(bm2, moon, by=c("site","date"))
+
+
+# Identify rows with NA values
+rows_with_na <- bm2[rowSums(is.na(bm2)) > 0, ] # some wind and temp have NAs because we are missing agusot 2021 weather data.
 
 
 # scale data 
@@ -98,9 +120,17 @@ ggplot(filtered_bm, aes(x=jday, y=n, col=treatmt))+
   facet_wrap("site")
 
 
+ggplot(bm2, aes(x = elev_mean)) +
+  geom_histogram(fill = "blue", color = "black") +
+  theme_minimal() 
+
+ggplot(bm2, aes(x = percent_s)) +
+  geom_histogram( fill = "blue", color = "black") +
+  theme_minimal() 
+
 # models -------------------------------------------------------------------
 
-# Fit a Poisson model without random effects to check goodness-of-fit
+# Fit a Poisson model intercept model. 
 m1 <- glmer(n ~ (1|site),
                      data = bm2, 
                      family = poisson)
@@ -118,11 +148,10 @@ summary(m1.1)
 
 
 
-m1.2<- glmer(n ~ trmt_bin + jday_scaled+ percent_s +elev_mean_s+  (1|site),
+m1.2<- glmer(n ~ trmt_bin * jday_scaled + percent_s +elev_mean_s+  (1|site),
                    data = bm2, 
                    family = poisson)
 
-plot_residuals(m1.2)
 plot_model(m1.2)
 
 exp(m1.2@beta)
@@ -149,48 +178,7 @@ vif(m1.2)
 
 
 
-# negative binomial -------------------------------------------------------
+# quasipoisson -------------------------------------------------------
 
 
-library(MASS)
-m1.2_nb <- glmer.nb(n ~ treatmt +  (1|site), data = bm2)
-summary(m1.2_nb)
 
-plot(fitted(m1.2_nb), residuals(m1.2_nb), main = "Residuals vs Fitted", 
-     xlab = "Fitted values", ylab = "Residuals")
-abline(h = 0, col = "red")
-
-qqnorm(residuals(m1.2), main = "Normal Q-Q Plot")
-qqline(residuals(m1.2), col = "red")
-
-# Histogram of residuals
-hist(residuals(m1.2), breaks = 30, main = "Histogram of Residuals", 
-     xlab = "Residuals")
-
-# Scale-Location Plot
-plot(fitted(m1.2), sqrt(abs(residuals(m1.2))), main = "Scale-Location Plot",
-     xlab = "Fitted values", ylab = "Square Root of |Residuals|")
-abline(h = 0, col = "red")
-
-
-m1.3_nb <- glmer.nb(n ~ treatmt+ ndvi_mean_s +  (1|site), data = bm2)
-summary(m1.3_nb)
-
-plot(fitted(m1.3_nb), residuals(m1.3_nb), main = "Residuals vs Fitted", 
-     xlab = "Fitted values", ylab = "Residuals")
-abline(h = 0, col = "red")
-
-qqnorm(residuals(m1.3_nb), main = "Normal Q-Q Plot")
-qqline(residuals(m1.3_nb), col = "red")
-
-# Histogram of residuals
-hist(residuals(m1.3_nb), breaks = 30, main = "Histogram of Residuals", 
-     xlab = "Residuals")
-
-# Scale-Location Plot
-plot(fitted(m1.3_nb), sqrt(abs(residuals(m1.3_nb))), main = "Scale-Location Plot",
-     xlab = "Fitted values", ylab = "Square Root of |Residuals|")
-abline(h = 0, col = "red")
-
-
-plot_model(m1.3_nb, type = "est", show.values = TRUE, value.offset = 0.3)
