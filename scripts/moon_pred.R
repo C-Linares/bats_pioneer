@@ -46,7 +46,7 @@ t1<-merge(dates, sts, by=NULL)
 # moon illumination, times, and pos ----------------------
 
 t1<-left_join(datesite,sts, by = "site")
-t1<-rename(t1, date=noche) # rename noche as date but remember this when rejoining the other data.
+# t1<-rename(t1, date=noche) # rename noche as date but remember this when rejoining the other data.
 t1<-t1 %>% select(date,lat,lon)
 
 moon_pos<- unique(getMoonPosition(data = t1))

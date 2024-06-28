@@ -64,17 +64,18 @@ weather$date<-as_date(weather$date)
 
 # moon clean-up
 moon<-read.csv('data_for_analysis/moon_pred.csv')
-# change noche to date
-moon<-moon %>% rename("date" = "noche")
 moon$date<- as_date(moon$date)
-moon$site <-tolower(moon$site)
+moon.adj<-moon %>% mutate(
+  phase = ifelse(above_horizon==FALSE,0,phase),
+  fraction= ifelse(above_horizon==FALSE,0,fraction),
+  l.illum= ifelse(above_horizon==FALSE,0,l.illum)
+)
 
-moon<- moon %>% dplyr::select(-c("X.1","X") ) # remove unncessary cols
+
+# merge -------------------------------------------------------------------
 
 
 
-
-#merge 
 namestraits<-left_join(btrait, batnames, by= "sp")
 colnames(namestraits)[2]<-"sp4"
 traits<- namestraits %>% dplyr::select(c("sp4","Six.letter.species.code","Mass","Aspect","PeakFreq","Loading" ) )
@@ -93,19 +94,42 @@ bm2$date<-as_date(bm2$date)
 bm2<- left_join(bm2, weather, by="date")
 
 
-t<- left_join(bm2, moon, by=c("site","date"))
+bm2<- left_join(bm2, moon.adj, by=c("date"))
 
 
 # Identify rows with NA values
-rows_with_na <- bm2[rowSums(is.na(bm2)) > 0, ] # some wind and temp have NAs because we are missing agusot 2021 weather data.
+rows_with_na <- bm2[rowSums(is.na(bm2)) > 0, ] # some wind and temp have NAs because we are missing august 2021 weather data.
+
+# correlation  ------------------------------------------------------------
+
+
+# check for correlation 
+numeric_cols<- sapply(bm2, is.numeric)
+cor1<-bm2[,numeric_cols] #keeps just the numeric
+cor1<-cor1 %>% select(-c("X_min","X_max","altitude","parallacticAngle","angle","lat", "lon" ))
+
+c1<- cor(cor1,use="pairwise.complete.obs")
+corrplot(c1, order= 'AOE', tl.)
 
 
 # scale data 
 
-bm2$elev_mean_s<- scale(bm2$elev_mean, center = T, scale = T)
-bm2$ndvi_mean_s<- scale(bm2$ndvi_mean)
-bm2$percent_s<-scale(bm2$percent)
-bm2$jday_s<-scale(bm2$jday)
+# bm2$elevm_s<- scale(bm2$elev_mean, center = T, scale = T) Use the loop instead. 
+# bm2$ndvim_s<- scale(bm2$ndvi_mean)
+# bm2$percent_s<-scale(bm2$percent)
+# bm2$jday_s<-scale(bm2$jday)
+# bm2$PeakFreq_s<-scale(bm2$PeakFreq)
+# bm2$l.illum_s<-scale(bm2$l.illum)
+# bm2$wind_s<scale(bm2$avg_wind_speed)
+
+# List of variable names to be scaled
+variables_to_scale <- c("elev_mean", "ndvi_mean", "percent", "jday", 
+                        "PeakFreq", "l.illum", "avg_wind_speed","avg_temperature","phase","fraction" )
+
+# Loop over each variable, scale it, and assign it back to the data frame with a new name
+for (var in variables_to_scale) {
+  bm2[[paste0(var, "_s")]] <- scale(bm2[[var]], center = TRUE, scale = TRUE)
+}
 
 # explore data ------------------------------------------------------------
 
@@ -120,13 +144,25 @@ ggplot(filtered_bm, aes(x=jday, y=n, col=treatmt))+
   facet_wrap("site")
 
 
-ggplot(bm2, aes(x = elev_mean)) +
-  geom_histogram(fill = "blue", color = "black") +
-  theme_minimal() 
-
-ggplot(bm2, aes(x = percent_s)) +
-  geom_histogram( fill = "blue", color = "black") +
-  theme_minimal() 
+variables_to_plot <- c("elev_mean", "ndvi_mean", "percent", "jday", 
+                        "PeakFreq", "l.illum", "avg_wind_speed","avg_temperature","phase","fraction" )
+# Generate the plots
+plots <- lapply(variables_to_plot, function(var) {
+  if (is.numeric(bm2[[var]])) {
+    ggplot(bm2, aes_string(x = var)) +
+      geom_histogram(fill = "blue", color = "black") +
+      theme_minimal() +
+      ggtitle(paste("Histogram of", var))
+  } else {
+    message(paste("Skipping non-numeric variable:", var))
+    NULL
+  }
+})
+# Combine the plots using patchwork
+plots <- Filter(Negate(is.null), plots)# removes all the null or NAs from the plot. We have somefor missing data. in avg temp, wind and peak freq
+combined_plot <- wrap_plots(plots)
+# Print the combined plot
+print(combined_plot)
 
 # models -------------------------------------------------------------------
 
@@ -137,14 +173,6 @@ m1 <- glmer(n ~ (1|site),
 exp(m1@beta)# base line for bats at all sites. 
 
 summary(m1)
-
-
-
-m1.1<- glmer(n ~ trmt_bin +(1|site),
-           data = bm2, 
-           family = poisson)
-exp(m1.1@beta)
-summary(m1.1)
 
 
 
@@ -182,3 +210,15 @@ vif(m1.2)
 
 
 
+m1.2 <- glmer(
+  n ~ trmt_bin * jday_s + ndvi_mean_s + percent_s + PeakFreq_s + l.illum_s +
+    avg_wind_speed_s + avg_temperature_s + (1+sp|site),
+  data = bm2,
+  family = 'poisson'
+)
+
+summary(m1.2)
+
+exp(coef(m1.2))
+
+plot_model(m1.2,)
