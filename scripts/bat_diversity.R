@@ -1,7 +1,22 @@
-################################################################################
-# This script was created by Carlos Linares for the analysis of the bat data collected in 2021
-# Dec 2022 
-#
+# ---------------------------
+##
+## Script name:  bat_diversity.R
+##
+## Purpose of script: asses bat diversity
+##
+## Author: Carlos Linares
+##
+## Date Created: 05/21/2024
+##
+## Email: carlosgarcialina@u.boisestate.edu
+##
+## ---------------------------
+##
+## Notes: started in 2022 and reworked in 2024 
+##   
+##
+## ---------------------------
+## 
 
 # load libraries 
 library(vegan)
@@ -10,15 +25,90 @@ library(iNEXT)
 library(tidyverse)
 library(lubridate)
 
-# load data
 
-bat2021<-read.csv('data_analysis/bat2021_v2.csv',check.names = T)
-bat2021$datetime<-ymd_hms(bat2021$datetime) # makes dates as dates 
-bat2021$noche<-ymd(bat2021$noche)# makes dates as dates
+# load data ---------------------------------------------------------------
 
-unique(bat2021$site)# tell us what sites we have
+# load kpro data. 
+
+bm<-read.csv('data_for_analysis/data_glmm/bat_counts.csv', header = T) # bat counts by jday  
+
+
+# bat2021<-read.csv('data_analysis/bat2021_v2.csv',check.names = T)
+# bat2021$datetime<-ymd_hms(bat2021$datetime) # makes dates as dates 
+# bat2021$noche<-ymd(bat2021$noche)# makes dates as dates
+
+# unique(bat2021$site)# tell us what sites we have
+
+
 
 # Matrix building ------------------
+
+# Summarize data to get total counts per species per site
+abundance_data <- bm %>%
+  group_by(site, AUTO.ID.) %>%
+  summarize(count = sum(n), .groups = 'drop') %>%
+  spread(key = site, value = count, fill = 0)
+
+# Convert to matrix and set species names as row names
+abundance_matrix <- as.matrix(abundance_data[,-1])
+rownames(abundance_matrix) <- abundance_data$AUTO.ID.
+
+# Check the matrix
+head(abundance_matrix)
+summary(abundance_data) # there is no NAs
+
+
+#Sum the abundances of each species across all sites
+total_abundance <- rowSums(abundance_matrix)
+
+# Print the total abundances
+print(total_abundance)
+
+# Identify the species with the highest total abundance
+most_abundant_species <- names(which.max(total_abundance))
+
+# Print the most abundant species
+print(paste("The most abundant species is:", most_abundant_species))
+
+# Perform iNEXT analysis
+iNEXT_result <- iNEXT(abundance_matrix, q=c(0,1,2),datatype = "abundance")
+
+# Plot results
+ggiNEXT(iNEXT_result)
+
+# Manually specify shapes and colors
+shapes <- c(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14)  # Up to 15 different shapes
+colors <- rainbow(15)  # Up to 15 different colors
+
+# Customize the ggiNEXT plot
+ggiNEXT(iNEXT_result,type = 1) +
+  scale_shape_manual(values = shapes) +
+  scale_color_manual(values = colors) +
+  theme_minimal()
+
+ggiNEXT(iNEXT_result, type = 3) +
+  scale_shape_manual(values = shapes) +
+  scale_color_manual(values = colors) +
+  theme_minimal()
+
+
+
+
+#Group by site and treatment, then summarize the total counts for each species
+
+bm<-filter(bm, AUTO.ID.!=c("Noise","NoID"))
+species_abundance <- bm %>%
+  group_by(site, treatmt, AUTO.ID.) %>%
+  summarize(total_count = sum(n), .groups = 'drop') %>%
+  arrange(site, treatmt, desc(total_count))
+
+# Get the most abundant species for each site and treatment
+most_abundant_species <- species_abundance %>%
+  group_by(site, treatmt) %>%
+  slice_max(total_count, n = 1, with_ties = FALSE)
+
+print(most_abundant_species)
+
 
 bat.sp.m<- bat2021 %>% 
   arrange(site) %>% 
@@ -45,31 +135,6 @@ bat.pred<- select(bat2021, "noche","site", "fraction", 'treatmt','trmt_bin') %>%
 bat.m<- left_join(bat.m, bat.pred)
 
 
-
-#---------------Activity Index --------------------#
-# with these two matrix we try to calculate the miller activity index.
-
-
-bat.m2<-bat2021 %>% # counts every minute but I make them presence absence later
-  group_by(site,SppAccp,noche,hr,min) %>% 
-  count(SppAccp) %>% 
-  mutate(pre.index= ifelse(n>=1,1,0)) %>% # this makes any counts >1 into 1 
-  spread(SppAccp,pre.index,fill = 0)
-
-# bat.m2long<- 
-
-bat.m3<- bat2021 %>% 
-  group_by(site,SppAccp,noche,hr,min) %>% 
-  count(SppAccp) %>% spread(SppAccp, n, fill=0)
-
-bat.m4<-bat.m3 %>% pivot_longer(-c(site,noche,hr,min,), names_to = "spp", values_to = "ai_miller")# long version of bat.m3 I don't know if I need a long format. I guess that for running the analysis I do. 
-
-
-recdates<-bat2021 %>% # this gives us the number of days each recorder was on. 
-  group_by(site) %>% 
-  summarise(startdate= min(datetime), enddate=max(datetime)) %>% 
-  mutate(n.days= time_length(enddate - startdate, unit = "days"))
-  
 
 
 
@@ -358,3 +423,37 @@ plot_model(m.myvo, title = "Myotis volans")
 m.myev<- glmer(n ~ scale(jday) + scale(fraction) + trmt_bin + (1|site), data = myev, family = poisson)
 summary (m.myev)
 plot_model(m.myev, title = "Myotis evotis")
+
+
+
+
+
+# junk --------------------------------------------------------------------
+
+
+#---------------Activity Index --------------------#
+# with these two matrix we try to calculate the miller activity index.
+
+
+bat.m2<-bat2021 %>% # counts every minute but I make them presence absence later
+  group_by(site,SppAccp,noche,hr,min) %>% 
+  count(SppAccp) %>% 
+  mutate(pre.index= ifelse(n>=1,1,0)) %>% # this makes any counts >1 into 1 
+  spread(SppAccp,pre.index,fill = 0)
+
+# bat.m2long<- 
+
+bat.m3<- bat2021 %>% 
+  group_by(site,SppAccp,noche,hr,min) %>% 
+  count(SppAccp) %>% spread(SppAccp, n, fill=0)
+
+bat.m4<-bat.m3 %>% pivot_longer(-c(site,noche,hr,min,), names_to = "spp", values_to = "ai_miller")# long version of bat.m3 I don't know if I need a long format. I guess that for running the analysis I do. 
+
+
+recdates<-bat2021 %>% # this gives us the number of days each recorder was on. 
+  group_by(site) %>% 
+  summarise(startdate= min(datetime), enddate=max(datetime)) %>% 
+  mutate(n.days= time_length(enddate - startdate, unit = "days"))
+
+
+

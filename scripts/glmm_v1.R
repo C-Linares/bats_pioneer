@@ -208,13 +208,14 @@ vif(m1.2)
 
 # quasipoisson -------------------------------------------------------
 
-
+#trying to make a quasi poisson.
 
 m1.2 <- glmer(
   n ~ trmt_bin * jday_s + ndvi_mean_s + percent_s + PeakFreq_s + l.illum_s +
     avg_wind_speed_s + avg_temperature_s + (1+sp|site),
   data = bm2,
-  family = 'poisson'
+  family = 'poisson',
+  control = glmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 100000))
 )
 
 summary(m1.2)
@@ -222,3 +223,10 @@ summary(m1.2)
 exp(coef(m1.2))
 
 plot_model(m1.2,)
+
+model_convergence <- m1.2@optinfo$conv$opt
+print(model_convergence)
+
+# Check if the Hessian matrix is positive definite
+is_positive_definite <- all(eigen(m1.2@optinfo$derivs$Hessian)$values > 0)
+print(is_positive_definite)
