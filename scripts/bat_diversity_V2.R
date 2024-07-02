@@ -148,7 +148,7 @@ bat.sp.m<- bm %>%
 tab<-t( bat.sp.m[,-1])
 totals2021<- rowSums(tab) # bat passes totals for 2021
 totals2021
-write.table(totals)
+write.table(totals2021)
 # Alpha
 
 sps<-specnumber(bat.sp.m)
@@ -237,6 +237,21 @@ beta.bat<-betadiver(bat.site.m, "w")
 range(beta.bat - vegdist(bat.site.m, binary = T))
 
 # -----------------Beta -----------------------
+
+metadata <- data.frame(
+  site = bat.sp.m$site,
+  Group = c("lit","d","lit","d","lit","d","lit","d","lit","d","d","d","d","d","d")) # Example grouping
+
+
+# Calculate Bray-Curtis dissimilarity
+beta_div <- vegdist(bat.sp.m[,-1], method = "bray")
+
+# Ensure the site order in metadata matches the site order in bat.sp.m
+metadata <- metadata[match(bat.sp.m$site, metadata$site), ]
+
+# Perform PERMANOVA
+adonis_result <- adonis2(beta_div ~ Group, data = metadata)
+
 
 
 bat.sp.m<-column_to_rownames(bat.sp.m, var = "site")

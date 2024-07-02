@@ -234,3 +234,21 @@ Maybe one by julian day by each species.
 | iron1         | 1     | 1     | 1    | 1   |      |      |
 |               |       |       |      |     |      |      |
 |               |       |       |      |     |      |      |
+
+------------------------------------------------------------------------
+
+7/1/2024
+
+I worked on the alpha and beta diversity. I am struggling finding calculate the beta diversity.\
+next:\
+put together the whole data for the three season.
+
+------------------------------------------------------------------------
+
+7/2/2024
+
+I ran a beta diversity with the vegan package and there is no difference in species composition between lit sites and drainages.
+
+I put together a table for robomoth 2022
+
+next: Robomoth 2023 and start exploring other ways to show no differences in beta diversity.
