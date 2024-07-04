@@ -252,3 +252,9 @@ I ran a beta diversity with the vegan package and there is no difference in spec
 I put together a table for robomoth 2022
 
 next: Robomoth 2023 and start exploring other ways to show no differences in beta diversity.
+
+------------------------------------------------------------------------
+
+07/03/2024
+
+Did some code o calculate the beta diversity and plotted the dissimilarity between sites. I also did a simple plot for alpha diversity.

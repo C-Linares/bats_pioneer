@@ -24,6 +24,7 @@ library(ggplot2)
 library(iNEXT)
 library(tidyverse)
 library(lubridate)
+library(viridis)
 
 
 # load data ---------------------------------------------------------------
@@ -140,7 +141,7 @@ print(most_abundant_species)
 bat.sp.m<- bm %>% 
   arrange(site) %>% 
   group_by(site) %>% 
-  count(AUTO.ID.) %>% 
+  count(AUTO.ID.) %>%  #counts the occurrences not the number of calls
   spread(AUTO.ID., n, fill=0)
 
 
@@ -153,26 +154,26 @@ write.table(totals2021)
 
 sps<-specnumber(bat.sp.m)
 shanon<- diversity(bat.sp.m[-1])
-ens<- exp(shan)
+ens<- exp(shanon)
 totbats <-
   rowSums(bat.sp.m != 0)
 
-alpha <-cbind.data.frame(sites = bat.sp.m[1] , sps, totbats, shan, ens) 
-alpha
+alpha.div <-cbind.data.frame(sites = bat.sp.m[1] , sps, totbats, shanon, ens) 
+alpha.div
 
 litsites<-c("iron01","iron03","iron05","long01","long03")
 
 
-alpha$treatmt<-ifelse(alpha$site %in% litsites , "lit", "dark")
+alpha.div$treatmt<-ifelse(alpha.div$site %in% litsites , "lit", "dark")
 
 
 #----- plot alpha ------
   
-p1.1 <- ggplot(data=alpha, aes(x=site, y=sps,size=5)) +
-  geom_point(colour="brown") +
-  # ylim(0,10) +
-  ylab("bat species richness")+
-  theme_classic() 
+p1.1 <- ggplot(data=alpha.div, aes(x=site, y=ens, color=treatmt)) +
+  geom_point() +
+  ylab("effective number of species")+
+  theme_classic() +
+  scale_color_viridis(discrete = T, option = "A",begin = 0, end = .5)
 p1.1
 
 
@@ -252,6 +253,37 @@ metadata <- metadata[match(bat.sp.m$site, metadata$site), ]
 # Perform PERMANOVA
 adonis_result <- adonis2(beta_div ~ Group, data = metadata)
 
+# -----------------------betapart-----------------
+
+library(betapart)
+library(dendextend)
+library(ggdendro)
+binary_bat_sp_m <- bat.sp.m %>%
+  mutate(across(everything(), ~ ifelse(. > 0, 1, 0)))
+
+beta.div<-beta.pair(binary_bat_sp_m[,-1], index.family = "sorensen")
+print(beta.div)
+
+# Perform hierarchical clustering
+hc <- hclust(beta.div$beta.sor, method = "average")
+# Convert to dendrogram object
+dend <- as.dendrogram(hc)
+#Convert to data frame for ggplot
+dend_data <- ggdendro::dendro_data(dend)
+
+# Plot using ggplot2
+ggplot() +
+  geom_segment(data = dend_data$segments, aes(x = x, y = y, xend = xend, yend = yend)) +
+  geom_text(data = dend_data$labels, aes(x = x, y = y, label = label), hjust = 1, size = 3) +
+  labs(title = "Dendrogram of Beta Diversity 2021") +
+  ylab("Sorensen disimilarity")+
+  theme(plot.title = element_text(hjust = 0.5))
+
+plot(hclust(beta.div$beta.sim, method="average"), hang=-1)
+plot(hclust(beta.div$beta.sor, method="average"))
+plot(density(beta.div$beta.sor), xlim=c(0,0.8), ylim=c(0, 19), xlab='Beta diversity', main="", lwd=3)
+
+#---------------------------------
 
 
 bat.sp.m<-column_to_rownames(bat.sp.m, var = "site")
@@ -267,6 +299,12 @@ scores(bats.bc.nmds)
 p6<-ordiplot(bats.bc.nmds, type = "none")
 points(p6, "sites", pch=21, col="red", bg="yellow")
 text(p6, "sites", col="blue", cex=0.9)
+
+
+
+
+
+
 
 
 
