@@ -258,3 +258,9 @@ next: Robomoth 2023 and start exploring other ways to show no differences in bet
 07/03/2024
 
 Did some code o calculate the beta diversity and plotted the dissimilarity between sites. I also did a simple plot for alpha diversity.
+
+------------------------------------------------------------------------
+
+07/08/2024
+
+worked on the BAT package to calculate beta diversity.

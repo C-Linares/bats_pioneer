@@ -283,6 +283,54 @@ plot(hclust(beta.div$beta.sim, method="average"), hang=-1)
 plot(hclust(beta.div$beta.sor, method="average"))
 plot(density(beta.div$beta.sor), xlim=c(0,0.8), ylim=c(0, 19), xlab='Beta diversity', main="", lwd=3)
 
+# adespatial
+
+# install.packages("adespatial")
+library(adespatial)
+
+# BAT package
+
+# install.packages("BAT")
+library(BAT)
+
+beta.div<-beta(bat.sp.m[,-1], abund = T) # jaccard beta diversity. 
+print(beta.div)
+
+# Convert beta_div to a distance matrix
+beta_dist <- as.dist(beta.div$Brich)
+
+# Perform PCoA
+pcoa_result <- cmdscale(beta_dist, eig = TRUE, k = 2)  # k is the number of dimensions
+pcoa_result$eig
+# Extract coordinates
+coordinates <- as.data.frame(pcoa_result$points)
+
+# Plot the PCoA results
+plot(coordinates$V1, coordinates$V2, xlab = "PCoA1", ylab = "PCoA2", main = "PCoA of Beta Diversity")
+text(coordinates$V1, coordinates$V2, labels = rownames(coordinates), pos = 3)
+
+
+coordinates_df <- as.data.frame(pcoa_result$points)
+coordinates_df$Site <- rownames(coordinates_df)
+
+# Create a ggplot
+ggplot(coordinates_df, aes(x = V1, y = V2, label = Site)) +
+  geom_point(size = 3) +
+  geom_text(vjust = 1.5, hjust = 0.5) +
+  labs(x = "PCoA1", y = "PCoA2", title = "PCoA of Beta Diversity") +
+  theme_minimal()
+
+ggplot(coordinates_df, aes(x = V1, y = V2)) +
+  geom_point(size = 3) +
+  geom_text(aes(label = c("iron01", "iron02", "iron03", "iron04", "iron05", 
+                          "iron06", "long01", "long02", "long03", "long04", 
+                          "long05", "viz01", "viz02", "viz03", "viz04")),
+            vjust = -1, hjust = 0.5) +  # Adjust vjust and hjust for label position
+  labs(title = "PCoA of Beta Diversity", x = "PCoA1", y = "PCoA2") +
+  theme_minimal()
+
+# beta1<-beta.multi(bat.sp.m[,-1], func = "jaccard", abund = TRUE, raref = 2, runs = 100) not working
+# con<-contribution(bat.sp.m[,-1], abund = TRUE) Not wortking 
 #---------------------------------
 
 
