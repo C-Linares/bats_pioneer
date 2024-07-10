@@ -176,33 +176,33 @@ summary(m1)
 
 
 
-m1.2<- glmer(n ~ trmt_bin * jday_scaled + percent_s +elev_mean_s+  (1|site),
+m1.1<- glmer(n ~ trmt_bin * jday_s + percent_s +elev_mean_s+  (1|site),
                    data = bm2, 
                    family = poisson)
 
-plot_model(m1.2)
+plot_model(m1.1)
 
-exp(m1.2@beta)
-summary(m1.2)
+exp(m1.1@beta)
+summary(m1.1)
 
-plot(fitted(m1.2), residuals(m1.2), main = "Residuals vs Fitted", 
+plot(fitted(m1.1), residuals(m1.1), main = "Residuals vs Fitted", 
      xlab = "Fitted values", ylab = "Residuals")
 abline(h = 0, col = "red")
 
-qqnorm(residuals(m1.2), main = "Normal Q-Q Plot")
-qqline(residuals(m1.2), col = "red")
+qqnorm(residuals(m1.1), main = "Normal Q-Q Plot")
+qqline(residuals(m1.1), col = "red")
 
 # Histogram of residuals
-hist(residuals(m1.2), breaks = 30, main = "Histogram of Residuals", 
+hist(residuals(m1.1), breaks = 30, main = "Histogram of Residuals", 
      xlab = "Residuals")
 
 # Scale-Location Plot
-plot(fitted(m1.2), sqrt(abs(residuals(m1.2))), main = "Scale-Location Plot",
+plot(fitted(m1.1), sqrt(abs(residuals(m1.2))), main = "Scale-Location Plot",
      xlab = "Fitted values", ylab = "Square Root of |Residuals|")
 abline(h = 0, col = "red")
 
 # Calculate VIF
-vif(m1.2)
+vif(m1.1)
 
 
 
@@ -212,7 +212,7 @@ vif(m1.2)
 
 m1.2 <- glmer(
   n ~ trmt_bin * jday_s + ndvi_mean_s + percent_s + PeakFreq_s + l.illum_s +
-    avg_wind_speed_s + avg_temperature_s + (1+sp|site),
+    avg_wind_speed_s + avg_temperature_s + (1 + sp | site),
   data = bm2,
   family = 'poisson',
   control = glmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 100000))
@@ -230,3 +230,25 @@ print(model_convergence)
 # Check if the Hessian matrix is positive definite
 is_positive_definite <- all(eigen(m1.2@optinfo$derivs$Hessian)$values > 0)
 print(is_positive_definite)
+
+
+quasi_table <- function(m1.2,ctab=coef(summary(m1.2))) {
+  phi <- sum(residuals(m1.2, type="pearson")^2)/df.residual(m1.2)
+  qctab <- within(as.data.frame(ctab),
+                  {   `Std. Error` <- `Std. Error`*sqrt(phi)
+                  `z value` <- Estimate/`Std. Error`
+                  `Pr(>|z|)` <- 2*pnorm(abs(`z value`), lower.tail=FALSE)
+                  })
+  return(qctab)
+}
+
+printCoefmat(quasi_table(m1.2),digits=2)
+
+
+
+
+# save models -------------------------------------------------------------
+
+
+save(m1.2, file = 'models/glmm_v1.RData')
+load("models/glmm_v1.RData")
