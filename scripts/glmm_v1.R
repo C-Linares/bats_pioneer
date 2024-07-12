@@ -4,7 +4,7 @@
 ##
 ## Purpose of script: Start running models for the 2021 data with glmm
 ##
-## Author: Carlos Linares
+## Author: Carlos Linares, Jen Cruz (collaborator)
 ##
 ## Date Created: 05/21/2024
 ##
@@ -12,7 +12,7 @@
 ##
 ## ---------------------------
 ##
-## Notes: need to anotate what script produced each data set inputed. 
+## Notes: need to annotate what script produced each data set imputed. 
 ##   
 ##
 ## ---------------------------
@@ -71,6 +71,8 @@ moon.adj<-moon %>% mutate(
   l.illum= ifelse(above_horizon==FALSE,0,l.illum)
 )
 
+effort_hrs<-read.csv('data_for_analysis/data_glmm/effort_hrs.csv')
+
 
 # merge -------------------------------------------------------------------
 
@@ -95,7 +97,7 @@ bm2<- left_join(bm2, weather, by="date")
 
 
 bm2<- left_join(bm2, moon.adj, by=c("date"))
-
+t<- left_join(bm2, effort_hrs, by=c("jday","site"))
 
 # Identify rows with NA values
 rows_with_na <- bm2[rowSums(is.na(bm2)) > 0, ] # some wind and temp have NAs because we are missing august 2021 weather data.
@@ -211,11 +213,11 @@ vif(m1.1)
 #trying to make a quasi poisson.
 
 m1.2 <- glmer(
-  n ~ trmt_bin * jday_s + ndvi_mean_s + percent_s + PeakFreq_s + l.illum_s +
-    avg_wind_speed_s + avg_temperature_s + (1 + sp | site),
+  n ~ trmt_bin + jday_s + I(jday_s^2) + ndvi_mean_s + percent_s + PeakFreq_s + l.illum_s +
+    avg_wind_speed_s + avg_temperature_s + (1 | site) + (1 + trmt_bin + ndvi_mean_s | sp ),
   data = bm2,
   family = 'poisson',
-  control = glmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 100000))
+#  control = glmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 100000))
 )
 
 summary(m1.2)
@@ -239,6 +241,7 @@ quasi_table <- function(m1.2,ctab=coef(summary(m1.2))) {
                   `z value` <- Estimate/`Std. Error`
                   `Pr(>|z|)` <- 2*pnorm(abs(`z value`), lower.tail=FALSE)
                   })
+  print(phi)
   return(qctab)
 }
 
@@ -247,8 +250,36 @@ printCoefmat(quasi_table(m1.2),digits=2)
 
 
 
+
+
+
+m1.3 <- glmer(
+  n ~ trmt_bin + jday_s + I(jday_s ^ 2) + ndvi_mean_s + percent_s + PeakFreq_s + l.illum_s +
+    avg_wind_speed_s + avg_temperature_s + (1 |site) + (1 + trmt_bin + ndvi_mean_s + jday_s + I(jday_s ^ 2) |sp),
+  data = bm2,
+  family = 'poisson',
+  #  control = glmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 100000))
+)
+
+summary(m1.3)
+
+printCoefmat(quasi_table(m1.2),digits=2)
+
+
+m1.3 <- glmer(
+  n ~ trmt_bin + jday_s + I(jday_s ^ 2) + ndvi_mean_s + percent_s + PeakFreq_s + l.illum_s +
+    avg_wind_speed_s + avg_temperature_s + (1 |site) + (1 + trmt_bin + ndvi_mean_s + jday_s + I(jday_s ^ 2) |sp),
+  offset = ###########ad effort 
+  data = bm2,
+  family = 'poisson',
+  #  control = glmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 100000))
+)
+
+
+
 # save models -------------------------------------------------------------
 
 
 save(m1.2, file = 'models/glmm_v1.RData')
 load("models/glmm_v1.RData")
+warnings(m1.2)

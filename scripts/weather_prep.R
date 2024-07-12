@@ -17,7 +17,9 @@ library(purrr)
 
 
 #----------- load data ---------------
-wetfls<-list.files('data_for_analysis/weather/',pattern = "*.csv",full.names = T) # list csvs
+#Data was obtainde from https://mesowest.utah.edu/ statition KSUN in Idaho. 
+#
+wetfls<-list.files('data_for_analysis/weather/',pattern = "^KSUN.*\\.csv$",full.names = T) # list csvs
 
 # this creates the data frame list but not the data base. 
 wetdb <- lapply(wetfls, function(wetfls) {

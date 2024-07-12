@@ -201,10 +201,13 @@ effort_days <- kpro_2021_bat %>%
   )
 
 effort_hrs <- kpro_2021_bat %>%
-  group_by(site, noche) %>%
+  group_by(site, noche, jday) %>%
   summarise(stard = min(date_time), endd = max(date_time)) %>%
   mutate(eff.hrs = time_length(endd - stard, unit = "hours")) %>% 
   mutate(wk=week(noche)) # calculates the week too. 
+
+write.csv(effort_hrs,file = 'data_for_analysis/data_glmm/effort_hrs.csv',
+          row.names = F)
 
 # calls by week
 

@@ -264,3 +264,9 @@ Did some code o calculate the beta diversity and plotted the dissimilarity betwe
 07/08/2024
 
 worked on the BAT package to calculate beta diversity.
+
+------------------------------------------------------------------------
+
+07/11/2024
+
+I tried to fixed the weather data and the effort data to add an offset to the model an maybe improve how it works.
