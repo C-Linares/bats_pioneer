@@ -270,3 +270,11 @@ worked on the BAT package to calculate beta diversity.
 07/11/2024
 
 I tried to fixed the weather data and the effort data to add an offset to the model an maybe improve how it works.
+
+------------------------------------------------------------------------
+
+07/16/2023
+
+Weather updated
+
+next step try an offset model
