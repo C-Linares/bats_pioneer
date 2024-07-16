@@ -18,8 +18,8 @@ library(purrr)
 
 #----------- load data ---------------
 #Data was obtainde from https://mesowest.utah.edu/ statition KSUN in Idaho. 
-#
-wetfls<-list.files('data_for_analysis/weather/',pattern = "^KSUN.*\\.csv$",full.names = T) # list csvs
+#list data
+wetfls<-list.files('data_for_analysis/weather/',pattern = "^KSUN.*\\.csv$",full.names = T)
 
 # this creates the data frame list but not the data base. 
 wetdb <- lapply(wetfls, function(wetfls) {
@@ -32,13 +32,15 @@ str(wetdb)
 
 # data cleaning --------------
 
-wetdb<- setnames(wetdb, old = "X.1", new = "date.time") # change col name to date
+wetdb<- setnames(wetdb, old = c("X.1","X"), new = c("date.time", "station")) # change col name to date
 
 wetdb$date.time<- mdy_hm(wetdb$date.time, tz = "America/Denver")
 
 wetdb$wk<- week(wetdb$date.time)
 
-wetdb <- wetdb %>% select(-"Millimeters")# remove empty colum
+wetdb$hr<-hour(wetdb$date.time)
+
+# wetdb <- wetdb %>% select(-"Millimeters")# remove empty colum
 
 # just date column
 
@@ -53,8 +55,30 @@ daily_averages <- wetdb %>%
     avg_temperature = mean(Celsius, na.rm = TRUE),
     avg_wind_speed = mean(m.s, na.rm = TRUE)
   )
+  
+# calculate night averages
+
+nigh_averages <- wetdb %>%
+  # Filter for nighttime records (example: 6 PM to 6 AM)
+  filter(hr >= 18 | hr < 6) %>%
+  # Group by date
+  group_by(date) %>%
+  # Calculate nightly averages
+  summarize(
+    avg_temperature = mean(Celsius, na.rm = TRUE),
+    avg_wind_speed = mean(m.s, na.rm = TRUE)
+  )
+
+#filter clouds just at night. 
+cls<- wetdb %>% 
+  filter(hr >= 18 | hr < 6) %>% 
+  mutate(cld= str_extract(cls$code, "\\d$"))
+
+# extract the last digit of the cloud code. This correspond to the clud magnitude. 
+cls.code<-str_extract(cls$code, "\\d$")
 
 write.csv(daily_averages, file = "data_for_analysis/weather/dailyavg.csv",row.names = F)
+write.csv(daily_averages, file = "data_for_analysis/weather/nigh_averages.csv",row.names = F)
 
 
 mtempwind<- wetdb %>%
@@ -85,3 +109,9 @@ ggplot(daily_averages, aes(x= date, y=avg_temperature ))+
   labs(title = "time series temp",
        x="date",
        y= "temp C")
+
+
+ggplot(cls, aes(x = cld)) +
+  geom_bar(stat = "count", fill = "blue", color = "black") + # there's almost no clouds at night. 
+  theme_minimal() +
+  labs(title = "", x = "", y = "Frequency")
