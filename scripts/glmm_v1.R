@@ -28,7 +28,11 @@ library(sjPlot)
 library(ggeffects)
 library(car)
 library(glmmTMB)
+library(corrplot)
 
+#load environment 
+#last worked 7/17/2024
+# load(file = 'working_env/glmm_v1.RData')
 
 # data --------------------------------------------------------------------
 
@@ -59,7 +63,7 @@ ndvi$site<-tolower(ndvi$site)
 #Use gsub to replace 'viz' with 'vizc' in the 'site' column of df1
 ndvi$site <- gsub("viz(\\d{2})", "vizc\\1", ndvi$site)
 
-weather<-read.csv('data_for_analysis/weather/dailyavg.csv', header = T)
+weather<-read.csv('data_for_analysis/weather/nigh_averages.csv', header = T) #load nightly averages
 weather$date<-as_date(weather$date)
 
 # moon clean-up
@@ -97,7 +101,7 @@ bm2<- left_join(bm2, weather, by="date")
 
 
 bm2<- left_join(bm2, moon.adj, by=c("date"))
-t<- left_join(bm2, effort_hrs, by=c("jday","site"))
+bm2<- left_join(bm2, effort_hrs, by=c("jday","site"))
 
 # Identify rows with NA values
 rows_with_na <- bm2[rowSums(is.na(bm2)) > 0, ] # some wind and temp have NAs because we are missing august 2021 weather data.
@@ -111,10 +115,10 @@ cor1<-bm2[,numeric_cols] #keeps just the numeric
 cor1<-cor1 %>% select(-c("X_min","X_max","altitude","parallacticAngle","angle","lat", "lon" ))
 
 c1<- cor(cor1,use="pairwise.complete.obs")
-corrplot(c1, order= 'AOE', tl.)
+corrplot(c1, order= 'AOE')
 
 
-# scale data 
+# scale data old way
 
 # bm2$elevm_s<- scale(bm2$elev_mean, center = T, scale = T) Use the loop instead. 
 # bm2$ndvim_s<- scale(bm2$ndvi_mean)
@@ -135,13 +139,16 @@ for (var in variables_to_scale) {
 
 # explore data ------------------------------------------------------------
 
+summary(bm2)
+# there are some bat 
+
 # Plot the distribution of the count data
-ggplot(filtered_bm, aes(x = n)) +
+ggplot(bm2, aes(x = n)) +
   geom_histogram(binwidth = 40, fill = "blue", color = "black") +
   theme_minimal() +
   labs(title = "Distribution of Bat Calls", x = "Number of Calls", y = "Frequency")
 
-ggplot(filtered_bm, aes(x=jday, y=n, col=treatmt))+
+ggplot(bm2, aes(x=jday, y=n, col=treatmt))+
   geom_point()+
   facet_wrap("site")
 
@@ -217,7 +224,6 @@ m1.2 <- glmer(
     avg_wind_speed_s + avg_temperature_s + (1 | site) + (1 + trmt_bin + ndvi_mean_s | sp ),
   data = bm2,
   family = 'poisson',
-#  control = glmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 100000))
 )
 
 summary(m1.2)
@@ -263,23 +269,113 @@ m1.3 <- glmer(
 
 summary(m1.3)
 
-printCoefmat(quasi_table(m1.2),digits=2)
+printCoefmat(quasi_table(m1.3),digits=2)
+
+model_convergence <- m1.3@optinfo$conv$opt
+print(model_convergence)
 
 
-m1.3 <- glmer(
-  n ~ trmt_bin + jday_s + I(jday_s ^ 2) + ndvi_mean_s + percent_s + PeakFreq_s + l.illum_s +
-    avg_wind_speed_s + avg_temperature_s + (1 |site) + (1 + trmt_bin + ndvi_mean_s + jday_s + I(jday_s ^ 2) |sp),
-  offset = ###########ad effort 
+# calculate c-hat
+# Calculate residual deviance and residual degrees of freedom
+residual_deviance <- deviance(m1.3)
+residual_df <- df.residual(m1.3)
+
+# Calculate c-hat using residual deviance
+c_hat_deviance <- residual_deviance / residual_df
+print(c_hat_deviance)
+
+
+
+
+# glm no random effects ---------------------------------------------------
+
+
+# the model below is severely over-disperse. 
+m1.4 <- glm(
+  n ~ trmt_bin + jday_s + I(jday_s ^ 2) + ndvi_mean_s + percent_s  + l.illum_s +
+    avg_wind_speed_s + avg_temperature_s ,
   data = bm2,
   family = 'poisson',
   #  control = glmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 100000))
 )
+summary(m1.4)
+
+# calculate c-hat
+# Calculate residual deviance and residual degrees of freedom
+residual_deviance <- deviance(m1.4)
+residual_df <- df.residual(m1.4)
+
+# Calculate c-hat using residual deviance
+c_hat_deviance <- residual_deviance / residual_df
+print(c_hat_deviance)
+
+# Calculate Pearson's chi-square statistic
+pearson_chisq <- sum(residuals(m1.4, type = "pearson")^2)
+
+# Calculate c-hat using Pearson's chi-square statistic
+c_hat_pearson <- pearson_chisq / residual_df
+print(c_hat_pearson)
+
+
+#---------------------------------------------------------------#
+
+m1.4_quasi <- glm(
+  n ~ trmt_bin + jday_s + I(jday_s^2) + ndvi_mean_s + percent_s + PeakFreq_s + l.illum_s +
+    avg_wind_speed_s + avg_temperature_s,
+  data = bm2,
+  family = quasipoisson()
+)
+summary(m1.4_quasi)
+
+
+# Calculate residual deviance and residual degrees of freedom
+residual_deviance <- deviance(m1.4_quasi)
+residual_df <- df.residual(m1.4_quasi)
+
+# Calculate c-hat using residual deviance
+c_hat_deviance <- residual_deviance / residual_df
+print(c_hat_deviance)
+
+#---------------------------------------------------------------#
+#this one needs a long time to run 
+library(MASS)
+m1.4_nb <- glmer.nb(
+  n ~ trmt_bin + jday_s + I(jday_s^2) + ndvi_mean_s + percent_s + PeakFreq_s + l.illum_s +
+    avg_wind_speed_s + avg_temperature_s + (1 | site) + (1 + trmt_bin + ndvi_mean_s + jday_s + I(jday_s^2) | sp),
+  data = bm2
+)
+summary(m1.4_nb)
+
+# Calculate residual deviance and residual degrees of freedom
+residual_deviance <- deviance(m1.4_nb)
+residual_df <- df.residual(m1.4_nb)
+
+# Calculate c-hat using residual deviance
+c_hat_deviance <- residual_deviance / residual_df
+print(c_hat_deviance)
+
+model_convergence <- m1.4_nb@optinfo$conv$opt
+print(model_convergence)
+
+profile(m1.4_nb)
+# model with offset effort  -------------------------------------------------------
+
+
+m1.4 <- glm(
+  n ~ trmt_bin + jday_s + I(jday_s ^ 2) + ndvi_mean_s + percent_s  + l.illum_s +
+    avg_wind_speed_s + avg_temperature_s ,
+   offset = ###########ad effort 
+  data = bm2,
+  family = 'poisson',
+)
+
 
 
 
 # save models -------------------------------------------------------------
 
+#sace image 
+save.image(file = "working_env/glmm_v1.RData")
 
-save(m1.2, file = 'models/glmm_v1.RData')
+save(c(m1.2,m1.3,m1.4,m1.4_nb,m1.4_quasi), file = 'models/glmm_v1.RData')
 load("models/glmm_v1.RData")
-warnings(m1.2)

@@ -74,19 +74,13 @@ cls<- wetdb %>%
   filter(hr >= 18 | hr < 6) %>% 
   mutate(cld= str_extract(cls$code, "\\d$"))
 
-# extract the last digit of the cloud code. This correspond to the clud magnitude. 
+# extract the last digit of the cloud code. This correspond to the cloud magnitude. 
 cls.code<-str_extract(cls$code, "\\d$")
 
 write.csv(daily_averages, file = "data_for_analysis/weather/dailyavg.csv",row.names = F)
 write.csv(daily_averages, file = "data_for_analysis/weather/nigh_averages.csv",row.names = F)
 
 
-mtempwind<- wetdb %>%
-  group_by(wk) %>%
-  summarize(mean_tem = mean(Celsius, na.rm = T), mean_wind = mean(m.s, na.rm = T))# there are NA's I don't know from where. I know now that we need to include the na.rm=T argument so there are no 
-
-# Filter and save rows with NAs
-na_rows <- wetdb[!complete.cases(wetdb), ]
 
 
 #write data
@@ -115,3 +109,17 @@ ggplot(cls, aes(x = cld)) +
   geom_bar(stat = "count", fill = "blue", color = "black") + # there's almost no clouds at night. 
   theme_minimal() +
   labs(title = "", x = "", y = "Frequency")
+
+
+
+# junk --------------------------------------------------------------------
+
+# week weather.
+#   possibly not necessary 
+mtempwind<- wetdb %>%
+  group_by(wk) %>%
+  summarize(mean_tem = mean(Celsius, na.rm = T), mean_wind = mean(m.s, na.rm = T))# there are NA's I don't know from where. I know now that we need to include the na.rm=T argument so there are no 
+
+# Filter and save rows with NAs
+na_rows <- wetdb[!complete.cases(wetdb), ]
+
