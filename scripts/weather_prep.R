@@ -74,7 +74,7 @@ cls<- wetdb %>%
   filter(hr >= 18 | hr < 6) %>% 
   mutate(cld= str_extract(cls$code, "\\d$"))
 
-# extract the last digit of the cloud code. This correspond to the cloud magnitude. 
+# extnullfile()# extract the last digit of the cloud code. This correspond to the cloud magnitude. 
 cls.code<-str_extract(cls$code, "\\d$")
 
 write.csv(daily_averages, file = "data_for_analysis/weather/dailyavg.csv",row.names = F)

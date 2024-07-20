@@ -30,6 +30,7 @@ library(car)
 library(glmmTMB)
 library(corrplot)
 
+
 #load environment 
 #last worked 7/17/2024
 # load(file = 'working_env/glmm_v1.RData')
@@ -117,7 +118,6 @@ cor1<-cor1 %>% select(-c("X_min","X_max","altitude","parallacticAngle","angle","
 c1<- cor(cor1,use="pairwise.complete.obs")
 corrplot(c1, order= 'AOE')
 
-
 # scale data old way
 
 # bm2$elevm_s<- scale(bm2$elev_mean, center = T, scale = T) Use the loop instead. 
@@ -129,8 +129,19 @@ corrplot(c1, order= 'AOE')
 # bm2$wind_s<scale(bm2$avg_wind_speed)
 
 # List of variable names to be scaled
-variables_to_scale <- c("elev_mean", "ndvi_mean", "percent", "jday", 
-                        "PeakFreq", "l.illum", "avg_wind_speed","avg_temperature","phase","fraction" )
+variables_to_scale <- c(
+  "elev_mean",
+  "ndvi_mean",
+  "percent",
+  "jday",
+  "PeakFreq",
+  "l.illum",
+  "avg_wind_speed",
+  "avg_temperature",
+  "phase",
+  "fraction",
+  "eff.hrs"
+)
 
 # Loop over each variable, scale it, and assign it back to the data frame with a new name
 for (var in variables_to_scale) {
@@ -357,18 +368,31 @@ print(c_hat_deviance)
 model_convergence <- m1.4_nb@optinfo$conv$opt
 print(model_convergence)
 
-profile(m1.4_nb)
+#coefficients
+mcoef<-coef(m1.4_nb)
+
 # model with offset effort  -------------------------------------------------------
 
 
-m1.4 <- glm(
+m1.4_off <- glmer.nb(
   n ~ trmt_bin + jday_s + I(jday_s ^ 2) + ndvi_mean_s + percent_s  + l.illum_s +
-    avg_wind_speed_s + avg_temperature_s ,
-   offset = ###########ad effort 
+    avg_wind_speed_s + avg_temperature_s + (1 | site) + (1 + trmt_bin + ndvi_mean_s + jday_s + I(jday_s^2) | sp),
+   offset = eff.hrs_s,
   data = bm2,
-  family = 'poisson',
 )
 
+summary(m1.4_off)
+
+# Calculate residual deviance and residual degrees of freedom
+residual_deviance <- deviance(m1.4_off)
+residual_df <- df.residual(m1.4_off)
+
+# Calculate c-hat using residual deviance
+c_hat_deviance <- residual_deviance / residual_df
+print(c_hat_deviance)
+
+model_convergence <- m1.4_nb@optinfo$conv$opt
+print(model_convergence)
 
 
 
@@ -379,3 +403,80 @@ save.image(file = "working_env/glmm_v1.RData")
 
 save(c(m1.2,m1.3,m1.4,m1.4_nb,m1.4_quasi), file = 'models/glmm_v1.RData')
 load("models/glmm_v1.RData")
+
+
+
+
+# plots -------------------------------------------------------------------
+
+# model m1.4_nb
+sjPlot::plot_model(m1.4_nb)
+
+plot_jday <- effect("jday_s", m1.4_nb, xlevels = list(jday_s = seq(
+  min(bm2$jday_s), max(bm2$jday_s), length.out = 100
+)))
+
+plot_trmt_bin <- effect("trmt_bin", m1.4_nb, xlevels = list(trmt_bin = seq(
+  min(bm2$trmt_bin), max(bm2$trmt_bin), length.out = 100
+)))
+
+plot_ndvi <- effect("ndvi_mean_s", m1.4_nb, xlevels = list(ndvi_mean_s = seq(
+  min(bm2$ndvi_mean_s), max(bm2$ndvi_mean_s), length.out = 100
+)))
+
+plot_percent_s <- effect("percent_s", m1.4_nb, xlevels = list(percent_s = seq(
+  min(bm2$percent_s), max(bm2$percent_s), length.out = 100
+)))
+
+plot_PeakFreq_s  <- effect("PeakFreq_s ", m1.4_nb, xlevels = list(PeakFreq_s  = seq(
+  min(bm2$PeakFreq_s,na.rm = TRUE), max(bm2$PeakFreq_s,na.rm = TRUE ), length.out = 100
+)))
+
+plot_l.illum_s  <- effect("l.illum_s ", m1.4_nb, xlevels = list(l.illum_s  = seq(
+  min(bm2$l.illum_s,na.rm = TRUE), max(bm2$l.illum_s,na.rm = TRUE ), length.out = 100
+)))
+
+plot_avg_wind_speed_s   <- effect("avg_wind_speed_s  ", m1.4_nb, xlevels = list(avg_wind_speed_s   = seq(
+  min(bm2$avg_wind_speed_s ,na.rm = TRUE), max(bm2$avg_wind_speed_s ,na.rm = TRUE ), length.out = 100
+)))
+
+plot_avg_temperature_s     <- effect("avg_temperature_s    ", m1.4_nb, xlevels = list(avg_temperature_s     = seq(
+  min(bm2$avg_temperature_s   ,na.rm = TRUE), max(bm2$avg_temperature_s   ,na.rm = TRUE ), length.out = 100
+)))
+
+plot(plot_jday, multiline = TRUE)
+plot(plot_trmt_bin, multiline = TRUE)
+plot(plot_ndvi, multiline = TRUE)
+plot(plot_percent_s, multiline = T)
+plot(plot_PeakFreq_s, multiline = T)
+plot(plot_l.illum_s, multiline = T)
+plot(plot_avg_wind_speed_s, multiline = T)
+plot(plot_avg_temperature_s, multiline = T)
+
+
+
+
+generate_effect_plot <- function(variable_name, model_object, data) {
+  plot_data <- effect(variable_name, model_object, 
+                      xlevels = list(
+                        !!variable_name := seq(min(data[[variable_name]]), max(data[[variable_name]]), length.out = 100)
+                      ))
+  return(plot_data)
+}
+
+
+
+# plotting partial predictors
+
+# values to use
+n<-100
+int<-rep(1,n)
+
+# obs. values
+ord.day<-seq(min(bm2[,"jday"]), max(bm2[,"jday"]), length.out=n)
+#std pred
+jday.s<- scale(ord.day)
+
+#extract relevant fixed coefficient from abundance submodel results
+t<- m1.4_nb$sims.list$int.lam
+fixedabund <- cbind( mr$sims.list$int.lam, mr$sims.list$beta[,2] )
