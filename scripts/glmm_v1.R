@@ -477,6 +477,80 @@ ord.day<-seq(min(bm2[,"jday"]), max(bm2[,"jday"]), length.out=n)
 #std pred
 jday.s<- scale(ord.day)
 
-#extract relevant fixed coefficient from abundance submodel results
-t<- m1.4_nb$sims.list$int.lam
-fixedabund <- cbind( mr$sims.list$int.lam, mr$sims.list$beta[,2] )
+#extract fixed coef jday
+f.jday <- fixef(m1.4_nb)[c(1, 3)]
+
+#predicted ab
+
+predabund <- exp( f.jday %*% t( cbind( int, jday.s) ) )
+
+# mean abu
+
+mabund <- apply( predabund, MARGIN = 2, FUN = mean )
+
+#95% CI
+
+CIabund <- apply( predabund, MARGIN = 2, FUN = quantile, 
+                  probs = c(0.025, 0.975) )
+
+#Data
+
+abunddf <- data.frame(mabund, t(CIabund), jday.s, ord.day)
+
+colnames(abunddf )[1:3] <- c(  "Mean", "lowCI", "highCI" )
+
+ggplot( abunddf, aes( x = jday.s, y = Mean) ) +
+  theme_classic( base_size = 17) +
+  ylab( "bat calls" ) +
+  xlab( "jday" ) +
+  geom_line( size = 1.5) +
+  geom_ribbon( alpha = 0.3, aes( ymin = lowCI, ymax = highCI ) )
+
+# treatment partial prfedictor
+
+# obs. values
+trmt_bin<-seq(min(bm2[,"trmt_bin"]), max(bm2[,"trmt_bin"]), length.out=n) # how do you plot the obs. values when you have
+trmt_bin_s<- scale(trmt_bin)
+f.trmt <- fixef(m1.4_nb)[c(1,2 )]
+predabund <- exp( f.trmt %*% t( cbind( int, trmt_bin_s) ) )
+mabund <- apply( predabund, MARGIN = 2, FUN = mean )
+CIabund <- apply( predabund, MARGIN = 2, FUN = quantile, 
+                  probs = c(0.025, 0.975) )
+abunddf <- data.frame(mabund, t(CIabund), trmt_bin_s, trmt_bin)
+
+colnames(abunddf )[1:3] <- c(  "Mean", "lowCI", "highCI" )
+
+ggplot( abunddf, aes( x = trmt_bin_s, y = Mean) ) +
+  theme_classic( base_size = 17) +
+  ylab( "bat calls" ) +
+  xlab( "treatment" ) +
+  geom_line( size = 1.5) +
+  geom_ribbon( alpha = 0.3, aes( ymin = lowCI, ymax = highCI ) )
+
+ # marginal effects  -------------------------------------------------------
+
+day<-seq(min(bm2[,"jday"]), max(bm2[,"jday"]), length.out=n) # how do you plot the obs. values when you have
+day.s<- scale(day)
+f.day <- fixef(m1.4_nb)[c(1,2 )]
+predabund <- exp( f.trmt %*% t( cbind( int, trmt_bin_s) ) )
+mabund <- apply( predabund, MARGIN = 2, FUN = mean )
+CIabund <- apply( predabund, MARGIN = 2, FUN = quantile, 
+                  probs = c(0.025, 0.975) )
+abunddf <- data.frame(mabund, t(CIabund), trmt_bin_s, trmt_bin)
+
+colnames(abunddf )[1:3] <- c(  "Mean", "lowCI", "highCI" )
+
+ggplot( abunddf, aes( x = trmt_bin_s, y = Mean) ) +
+  theme_classic( base_size = 17) +
+  ylab( "bat calls" ) +
+  xlab( "treatment" ) +
+  geom_line( size = 1.5) +
+  geom_ribbon( alpha = 0.3, aes( ymin = lowCI, ymax = highCI ) )
+
+
+
+
+# cis
+
+cis<-confint(m1.4_nb)
+cis<-as.data.frame(cis)
