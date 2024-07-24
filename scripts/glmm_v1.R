@@ -21,7 +21,7 @@
 
 # libraries  --------------------------------------------------------------
 
-library(tidyverse)
+librar y(tidyverse)
 library(magrittr)
 library(lme4)
 library(sjPlot)
@@ -32,7 +32,7 @@ library(corrplot)
 
 
 #load environment 
-#last worked 7/17/2024
+#last worked 7/23/2024
 # load(file = 'working_env/glmm_v1.RData')
 
 # data --------------------------------------------------------------------
@@ -396,19 +396,35 @@ print(model_convergence)
 
 
 
-# save models -------------------------------------------------------------
+#rstan
+library(rstanarm)
 
-#sace image 
-save.image(file = "working_env/glmm_v1.RData")
-
-save(c(m1.2,m1.3,m1.4,m1.4_nb,m1.4_quasi), file = 'models/glmm_v1.RData')
-load("models/glmm_v1.RData")
+# rstan_models ------------------------------------------------------------
 
 
+# Define the formula
+formula <- n ~ trmt_bin + jday_s + I(jday_s^2) + ndvi_mean_s + percent_s + l.illum_s +
+  avg_wind_speed_s + avg_temperature_s + (1 | site) + (1 + trmt_bin + ndvi_mean_s + jday_s + I(jday_s^2) | sp)
+
+# Fit the negative binomial model using rstanarm
+m1.4_off <- stan_glmer(
+  formula,
+  family = neg_binomial_2(),  # Negative binomial family with log-link
+  # offset = log(scale(bm2$eff.hrs)),    # Offset term
+  data = bm2,
+  chains = 4,                 # Number of Markov chains
+  cores = 4                    # Number of cores to use (adjust as needed)
+)
 
 
+loo_m1.4_off <- loo(m1.4_off)
+print(loo_m1.4_off)
+
+plot_model(m1.4_off)
 # plots -------------------------------------------------------------------
 
+
+# plots with SJplot to see what I need to get manally
 # model m1.4_nb
 sjPlot::plot_model(m1.4_nb)
 
@@ -456,6 +472,23 @@ plot(plot_avg_temperature_s, multiline = T)
 
 
 
+
+# Sjplots  ----------------------------------------------------------------
+#Here we plot the negative binomial model using sjplot
+# coeffsicients
+b<-plot_model(m1.4_nb, type =c("re"), show.p = T)
+a<-plot_model(m1.4_nb, type =c("est"), se=T, show.p = T)
+
+# marginal effectrs
+c<-plot_model(m1.4_nb, type = "pred")
+
+
+#diagnostics 
+
+d<-plot_model(m1.4_nb, type = "diag")
+
+
+
 generate_effect_plot <- function(variable_name, model_object, data) {
   plot_data <- effect(variable_name, model_object, 
                       xlevels = list(
@@ -466,7 +499,7 @@ generate_effect_plot <- function(variable_name, model_object, data) {
 
 
 
-# plotting partial predictors
+# plotting partial predictors manually
 
 # values to use
 n<-100
@@ -559,7 +592,7 @@ re_sp <-ranef(m1.4_nb)$sp$trmt_bin
 fixefs<-fixef(m1.4_nb)
 
 rss<-re_sp
-rss[1]<- exp(rss[1]+fixef$)
+rss[1]<- exp(rss[1]+fixef)
 
 
 
@@ -599,3 +632,21 @@ plot(re_sp_slopes$ndvi_mean_s, main = "Random Slope: ndvi_mean_s", xlab = "Speci
 abline(h = 0, col = "red", lty = 2)
 
 par(mfrow = c(1, 1))  # Reset plotting layout to default
+
+
+
+
+
+
+
+
+
+
+
+# save models -------------------------------------------------------------
+
+#sace image 
+save.image(file = "working_env/glmm_v1.RData")
+
+save(c(m1.2,m1.3,m1.4,m1.4_nb,m1.4_quasi), file = 'models/glmm_v1.RData')
+load("models/glmm_v1.RData")

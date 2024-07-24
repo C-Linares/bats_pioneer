@@ -278,3 +278,8 @@ I tried to fixed the weather data and the effort data to add an offset to the mo
 Weather updated
 
 next step try an offset model
+
+0724/2024
+
+I have been working on plotting the random effects and the partial predictor plots for the model manually and using sjplot.\
+The next step should be rerun the model with the data from 2022 and 2023. I am building those databases right now and should load soon.
