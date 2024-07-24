@@ -550,7 +550,52 @@ ggplot( abunddf, aes( x = trmt_bin_s, y = Mean) ) +
 
 
 
-# cis
+# random effects plot
 
-cis<-confint(m1.4_nb)
-cis<-as.data.frame(cis)
+re_site <- ranef(m1.4_nb)$site
+re_sp <-ranef(m1.4_nb)$sp$trmt_bin 
+# Plot random intercepts for site
+
+fixefs<-fixef(m1.4_nb)
+
+rss<-re_sp
+rss[1]<- exp(rss[1]+fixef$)
+
+
+
+plot(re_site$'(Intercept)', xlab = "Site", ylab = "Random Intercept", main = "Random Intercept Variability: Site")
+abline(h = 0, col = "red", lty = 2)  # Add a reference line at zero
+
+
+
+
+
+
+
+#chat gpt code
+# Extract random effects for sp (intercept only)
+re_sp <- ranef(m1.4_nb)$sp
+
+# Plot random intercepts for sp
+plot(re_sp$'(Intercept)', xlab = "Species", ylab = "Random Intercept", main = "Random Intercept Variability: Species")
+abline(h = 0, col = "red", lty = 2)  # Add a reference line at zero
+
+# Extract random effects for sp (slopes)
+re_sp_slopes <- ranef(m1.4_nb)$sp
+
+# Plot random slopes for trmt_bin, jday_s, I(jday_s^2), ndvi_mean_s
+par(mfrow = c(2, 2))  # Set up a 2x2 plot layout
+
+plot(re_sp_slopes$trmt_bin, main = "Random Slope: trmt_bin", xlab = "Species")
+abline(h = 0, col = "red", lty = 2)
+
+plot(re_sp_slopes$jday_s, main = "Random Slope: jday_s", xlab = "Species")
+abline(h = 0, col = "red", lty = 2)
+
+plot(re_sp_slopes$I(jday_s^2), main = "Random Slope: I(jday_s^2)", xlab = "Species")
+abline(h = 0, col = "red", lty = 2)
+
+plot(re_sp_slopes$ndvi_mean_s, main = "Random Slope: ndvi_mean_s", xlab = "Species")
+abline(h = 0, col = "red", lty = 2)
+
+par(mfrow = c(1, 1))  # Reset plotting layout to default
