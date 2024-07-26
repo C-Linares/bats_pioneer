@@ -152,6 +152,18 @@ merged_df <- full_join(robo2021, robo2021_v420, by=col_keep) %>%
 write.csv(x = merged_df, file = "robo2021.csv",)
 
 
+# robomoth_kpr_2022 -------------------------------------------------------
+
+setwd('Z:/') #you have to set the wd() to the place where the files are stored
+
+patt<-"Z:/PioneerLights_2022/part2/robomoth" # path to files
+
+myfiles <-fs::dir_ls(path = patt, recurse = T, glob = "*.csv", ) # 695 this one runs faster than the above
+ids<- myfiles[grepl("id.csv", myfiles)] # this does it for just Id files. 
+dlist<- sapply(ids, read.csv, simplify = F, fill=T) 
+robo_2022 <- data.table::rbindlist(dlist, fill = TRUE, idcol = T)
+summary(robo_2022)
+write.csv(x = robo_2022, file ="PioneerLights_2022/robo2022_kpr.csv")
 
 
 # 2019 bat data kpro ------------------------------------------------------
@@ -187,8 +199,35 @@ write.csv(x = bat2019_kpr, file ="2019_phantomriver/bat2019_kpr.csv")
 
 
 
+# kpr 2022 bat data -------------------------------------------------------
+
+setwd('Z:/') #you have to set the wd() to the place where the files are stored
 
 
+patt<- "Z:/PioneerLights_2022/sm3/"
+
+
+#  list
+
+myfiles <-fs::dir_ls(path = patt, recurse = T, glob = "*.csv", ) # 695 this one runs faster than the above
+
+
+
+# id.files only
+
+ids<- myfiles[grepl("id.csv", myfiles)] # this does it for just the sm3 files. 
+
+
+# Merging all 
+
+dlist<- sapply(ids, read.csv, simplify = F, fill=T) #read all the files simplify assure they are returned as a list of dataframes. 
+
+
+# Rbind efficiently, handling potential column differences
+bat2019_kpr <- data.table::rbindlist(dlist, fill = TRUE, idcol = T)
+
+
+write.csv(x = bat2019_kpr, file ="2019_phantomriver/bat2019_kpr.csv")
 
 
 
