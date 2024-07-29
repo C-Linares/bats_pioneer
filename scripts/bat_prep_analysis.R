@@ -1,5 +1,5 @@
 
-# Script: bat_pot_analysis.R
+# Script: bat_prep_analysis.R
 # The purpose of this script is to prepare the data before modeling. 
 # 
 # Carlos Linares 2023
@@ -177,6 +177,8 @@ write.csv(obs.cov2,file = 'data_for_analysis/bat_pop_analysis/obs.cov2.csv',
 kpro_2021_bat<-read.csv(file = 'data_for_analysis/kpro2021_v1.csv') # data loading is the product of the script cleanup_script_v2
 
 
+
+
 kpro_2021_bat$date_time<-ymd_hms(kpro_2021_bat$date_time) # for some reason 22 fail to parse. 
 # kpro_2021_bat$jday<-lubridate::yday(kpro_2021_bat$DATE) # julian day
 
@@ -283,7 +285,7 @@ mylu_d.w<-byspecies(bmat2,"MYOLUC") # mylu by day and week
 
 presence_min<-kpro_2021_bat %>% #min of activity 
   group_by(site, AUTO.ID., noche, rmins) %>% 
-  summarize(activity_min= n()) %>% 
+  summarize(activity_min= n()) %>%  #calculate the num of min activte
   ungroup()
   
   
