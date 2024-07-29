@@ -338,6 +338,31 @@ write.csv(species_summary, file = "data_for_analysis/data_glmm/AI_sp_summary.csv
 
 
 
+# merge 3yr data set.  ----------------------------------------------------
+
+
+# load
+
+kpro_2021_bat<-read.csv(file = 'data_for_analysis/kpro2021_v1.csv') # data loading is the product of the script cleanup_script_v2
+kpro_2022_bat<-read.csv(file = 'data_for_analysis/kpro2021_v1.csv')
+
+kpro_2021_bat$date_time<-ymd_hms(kpro_2021_bat$date_time) # for some reason 22 fail to parse. 
+# kpro_2021_bat$jday<-lubridate::yday(kpro_2021_bat$DATE) # julian day
+
+#date time col. 
+datetime<-paste(kpro_2021_bat$DATE, kpro_2021_bat$TIME)#merge date and time
+datetime.parse<-lubridate::ymd_hms(datetime) # parse as date time
+kpro_2021_bat$date_time<-datetime.parse # add to data. 
+
+
+kpro_2021_bat$rmins<-round(kpro_2021_bat$date_time, units="mins") #rounds to the nearest min
+kpro_2021_bat$rmins<-round_date(kpro_2021_bat$date_time, unit = "minute")
+
+
+
+
+
+
 
 
 
