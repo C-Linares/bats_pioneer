@@ -37,6 +37,7 @@ library(corrplot)
 
 # data --------------------------------------------------------------------
 
+bm<-read.csv('data_for_analysis/combine_data/bat_combined.csv', header = T)
 
 bm<-read.csv('data_for_analysis/data_glmm/bat_counts.csv', header = T) # bat counts by jday
 bm$datefromyday<-as_date(bm$jday, origin= "2021-01-01")
@@ -370,6 +371,8 @@ print(model_convergence)
 
 #coefficients
 mcoef<-coef(m1.4_nb)
+
+?vif()
 
 # model with offset effort  -------------------------------------------------------
 
