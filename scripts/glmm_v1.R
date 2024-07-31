@@ -21,7 +21,7 @@
 
 # libraries  --------------------------------------------------------------
 
-librar y(tidyverse)
+library(tidyverse)
 library(magrittr)
 library(lme4)
 library(sjPlot)
@@ -33,7 +33,7 @@ library(corrplot)
 
 #load environment 
 #last worked 7/23/2024
-# load(file = 'working_env/glmm_v1.RData')
+# h
 
 # data --------------------------------------------------------------------
 
@@ -504,66 +504,81 @@ generate_effect_plot <- function(variable_name, model_object, data) {
 
 
 
+# partial predictor manual jday -------------------------------------------
+
+
 # plotting partial predictors manually
 
 # values to use
-n<-100
-int<-rep(1,n)
+n <- 100
+int <- rep(1, n)
 
 # obs. values
-ord.day<-seq(min(bm2[,"jday"]), max(bm2[,"jday"]), length.out=n)
+ord.day <- seq(min(bm2[, "jday"]), max(bm2[, "jday"]), length.out = n)
+# extraer el jday sqr 
+ord.day.sqr<-ord.day^2
 #std pred
-jday.s<- scale(ord.day)
-
+jday.s <- scale(ord.day)
+jday.sqr<- scale(ord.day.sqr)
 #extract fixed coef jday
-f.jday <- fixef(m1.4_nb)[c(1, 3)]
+f.jday <- fixef(m1.4_nb)[c(1, 3,4)] # extract the intercept and the coeficient for jday
 
 #predicted ab
 
-predabund <- exp( f.jday %*% t( cbind( int, jday.s) ) )
+predabund <- exp(f.jday %*% t(cbind(int, jday.s, jday.sqr)))
 
 # mean abu
 
-mabund <- apply( predabund, MARGIN = 2, FUN = mean )
+mabund <- apply(predabund, MARGIN = 2, FUN = mean)
 
 #95% CI
 
-CIabund <- apply( predabund, MARGIN = 2, FUN = quantile, 
-                  probs = c(0.025, 0.975) )
+CIabund <- apply(
+  predabund,
+  MARGIN = 2,
+  FUN = quantile,
+  probs = c(0.025, 0.975)
+)
 
 #Data
 
-abunddf <- data.frame(mabund, t(CIabund), jday.s, ord.day)
+abunddf <- data.frame(mabund, t(CIabund), jday.s, ord.day) # make a df with all the above
 
-colnames(abunddf )[1:3] <- c(  "Mean", "lowCI", "highCI" )
+colnames(abunddf)[1:3] <- c("Mean", "lowCI", "highCI")
 
-ggplot( abunddf, aes( x = jday.s, y = Mean) ) +
-  theme_classic( base_size = 17) +
-  ylab( "bat calls" ) +
-  xlab( "jday" ) +
-  geom_line( size = 1.5) +
-  geom_ribbon( alpha = 0.3, aes( ymin = lowCI, ymax = highCI ) )
+ggplot(abunddf, aes(x = ord.day, y = Mean)) +
+  theme_classic(base_size = 17) +
+  ylab("bat calls") +
+  xlab("jday") +
+  geom_line(size = 1.5) +
+  geom_ribbon(alpha = 0.3, aes(ymin = lowCI, ymax = highCI))
+
+
+
+
 
 # treatment partial prfedictor
 
 # obs. values
-trmt_bin<-seq(min(bm2[,"trmt_bin"]), max(bm2[,"trmt_bin"]), length.out=n) # how do you plot the obs. values when you have
-trmt_bin_s<- scale(trmt_bin)
+trmt_bin<-c("dark", "light") # how do you plot the obs. values when you have
+trmt_bin_s<- c(0,1) # this should be -1 and 1  and remember to rerun the model for that 
 f.trmt <- fixef(m1.4_nb)[c(1,2 )]
-predabund <- exp( f.trmt %*% t( cbind( int, trmt_bin_s) ) )
-mabund <- apply( predabund, MARGIN = 2, FUN = mean )
-CIabund <- apply( predabund, MARGIN = 2, FUN = quantile, 
-                  probs = c(0.025, 0.975) )
-abunddf <- data.frame(mabund, t(CIabund), trmt_bin_s, trmt_bin)
+
+t<-confint(m1.4_nb)
+
+mean.pred <- c(exp( trmt_bin_s[1]*f.trmt[1]), exp(trmt_bin_s[2]*(f.trmt[1]+f.trmt[2]) ))
+lowCI <-  c(exp( trmt_bin_s[1]*t[1,1]), exp(trmt_bin_s[2]*(t[1,1]+t[2,1]) ))
+highCI <- c(exp( trmt_bin_s[1]*f.trmt[1]), exp(trmt_bin_s[2]*(f.trmt[1]+f.trmt[2]) ))
+abunddf <- data.frame(mean.pred, lowCI, highCI, trmt_bin)
 
 colnames(abunddf )[1:3] <- c(  "Mean", "lowCI", "highCI" )
 
-ggplot( abunddf, aes( x = trmt_bin_s, y = Mean) ) +
+ggplot( abunddf, aes( x = trmt_bin, y = Mean) ) +
   theme_classic( base_size = 17) +
   ylab( "bat calls" ) +
   xlab( "treatment" ) +
-  geom_line( size = 1.5) +
-  geom_ribbon( alpha = 0.3, aes( ymin = lowCI, ymax = highCI ) )
+  geom_point()+
+  geom_errorbar( aes( ymin = lowCI, ymax = highCI ) )
 
  # marginal effects  -------------------------------------------------------
 
@@ -591,14 +606,13 @@ ggplot( abunddf, aes( x = trmt_bin_s, y = Mean) ) +
 # random effects plot
 
 re_site <- ranef(m1.4_nb)$site
-re_sp <-ranef(m1.4_nb)$sp$trmt_bin 
+re_sp <-ranef(m1.4_nb)$sp
 # Plot random intercepts for site
 
 fixefs<-fixef(m1.4_nb)
 
-rss<-re_sp
-rss[1]<- exp(rss[1]+fixef)
-
+rss.light<- exp(re_sp[,1] + fixefs[1]+  re_sp[,2]+fixefs[2])
+rss.nolight <- exp(re_sp[,1]+ fixefs[1])
 
 
 plot(re_site$'(Intercept)', xlab = "Site", ylab = "Random Intercept", main = "Random Intercept Variability: Site")
