@@ -37,9 +37,11 @@ library(corrplot)
 
 # data --------------------------------------------------------------------
 
-bm<-read.csv('data_for_analysis/combine_data/bat_combined.csv', header = T)
+bm<-read.csv('data_for_analysis/combine_data/bat_combined.csv', header = T) 
+filtered_bm <- bm[bm$AUTO.ID. != "Noise", ] # if noise is not filtered there is more records for dark sites. 
+colnames(filtered_bm)
 
-bm<-read.csv('data_for_analysis/data_glmm/bat_counts.csv', header = T) # bat counts by jday
+bm<-read.csv('data_for_analysis/data_glmm/bat_counts.csv', header = T) # bat counts by jday for 2021
 bm$datefromyday<-as_date(bm$jday, origin= "2021-01-01")
 filtered_bm <- bm[bm$AUTO.ID. != "Noise", ] # if noise is not filtered there is more records for dark sites. 
 colnames(filtered_bm)[3]<-"sp" # change Auto.ID to sp
@@ -77,7 +79,7 @@ moon.adj<-moon %>% mutate(
   l.illum= ifelse(above_horizon==FALSE,0,l.illum)
 )
 
-effort_hrs<-read.csv('data_for_analysis/data_glmm/effort_hrs.csv')
+effort_hrs<-read.csv('data_for_analysis/data_glmm/effort_hrs.csv')# this one is not needed for the three year data
 
 
 # merge -------------------------------------------------------------------
@@ -94,7 +96,7 @@ filtered_bm<- left_join(filtered_bm, traits, by="sp")
 
 bm2<-left_join(filtered_bm, elev, by="site" )
 bm2 <- left_join(bm2, ndvi, by = "site") %>%
-  select(-c("X", "time", "buff_area.x", "buff_area.y"))
+  select(-c( "time", "buff_area.x", "buff_area.y"))
 
 colnames(bm2)[7]<-"date"
 

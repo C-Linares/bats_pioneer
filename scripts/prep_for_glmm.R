@@ -127,20 +127,27 @@ effort_hrs <- bat_combined %>%
 bat_combined<- left_join(bat_combined, effort_hrs, by=c("site", "jday", "yr", "noche"))
 
 
+keep<- c("AUTO.ID.", "PULSES", "site","noche","date_time", "yr","treatmt","trmt_bin","jday","eff.hrs") # cols to keep
+
+bat_combined <- bat_combined %>% select(all_of(keep))
 
 
 
 
+summary(bat_combined)
 
 
 
-# write the data. 
-# dir.create("data_for_analysis/combine_data", showWarnings = FALSE)
+
+# write call count data ---------------------------------------------------
+
+# dir.create("data_for_analysis/combine_data", showWarnings = FALSE) # just run if the dir is abscent
 
 write.csv(bat_combined, file = 'data_for_analysis/combine_data/bat_combined.csv', row.names = F)
 
 # Create a README file with information about the script
-readme_content <- "This directory contains the bat_combined.csv file which was created using the script prep_for_glmm.R combines bat species call abundance data. This script merges the data that was previously scaned with Kaleidoscope pro"
+readme_content <- "Carlos Linares 7/30/2024 
+This directory contains the bat_combined.csv file which was created using the script prep_for_glmm.R combines bat species call abundance data. This script merges 2021-23 data that was previously scaned with Kaleidoscope pro"
 
 # Write the README content to a file
 writeLines(readme_content, "data_for_analysis/combine_data/README.txt")
@@ -173,10 +180,12 @@ ggplot(bat_summary, aes(x = yr, y = count, fill = AUTO.ID.)) +
   theme_minimal() +
   theme(plot.title = element_text(hjust = 0.5))
 
+
+
 #-------------------------- calls by jday and treatment
 
 filtered_bat_combined <- bat_combined %>%
-  filter(!AUTO.ID. %in% c("Noise", "NoID"))
+  filter(!AUTO.ID. %in% c("Noise", "EUDMAC"))
 
 # Summarize the number of pulses per Julian day and treatment
 summary_data <- filtered_bat_combined %>%
@@ -187,16 +196,16 @@ summary_data <- filtered_bat_combined %>%
 # Create the plot
 ggplot(summary_data, aes(x = jday, y = count, col = treatmt)) +
   geom_point() +
-  facet_wrap(~ treatmt + yr, scales = "free_y") +  labs(title = "Call activity by Julian Day and Treatment",
+  facet_wrap(~ yr+ treatmt , scales = "free_y") +  labs(title = "Call activity by Julian Day and Treatment",
        x = "Julian Day",
-       y = "Number of Pulses") +
+       y = "Number of calls") +
   geom_vline(xintercept = 180, linetype = "dashed", color = "red") +
   theme_minimal() +
   theme(plot.title = element_text(hjust = 0.5))
 
 
 
-#-------------------------- species calls by julian day and treatment
+#-------------------------- species calls by Julian day and treatment
 
 summary_data <- filtered_bat_combined %>%
   group_by(jday, treatmt, AUTO.ID.) %>%
@@ -207,16 +216,31 @@ summary_data <- filtered_bat_combined %>%
 # Create the plot
 ggplot(summary_data, aes(x = jday, y = count, col = treatmt)) +
   geom_point() +
-  facet_wrap(~ treatmt  + AUTO.ID., scales = "free_y") +  labs(title = "Call activity by Julian Day and Treatment",
-                                                        x = "Julian Day",
-                                                        y = "Number of Pulses") +
-  geom_vline(xintercept = 180, linetype = "dashed", color = "red") +
+  facet_wrap( ~  AUTO.ID. + treatmt, scales = "free_y") +  labs(title = "Call activity by Julian Day and Treatment", x = "Julian Day", y = "call counts") +
+  geom_vline(xintercept = 180,
+             linetype = "dashed",
+             color = "red") +
   theme_minimal() +
   theme(plot.title = element_text(hjust = 0.5))
 
 
-#-----------------
 
+
+#-----------------
+summary_data <- filtered_bat_combined %>%
+  group_by(jday, treatmt, AUTO.ID., yr) %>%
+  summarise(count = n()) %>%
+  ungroup()
+
+# Create the plot
+ggplot(summary_data, aes(x = jday, y = count, col = treatmt)) +
+  geom_point() +
+  facet_wrap(~ AUTO.ID.+ yr , scales = "free_y") +  labs(title = "Call activity by Sp and year",
+                                                               x = "Julian Day",
+                                                               y = "Number of Pulses") +
+  geom_vline(xintercept = 180, linetype = "dashed", color = "red") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5))
 
 
 # Session info ------------------------------------------------------------
