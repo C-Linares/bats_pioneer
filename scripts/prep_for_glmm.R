@@ -22,6 +22,10 @@
 
 # outputs ----------------------
 
+# bat_combined.csv - process data no counts
+# bm.csv - counts of bat calls by day from 2021 to 2023 all sites
+# bm.miller.day - number of minutes of activity by day  for 2021-2023 data all sites
+
 # this should be a database ready to analyze with the glmm_v1 script. 
 
 # libraries
@@ -71,6 +75,7 @@ bat_combined$DATE<-lubridate::ymd(bat_combined$DATE)
 sum(is.na(bat_combined$DATE)) # check for NAs. 
 
 # noche/night
+# this variable assigns the same date to calls that belong to a single night. If a call happened in the July 6 at 3 am it assigns it to July 5 
 
 bat_combined$noche <-
   if_else(bat_combined$HOUR < 9, # if it is less than 9 put the date of the previous day
@@ -88,7 +93,10 @@ sum(is.na(bat_combined$date_time)) # check for NAs.
 #year
 
 bat_combined$yr<-year(bat_combined$DATE)
-unique(bat_combined$yr)
+unique(bat_combined$yr) #we check the three years are present.
+
+
+# treatment column 
 
 litsites<-c("iron01","iron03","iron05","long01","long03")
 
@@ -138,19 +146,59 @@ summary(bat_combined)
 
 
 
+# count matrix ------------------------------------------------------------
+# this is a matrix where we create a n column that tells us how many calls for each bat are there.
+# daily counts
 
-# write call count data ---------------------------------------------------
+bm <- bat_combined %>% # 
+  group_by(noche, AUTO.ID., site,yr, trmt_bin, treatmt) %>% 
+  summarise(n = n(), .groups = 'drop') 
 
-# dir.create("data_for_analysis/combine_data", showWarnings = FALSE) # just run if the dir is abscent
 
-write.csv(bat_combined, file = 'data_for_analysis/combine_data/bat_combined.csv', row.names = F)
+
+# miller matrix -----------------------------------------------------------
+
+
+
+# minutes activity 
+# in here we calculate the minutes of activity insipired by Miller 2001 paper. 
+
+bat_combined$rmins<-round(bat_combined$date_time, units="mins") #rounds to the nearest min
+
+bm.miller<-bat_combined %>% #min of activity 
+  group_by(site, AUTO.ID., noche, rmins) %>% 
+  summarize(activity_min= n()) %>%  #calculate the num of min activte
+  ungroup()
+
+
+bm.miller.day <- bm.miller %>% # number of minutes active  by night. 
+  group_by(site, noche, AUTO.ID.) %>%
+  summarize(activity_min = sum(activity_min))
+
+
+
+
+# outputs -----------------------------------------------------------------
+
+
+# dir.create("data_for_analysis/prep_for_glm", showWarnings = FALSE) # just run if the dir is abscent
+
+write.csv(bat_combined, file = 'data_for_analysis/prep_for_glmm/bat_combined.csv', row.names = F)
+write.csv(bm, file = 'data_for_analysis/prep_for_glmm/bm.csv', row.names = F)
+write.csv(bm.miller.day, file = "data_for_analysis/prep_for_glmm/bm.miller.day.csv")
+
+
 
 # Create a README file with information about the script
-readme_content <- "Carlos Linares 7/30/2024 
-This directory contains the bat_combined.csv file which was created using the script prep_for_glmm.R combines bat species call abundance data. This script merges 2021-23 data that was previously scaned with Kaleidoscope pro"
+readme_content <- "Carlos Linares 8/01/2024 
+This directory contains the bat_combined.csv file which was created using the script prep_for_glmm.R combines bat species call abundance data. This script merges 2021-23 data that was previously scanned with Kaleidoscope pro
+
+bat_combined.csv - process data no counts
+bm.csv - counts of bat calls by day from 2021 to 2023 all sites
+bm.miller.day - number of minutes of activity by day  for 2021-2023 data all sites"
 
 # Write the README content to a file
-writeLines(readme_content, "data_for_analysis/combine_data/README.txt")
+writeLines(readme_content, "data_for_analysis/prep_for_glmm/README.txt")
 
 
 
@@ -226,7 +274,7 @@ ggplot(summary_data, aes(x = jday, y = count, col = treatmt)) +
 
 
 
-#-----------------
+
 summary_data <- filtered_bat_combined %>%
   group_by(jday, treatmt, AUTO.ID., yr) %>%
   summarise(count = n()) %>%
@@ -241,6 +289,17 @@ ggplot(summary_data, aes(x = jday, y = count, col = treatmt)) +
   geom_vline(xintercept = 180, linetype = "dashed", color = "red") +
   theme_minimal() +
   theme(plot.title = element_text(hjust = 0.5))
+
+
+# pulses by treatment 
+
+ggplot(bat_combined, aes(x = treatmt, y = scale(PULSES), fill = treatmt)) +
+  geom_boxplot() +
+  labs(title = "Distribution of Bat Pulses by Treatment",
+       x = "Treatment",
+       y = "Number of Pulses") +
+  theme_minimal()
+
 
 
 # Session info ------------------------------------------------------------
@@ -276,4 +335,4 @@ ggplot(summary_data, aes(x = jday, y = count, col = treatmt)) +
 # [25] withr_3.0.0        magrittr_2.0.3     grid_4.4.1         rstudioapi_0.16.0  hms_1.1.3          lifecycle_1.0.4   
 # [31] sjmisc_2.8.10      vctrs_0.6.5        glue_1.7.0         fansi_1.0.6        colorspace_2.1-0   tools_4.4.1       
 # [37] pkgconfig_2.0.3   
-# ---------------------------
+# --------------------------- trash ----------------
