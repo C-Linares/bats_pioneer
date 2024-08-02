@@ -154,7 +154,7 @@ bm <- bat_combined %>% #
   group_by(noche, AUTO.ID., site,yr, trmt_bin, treatmt) %>% 
   summarise(n = n(), .groups = 'drop') 
 
-
+summary(bm)
 
 # miller matrix -----------------------------------------------------------
 
@@ -175,7 +175,7 @@ bm.miller.day <- bm.miller %>% # number of minutes active  by night.
   group_by(site, noche, AUTO.ID.) %>%
   summarize(activity_min = sum(activity_min))
 
-
+summary(bm.miller.day)
 
 
 # outputs -----------------------------------------------------------------

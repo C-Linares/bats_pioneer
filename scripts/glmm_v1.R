@@ -16,7 +16,15 @@
 ##   
 ##
 ## ---------------------------
-## 
+## # inputs ------------------------------------------------------------------
+#   data_for_analysis/prep_for_glmm/bm.csv
+#   data_for_analysis/Bat_trait.csv
+# outputs ----------------------
+
+# 
+
+# this should be a database ready to analyze with the glmm_v1 script. 
+
 
 
 # libraries  --------------------------------------------------------------
@@ -32,19 +40,19 @@ library(corrplot)
 
 
 #load environment 
-#last worked 7/23/2024
-# h
+#last worked 08/01/2024
+
 
 # data --------------------------------------------------------------------
 
-bm<-read.csv('data_for_analysis/combine_data/bat_combined.csv', header = T) 
+bm<-read.csv('data_for_analysis/prep_for_glmm/bm.csv', header = T) 
 filtered_bm <- bm[bm$AUTO.ID. != "Noise", ] # if noise is not filtered there is more records for dark sites. 
-colnames(filtered_bm)
+colnames(filtered_bm)[2]<-"sp"
 
-bm<-read.csv('data_for_analysis/data_glmm/bat_counts.csv', header = T) # bat counts by jday for 2021
-bm$datefromyday<-as_date(bm$jday, origin= "2021-01-01")
-filtered_bm <- bm[bm$AUTO.ID. != "Noise", ] # if noise is not filtered there is more records for dark sites. 
-colnames(filtered_bm)[3]<-"sp" # change Auto.ID to sp
+# bm<-read.csv('data_for_analysis/data_glmm/bat_counts.csv', header = T) # bat counts by jday for 2021
+# bm$datefromyday<-as_date(bm$jday, origin= "2021-01-01")
+# filtered_bm <- bm[bm$AUTO.ID. != "Noise", ] # if noise is not filtered there is more records for dark sites. 
+# colnames(filtered_bm)[3]<-"sp" # change Auto.ID to sp
 
 btrait<-read.csv('data_for_analysis/Bat_trait.csv', header = T)
 btrait$Species<-toupper(btrait$Species) # makes all caps
@@ -79,7 +87,7 @@ moon.adj<-moon %>% mutate(
   l.illum= ifelse(above_horizon==FALSE,0,l.illum)
 )
 
-effort_hrs<-read.csv('data_for_analysis/data_glmm/effort_hrs.csv')# this one is not needed for the three year data
+# effort_hrs<-read.csv('data_for_analysis/data_glmm/effort_hrs.csv')# we might not need effort because we are not doing an offset model. 
 
 
 # merge -------------------------------------------------------------------
@@ -94,18 +102,21 @@ rm(namestraits)
 
 filtered_bm<- left_join(filtered_bm, traits, by="sp")
 
+summary(filtered_bm)
+rows_with_na <- filtered_bm[rowSums(is.na(filtered_bm)) > 0, ]
+
 bm2<-left_join(filtered_bm, elev, by="site" )
 bm2 <- left_join(bm2, ndvi, by = "site") %>%
   select(-c( "time", "buff_area.x", "buff_area.y"))
 
 colnames(bm2)[7]<-"date"
 
-bm2$date<-as_date(bm2$date)
+bm2$date<-lubridate::as_date(bm2$noche)
 bm2<- left_join(bm2, weather, by="date")
 
 
 bm2<- left_join(bm2, moon.adj, by=c("date"))
-bm2<- left_join(bm2, effort_hrs, by=c("jday","site"))
+# bm2<- left_join(bm2, effort_hrs, by=c("jday","site"))
 
 # Identify rows with NA values
 rows_with_na <- bm2[rowSums(is.na(bm2)) > 0, ] # some wind and temp have NAs because we are missing august 2021 weather data.
@@ -114,22 +125,17 @@ rows_with_na <- bm2[rowSums(is.na(bm2)) > 0, ] # some wind and temp have NAs bec
 
 
 # check for correlation 
-numeric_cols<- sapply(bm2, is.numeric)
+numeric_cols<- sapply(bm2, is.numeric) # separate all the num col
 cor1<-bm2[,numeric_cols] #keeps just the numeric
-cor1<-cor1 %>% select(-c("X_min","X_max","altitude","parallacticAngle","angle","lat", "lon" ))
+cor1<-cor1 %>% select(-c("X_min","X_max","altitude","parallacticAngle","angle","lat", "lon", "yr" ))
 
 c1<- cor(cor1,use="pairwise.complete.obs")
 corrplot(c1, order= 'AOE')
 
-# scale data old way
+# make jday 
 
-# bm2$elevm_s<- scale(bm2$elev_mean, center = T, scale = T) Use the loop instead. 
-# bm2$ndvim_s<- scale(bm2$ndvi_mean)
-# bm2$percent_s<-scale(bm2$percent)
-# bm2$jday_s<-scale(bm2$jday)
-# bm2$PeakFreq_s<-scale(bm2$PeakFreq)
-# bm2$l.illum_s<-scale(bm2$l.illum)
-# bm2$wind_s<scale(bm2$avg_wind_speed)
+bm2$jday<-yday(bm2$noche)
+
 
 # List of variable names to be scaled
 variables_to_scale <- c(
@@ -151,6 +157,19 @@ for (var in variables_to_scale) {
   bm2[[paste0(var, "_s")]] <- scale(bm2[[var]], center = TRUE, scale = TRUE)
 }
 
+
+# make treatment -1 to 1 
+
+bm2$trmt_bin<- ifelse(bm2$trmt_bin == 1, 1, -1)
+
+
+
+
+# year as factor 
+
+bm2$yr<- as.factor(bm2$yr)
+
+
 # explore data ------------------------------------------------------------
 
 summary(bm2)
@@ -167,25 +186,8 @@ ggplot(bm2, aes(x=jday, y=n, col=treatmt))+
   facet_wrap("site")
 
 
-variables_to_plot <- c("elev_mean", "ndvi_mean", "percent", "jday", 
-                        "PeakFreq", "l.illum", "avg_wind_speed","avg_temperature","phase","fraction" )
-# Generate the plots
-plots <- lapply(variables_to_plot, function(var) {
-  if (is.numeric(bm2[[var]])) {
-    ggplot(bm2, aes_string(x = var)) +
-      geom_histogram(fill = "blue", color = "black") +
-      theme_minimal() +
-      ggtitle(paste("Histogram of", var))
-  } else {
-    message(paste("Skipping non-numeric variable:", var))
-    NULL
-  }
-})
-# Combine the plots using patchwork
-plots <- Filter(Negate(is.null), plots)# removes all the null or NAs from the plot. We have somefor missing data. in avg temp, wind and peak freq
-combined_plot <- wrap_plots(plots)
-# Print the combined plot
-print(combined_plot)
+
+
 
 # models -------------------------------------------------------------------
 
@@ -375,6 +377,27 @@ print(model_convergence)
 mcoef<-coef(m1.4_nb)
 
 ?vif()
+
+
+# model according to dylans example 
+
+m1.5nb <- glmmTMB(n ~ trmt_bin + jday_s + I(jday_s^2) + ndvi_mean_s + percent_s + PeakFreq_s + l.illum_s +
+                    avg_wind_speed_s + avg_temperature_s + (1 | site) + (1 + trmt_bin + ndvi_mean_s + jday_s + I(jday_s^2) | sp),
+                  data = bm2,
+                    nbinom2(link = "log"))
+summary(m1.5nb)
+confint(m1.5nb)
+
+# Calculate residual deviance and residual degrees of freedom
+residual_deviance <- deviance(m1.5nb)
+residual_df <- df.residual(m1.5nb)
+
+# Calculate c-hat using residual deviance
+c_hat_deviance <- residual_deviance / residual_df
+print(c_hat_deviance)
+
+saveRDS(m1.5nb,"models/m1.5nb")
+
 
 # model with offset effort  -------------------------------------------------------
 
@@ -664,8 +687,46 @@ par(mfrow = c(1, 1))  # Reset plotting layout to default
 
 # save models -------------------------------------------------------------
 
-#sace image 
+#save image 
 save.image(file = "working_env/glmm_v1.RData")
 
-save(c(m1.2,m1.3,m1.4,m1.4_nb,m1.4_quasi), file = 'models/glmm_v1.RData')
+save(c(m1.2,m1.3,m1.4,m1.4_nb,m1.4_quasi, m1.5nb), file = 'models/glmm_v1.RData')
 load("models/glmm_v1.RData")
+
+
+
+
+
+# trash -------------------------------------------------------------------
+
+# scale data old way
+
+# bm2$elevm_s<- scale(bm2$elev_mean, center = T, scale = T) Use the loop instead. 
+# bm2$ndvim_s<- scale(bm2$ndvi_mean)
+# bm2$percent_s<-scale(bm2$percent)
+# bm2$jday_s<-scale(bm2$jday)
+# bm2$PeakFreq_s<-scale(bm2$PeakFreq)
+# bm2$l.illum_s<-scale(bm2$l.illum)
+# bm2$wind_s<scale(bm2$avg_wind_speed)
+
+
+# # Combine the plots using patchwork
+# plots <- Filter(Negate(is.null), plots)# removes all the null or NAs from the plot. We have somefor missing data. in avg temp, wind and peak freq
+# combined_plot <- wrap_plots(plots)
+# # Print the combined plot
+# print(combined_plot)
+
+# variables_to_plot <- c("elev_mean", "ndvi_mean", "percent", "jday", 
+#                        "PeakFreq", "l.illum", "avg_wind_speed","avg_temperature","phase","fraction" )
+# # Generate the plots
+# plots <- lapply(variables_to_plot, function(var) {
+#   if (is.numeric(bm2[[var]])) {
+#     ggplot(bm2, aes_string(x = var)) +
+#       geom_histogram(fill = "blue", color = "black") +
+#       theme_minimal() +
+#       ggtitle(paste("Histogram of", var))
+#   } else {
+#     message(paste("Skipping non-numeric variable:", var))
+#     NULL
+#   }
+# })
