@@ -41,7 +41,7 @@ library(corrplot)
 
 #load environment 
 #last worked 08/01/2024
-
+load(file = "working_env/glmm_v1.RData")
 
 # data --------------------------------------------------------------------
 
@@ -78,6 +78,7 @@ ndvi$site <- gsub("viz(\\d{2})", "vizc\\1", ndvi$site)
 weather<-read.csv('data_for_analysis/weather/nigh_averages.csv', header = T) #load nightly averages
 weather$date<-as_date(weather$date)
 
+
 # moon clean-up
 moon<-read.csv('data_for_analysis/moon_pred.csv')
 moon$date<- as_date(moon$date)
@@ -103,24 +104,26 @@ rm(namestraits)
 filtered_bm<- left_join(filtered_bm, traits, by="sp")
 
 summary(filtered_bm)
-rows_with_na <- filtered_bm[rowSums(is.na(filtered_bm)) > 0, ]
+# rows_with_na <- filtered_bm[rowSums(is.na(filtered_bm)) > 0, ]
 
 bm2<-left_join(filtered_bm, elev, by="site" )
 bm2 <- left_join(bm2, ndvi, by = "site") %>%
   select(-c( "time", "buff_area.x", "buff_area.y"))
 
-colnames(bm2)[7]<-"date"
+colnames(bm2)[1]<-"date" # makes noche a data to easily merge
 
-bm2$date<-lubridate::as_date(bm2$noche)
+bm2$date<-lubridate::as_date(bm2$date)
 bm2<- left_join(bm2, weather, by="date")
 
 
 bm2<- left_join(bm2, moon.adj, by=c("date"))
 # bm2<- left_join(bm2, effort_hrs, by=c("jday","site"))
 
+
 # Identify rows with NA values
 rows_with_na <- bm2[rowSums(is.na(bm2)) > 0, ] # some wind and temp have NAs because we are missing august 2021 weather data.
 
+summary(bm2)
 # correlation  ------------------------------------------------------------
 
 
@@ -134,7 +137,11 @@ corrplot(c1, order= 'AOE')
 
 # make jday 
 
-bm2$jday<-yday(bm2$noche)
+bm2$jday<-yday(bm2$date)
+
+# continuous day
+
+bm2$cday<- bm2$jday*bm2$yr
 
 
 # List of variable names to be scaled
@@ -149,18 +156,29 @@ variables_to_scale <- c(
   "avg_temperature",
   "phase",
   "fraction",
-  "eff.hrs"
+  # "eff.hrs",
+  "cday"
 )
 
 # Loop over each variable, scale it, and assign it back to the data frame with a new name
 for (var in variables_to_scale) {
   bm2[[paste0(var, "_s")]] <- scale(bm2[[var]], center = TRUE, scale = TRUE)
 }
+# Loop over each variable, scale it by dividing by two standard deviations, and assign it back to the data frame with a new name
+for (var in variables_to_scale) {
+  # Check if the column exists and is numeric
+  if (var %in% names(bm2) && is.numeric(bm2[[var]])) {
+    mean_val <- mean(bm2[[var]], na.rm = TRUE)
+    sd_val <- sd(bm2[[var]], na.rm = TRUE)
+    bm2[[paste0(var, "_s")]] <- (bm2[[var]] - mean_val) / (2 * sd_val)
+  } else {
+    warning(paste("Column", var, "is not numeric or does not exist in the data frame."))
+  }
+}
 
+# make treatment -1 to 1
 
-# make treatment -1 to 1 
-
-bm2$trmt_bin<- ifelse(bm2$trmt_bin == 1, 1, -1)
+bm2$trmt_bin <- ifelse(bm2$trmt_bin == 1, 1, -1)
 
 
 
@@ -168,6 +186,9 @@ bm2$trmt_bin<- ifelse(bm2$trmt_bin == 1, 1, -1)
 # year as factor 
 
 bm2$yr<- as.factor(bm2$yr)
+bm2$sp<- as.factor(bm2$sp)
+bm2$sp<- as.factor(bm2$site)
+
 
 
 # explore data ------------------------------------------------------------
@@ -184,7 +205,6 @@ ggplot(bm2, aes(x = n)) +
 ggplot(bm2, aes(x=jday, y=n, col=treatmt))+
   geom_point()+
   facet_wrap("site")
-
 
 
 
@@ -352,7 +372,10 @@ residual_df <- df.residual(m1.4_quasi)
 c_hat_deviance <- residual_deviance / residual_df
 print(c_hat_deviance)
 
-#---------------------------------------------------------------#
+
+
+# Negative Binomial -------------------------------------------------------
+
 #this one needs a long time to run 
 library(MASS)
 m1.4_nb <- glmer.nb(
@@ -361,6 +384,7 @@ m1.4_nb <- glmer.nb(
   data = bm2
 )
 summary(m1.4_nb)
+
 
 # Calculate residual deviance and residual degrees of freedom
 residual_deviance <- deviance(m1.4_nb)
@@ -381,10 +405,15 @@ mcoef<-coef(m1.4_nb)
 
 # model according to dylans example 
 
-m1.5nb <- glmmTMB(n ~ trmt_bin + jday_s + I(jday_s^2) + ndvi_mean_s + percent_s + PeakFreq_s + l.illum_s +
-                    avg_wind_speed_s + avg_temperature_s + (1 | site) + (1 + trmt_bin + ndvi_mean_s + jday_s + I(jday_s^2) | sp),
-                  data = bm2,
-                    nbinom2(link = "log"))
+m1.5nb <- glmmTMB(
+  n ~ trmt_bin + cday_s + I(jday_s ^ 2) + percent_s + PeakFreq_s + l.illum_s +
+    avg_wind_speed_s + avg_temperature_s + yr + elev_mean_s +
+  (1 |site) + (1 + trmt_bin + ndvi_mean_s + jday_s + I(jday_s ^ 2) | sp),
+  data = bm2,
+  nbinom2(link = "log")
+)
+
+
 summary(m1.5nb)
 confint(m1.5nb)
 
