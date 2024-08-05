@@ -403,8 +403,10 @@ mcoef<-coef(m1.4_nb)
 ?vif()
 
 
-# model according to dylans example 
 
+# m1.5nb ------------------------------------------------------------------
+
+ 
 m1.5nb <- glmmTMB(
   n ~ trmt_bin + cday_s + I(jday_s ^ 2) + percent_s + PeakFreq_s + l.illum_s +
     avg_wind_speed_s + avg_temperature_s + yr + elev_mean_s +
@@ -483,7 +485,7 @@ plot_model(m1.4_off)
 
 # plots with SJplot to see what I need to get manally
 # model m1.4_nb
-sjPlot::plot_model(m1.4_nb)
+sjPlot::plot_model(m1.5nb, type = "re")
 
 plot_jday <- effect("jday_s", m1.4_nb, xlevels = list(jday_s = seq(
   min(bm2$jday_s), max(bm2$jday_s), length.out = 100
@@ -533,26 +535,18 @@ plot(plot_avg_temperature_s, multiline = T)
 # Sjplots  ----------------------------------------------------------------
 #Here we plot the negative binomial model using sjplot
 # coeffsicients
-b<-plot_model(m1.4_nb, type =c("re"), show.p = T)
-a<-plot_model(m1.4_nb, type =c("est"), se=T, show.p = T)
+b<-plot_model(m1.5nb, type =c("re"), show.p = T)
+a<-plot_model(m1.5nb, type =c("est"), se=T, show.p = T)
 
 # marginal effectrs
-c<-plot_model(m1.4_nb, type = "pred")
+c<-plot_model(m1.5nb, type = "pred")
+c <- plot_model(m1.5nb, type = "pred", terms = c("trmt_bin [all]", "jday_s [all]", "ndvi_mean_s [all]"))
 
 
 #diagnostics 
 
-d<-plot_model(m1.4_nb, type = "diag")
+d<-plot_model(m1.5nb, type = "diag")
 
-
-
-generate_effect_plot <- function(variable_name, model_object, data) {
-  plot_data <- effect(variable_name, model_object, 
-                      xlevels = list(
-                        !!variable_name := seq(min(data[[variable_name]]), max(data[[variable_name]]), length.out = 100)
-                      ))
-  return(plot_data)
-}
 
 
 
@@ -632,7 +626,10 @@ ggplot( abunddf, aes( x = trmt_bin, y = Mean) ) +
   geom_point()+
   geom_errorbar( aes( ymin = lowCI, ymax = highCI ) )
 
- # marginal effects  -------------------------------------------------------
+
+
+
+# marginal effects  -------------------------------------------------------
 
 day<-seq(min(bm2[,"jday"]), max(bm2[,"jday"]), length.out=n) # how do you plot the obs. values when you have
 day.s<- scale(day)
@@ -675,17 +672,159 @@ abline(h = 0, col = "red", lty = 2)  # Add a reference line at zero
 
 
 
+# plot model m1.5nb --------------------------------------------------------
+
+plot_model(m1.5nb, type = "est", show.values = TRUE, value.offset = 0.3)
+
+plot_model(m1.5nb, type = "est", show.values = TRUE, value.offset = 0.3,
+           ci.lvl = 0.95, dot.size = 3, line.size = 1) +
+  theme_minimal() +
+  labs(title = "Bat Vocal Activity 2021-2023",
+       x = "Coefficient Estimate",
+       y = "") +
+  scale_color_manual(values = c("orange", "purple")) +
+  theme(axis.text.y = element_text(size = 10),
+        axis.title.x = element_text(size = 12),
+        legend.position = "bottom")
+
+ff_jday <- Effect(c("jday_s", "I(jday_s^2)"), m1.5nb)
+
+# Plot the effects
+plot(eff_jday, rug = TRUE, main = "Partial Predictor Plot for jday_s and I(jday_s^2)")
+
+
+
+# plotting partial predictors manually
+
+# values to use
+n <- 100
+int <- rep(1, n)
+
+# obs. values
+jday_s_values <- seq(from = min(bm2$jday_s), to = max(bm2$jday_s), length.out = 100)
+
+new_data <- data.frame(
+  jday_s = jday_s_values,
+  jday_s2 = jday_s_values^2,
+  # Set other variables to their mean or reference values
+  trmt_bin = -1,  # or the most common value
+  ndvi_mean_s = mean(bm2$ndvi_mean_s),
+  percent_s = mean(bm2$percent_s),
+  PeakFreq_s = 0 ,
+  l.illum_s = mean(bm2$l.illum_s),
+  avg_wind_speed_s = 0,
+  avg_temperature_s = 0,
+  site = factor("long04"),  # or an appropriate reference level
+  sp = factor("NoID")  # or an appropriate reference level
+)
+
+predictions <- predict(m1.5nb, newdata = new_data, type = "response", se.fit = TRUE)
+new_data$fit <- predictions$fit
+new_data$se.fit <- predictions$se.fit
+
+ggplot(new_data, aes(x = jday_s, y = fit)) +
+  geom_line() +
+  geom_ribbon(aes(ymin = fit - 1.96 * se.fit, ymax = fit + 1.96 * se.fit), alpha = 0.2) +
+  labs(title = "Partial Predictor Plot for jday_s and I(jday_s^2)",
+       x = "Standardized Julian Day (jday_s)",
+       y = "Predicted Response") +
+  theme_minimal()
+
+
+
+
+# extraer el jday sqr 
+ord.day.sqr<-ord.day^2
+#std pred
+jday.s <- scale(ord.day)
+jday.sqr<- scale(ord.day.sqr)
+#extract fixed coef jday
+
+t<-coef(m1.5nb) # ?????????????????????????????????????? what do we multiply in the step below????
+t$cond$sp
+jday_coef <- summary_m1.5nb$coefficients$cond["jday_s", ]
+jday.sqr<- summary_m1.5nb$coefficients$cond["I(jday_s^2)",]
+
+#predicted ab
+
+predabund <- exp(as.numeric(jday_coef[1]) %*% t(cbind(int, jday.s, jday.sqr)))
+
+# mean abu
+
+mabund <- apply(predabund, MARGIN = 2, FUN = mean)
+
+#95% CI
+
+CIabund <- apply(
+  predabund,
+  MARGIN = 2,
+  FUN = quantile,
+  probs = c(0.025, 0.975)
+)
+
+#Data
+
+abunddf <- data.frame(mabund, t(CIabund), jday.s, ord.day) # make a df with all the above
+
+colnames(abunddf)[1:3] <- c("Mean", "lowCI", "highCI")
+
+ggplot(abunddf, aes(x = ord.day, y = Mean)) +
+  theme_classic(base_size = 17) +
+  ylab("bat calls") +
+  xlab("jday") +
+  geom_line(size = 1.5) +
+  geom_ribbon(alpha = 0.3, aes(ymin = lowCI, ymax = highCI))
+
+
+
+
+
+# partial predictor trmt_bin
+
+trmt_levels<- unique(bm2$trmt_bin)
+
+
+new_data_trmt <- data.frame(
+  trmt_bin = trmt_levels,
+  jday_s = mean(bm2$jday_s),
+  jday_s2 = mean(bm2$jday_s)^2,
+  ndvi_mean_s = mean(bm2$ndvi_mean_s),
+  percent_s = mean(bm2$percent_s),
+  PeakFreq_s = 0,
+  l.illum_s = mean(bm2$l.illum_s),
+  avg_wind_speed_s = 0,
+  avg_temperature_s = 0,
+  site = factor("long04"),  # Use an appropriate reference level or the most common level
+  sp = factor("NoID")  # Use an appropriate reference level or the most common level
+)
+
+predictions_trmt <- predict(m1.5nb, newdata = new_data_trmt, type = "response", se.fit = TRUE)
+
+# Combine predictions with the new data
+new_data_trmt$fit <- predictions_trmt$fit
+new_data_trmt$se.fit <- predictions_trmt$se.fit
+
+# Plot the predictions
+
+ggplot(new_data_trmt, aes(x = factor(trmt_bin), y = fit)) +
+  geom_point(size = 4) +
+  geom_errorbar(aes(ymin = fit - 1.96 * se.fit, ymax = fit + 1.96 * se.fit), width = 0.1) +
+  labs(title = "Partial Predictor Plot for trmt_bin",
+       x = "Treatment (trmt_bin)",
+       y = "Predicted Response") +
+  theme_minimal()
+
 
 #chat gpt code
 # Extract random effects for sp (intercept only)
-re_sp <- ranef(m1.4_nb)$sp
+re_sp <- coef(m1.5nb)$cond$sp
 
 # Plot random intercepts for sp
 plot(re_sp$'(Intercept)', xlab = "Species", ylab = "Random Intercept", main = "Random Intercept Variability: Species")
 abline(h = 0, col = "red", lty = 2)  # Add a reference line at zero
 
 # Extract random effects for sp (slopes)
-re_sp_slopes <- ranef(m1.4_nb)$sp
+re_sp_slopes <- coef(m1.5nb)$cond$sp
 
 # Plot random slopes for trmt_bin, jday_s, I(jday_s^2), ndvi_mean_s
 par(mfrow = c(2, 2))  # Set up a 2x2 plot layout
