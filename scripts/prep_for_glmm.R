@@ -85,7 +85,7 @@ bat_combined$noche <-
 
 
 # date time col. 
-datetime<-paste(bat_combined$DATE, bat_combined$TIME)#merge date and time
+datetime<-paste(bat_combined$DATE, bat_combined$TIME)#merge date and time # this time is wrong and needs to be extracted from the file itself. ############################!!!!!!!!!!!!!!!!
 datetime.parse<-lubridate::ymd_hms(datetime) # parse as date time
 bat_combined$date_time<-datetime.parse # add to data. 
 sum(is.na(bat_combined$date_time)) # check for NAs. 
