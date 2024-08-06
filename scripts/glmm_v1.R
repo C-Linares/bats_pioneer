@@ -141,7 +141,7 @@ bm2$jday<-yday(bm2$date)
 
 # continuous day
 
-bm2$cday<- bm2$jday*bm2$yr
+bm2$cday<- bm2$jday*as.numeric(bm2$yr)
 
 
 # List of variable names to be scaled
@@ -408,7 +408,7 @@ mcoef<-coef(m1.4_nb)
 
  
 m1.5nb <- glmmTMB(
-  n ~ trmt_bin + cday_s + I(jday_s ^ 2) + percent_s + PeakFreq_s + l.illum_s +
+  n ~ trmt_bin + cday_s + I(jday_s ^ 2) + percent_s + PeakFreq_s + l.illum_s + # maybe preak frq is not a good idea take it out and rerun. 
     avg_wind_speed_s + avg_temperature_s + yr + elev_mean_s +
   (1 |site) + (1 + trmt_bin + ndvi_mean_s + jday_s + I(jday_s ^ 2) | sp),
   data = bm2,
@@ -429,7 +429,7 @@ print(c_hat_deviance)
 
 saveRDS(m1.5nb,"models/m1.5nb")
 
-
+plot_model(m1.5nb)
 # model with offset effort  -------------------------------------------------------
 
 
@@ -687,7 +687,10 @@ plot_model(m1.5nb, type = "est", show.values = TRUE, value.offset = 0.3,
         axis.title.x = element_text(size = 12),
         legend.position = "bottom")
 
-ff_jday <- Effect(c("jday_s", "I(jday_s^2)"), m1.5nb)
+ff_jday <- Effect(c("jday_s", "I(jday_s^2)"), m1.5nb) # this does not work!
+
+
+jday_coefficients <- summary_m1.5nb$coefficients$cond[, c("Estimate", "Std. Error", "Pr(>|z|)")]
 
 # Plot the effects
 plot(eff_jday, rug = TRUE, main = "Partial Predictor Plot for jday_s and I(jday_s^2)")
@@ -732,43 +735,47 @@ ggplot(new_data, aes(x = jday_s, y = fit)) +
 
 
 
+# values to use
+n <- 100
+int <- rep(1, n)
+
+# obs. values
+jday_s_values <- seq(from = min(bm2$jday), to = max(bm2$jday), length.out = 100)
+
+
 
 # extraer el jday sqr 
-ord.day.sqr<-ord.day^2
 #std pred
-jday.s <- scale(ord.day)
-jday.sqr<- scale(ord.day.sqr)
+jday.s <- scale(jday_s_values)
+jday.sqr<- scale(jday_s_values^2)
+
 #extract fixed coef jday
 
 t<-coef(m1.5nb) # ?????????????????????????????????????? what do we multiply in the step below????
 t$cond$sp
-jday_coef <- summary_m1.5nb$coefficients$cond["jday_s", ]
-jday.sqr<- summary_m1.5nb$coefficients$cond["I(jday_s^2)",]
 
-#predicted ab
+c_inf<-confint(m1.5nb)
 
-predabund <- exp(as.numeric(jday_coef[1]) %*% t(cbind(int, jday.s, jday.sqr)))
+fix_eff<- c_inf[c(1,3,4), ]
+# # intm<- summary_m1.5nb$coefficients$cond[1,1]
+# # jday_coef <- summary_m1.5nb$coefficients$cond[3,1 ]
+# # jday.sqr<- summary_m1.5nb$coefficients$cond[4,1]
+# 
+# fix_eff<-c(intm, jday_coef, jday.sqr)
+# #predicted ab
 
-# mean abu
+predabund <- exp(t(fix_eff) %*% t(cbind( int, jday.s, jday.sqr)))
+t(predabund)
 
-mabund <- apply(predabund, MARGIN = 2, FUN = mean)
 
-#95% CI
-
-CIabund <- apply(
-  predabund,
-  MARGIN = 2,
-  FUN = quantile,
-  probs = c(0.025, 0.975)
-)
 
 #Data
 
-abunddf <- data.frame(mabund, t(CIabund), jday.s, ord.day) # make a df with all the above
+abunddf <- data.frame( t(predabund), jday_s_values) # make a df with all the above
 
-colnames(abunddf)[1:3] <- c("Mean", "lowCI", "highCI")
+colnames(abunddf)[1:3] <- c( "lowCI", "highCI", "Mean")
 
-ggplot(abunddf, aes(x = ord.day, y = Mean)) +
+ggplot(abunddf, aes(x = jday_s_values, y = Mean)) +
   theme_classic(base_size = 17) +
   ylab("bat calls") +
   xlab("jday") +
@@ -845,11 +852,20 @@ par(mfrow = c(1, 1))  # Reset plotting layout to default
 
 
 
+# extracting marginal effects 
+## Generate marginal effects for each species
+library(ggeffects)
+marginal_effects <- ggpredict(m1.5nb, terms = c("trmt_bin", "sp")) # this did not worked...
 
+ggplot(marginal_effects, aes(x = x, y = predicted, color = group)) +
+  geom_line() +
+  facet_wrap(~ group, scales = "free") +  # Facet by species
+  labs(title = "Marginal Effects by Species",
+       x = "Predictor Variable",
+       y = "Predicted Value") +
+  theme_minimal()
 
-
-
-
+plot_model(m1.5nb, type = "pred", terms = c("trmt_bin [all]", "sp"))
 
 
 
