@@ -283,3 +283,15 @@ next step try an offset model
 
 I have been working on plotting the random effects and the partial predictor plots for the model manually and using sjplot.\
 The next step should be rerun the model with the data from 2022 and 2023. I am building those databases right now and should load soon.
+
+------------------------------------------------------------------------
+
+8/07/2024
+
+-   I coded the year variable in the bm data set a as -1,0,1 for 2021,22,23 respectively
+
+-   change the scaling on the model from 2sd to just by one standard deviation
+
+-   remove ndvi and max-freq from the model m1.5nb. I also filtered out the "no-Id" calls from the model before running it.
+
+-   I need to code the treatment as -1, 0, 1 for sites close to lit sites and control sites.

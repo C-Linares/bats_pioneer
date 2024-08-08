@@ -46,7 +46,7 @@ load(file = "working_env/glmm_v1.RData")
 # data --------------------------------------------------------------------
 
 bm<-read.csv('data_for_analysis/prep_for_glmm/bm.csv', header = T) 
-filtered_bm <- bm[bm$AUTO.ID. != "Noise", ] # if noise is not filtered there is more records for dark sites. 
+filtered_bm <- bm[!(bm$AUTO.ID. %in% c("Noise","NoID")), ] # if noise is not filtered there is more records for dark sites. 
 colnames(filtered_bm)[2]<-"sp"
 
 # bm<-read.csv('data_for_analysis/data_glmm/bat_counts.csv', header = T) # bat counts by jday for 2021
@@ -110,7 +110,7 @@ bm2<-left_join(filtered_bm, elev, by="site" )
 bm2 <- left_join(bm2, ndvi, by = "site") %>%
   select(-c( "time", "buff_area.x", "buff_area.y"))
 
-colnames(bm2)[1]<-"date" # makes noche a data to easily merge
+colnames(bm2)[1]<-"date" # change name noche to date for merging
 
 bm2$date<-lubridate::as_date(bm2$date)
 bm2<- left_join(bm2, weather, by="date")
@@ -124,6 +124,7 @@ bm2<- left_join(bm2, moon.adj, by=c("date"))
 rows_with_na <- bm2[rowSums(is.na(bm2)) > 0, ] # some wind and temp have NAs because we are missing august 2021 weather data.
 
 summary(bm2)
+
 # correlation  ------------------------------------------------------------
 
 
@@ -139,9 +140,6 @@ corrplot(c1, order= 'AOE')
 
 bm2$jday<-yday(bm2$date)
 
-# continuous day
-
-bm2$cday<- bm2$jday*as.numeric(bm2$yr)
 
 
 # List of variable names to be scaled
@@ -155,39 +153,38 @@ variables_to_scale <- c(
   "avg_wind_speed",
   "avg_temperature",
   "phase",
-  "fraction",
-  # "eff.hrs",
-  "cday"
+  "fraction"
 )
 
 # Loop over each variable, scale it, and assign it back to the data frame with a new name
 for (var in variables_to_scale) {
   bm2[[paste0(var, "_s")]] <- scale(bm2[[var]], center = TRUE, scale = TRUE)
 }
-# Loop over each variable, scale it by dividing by two standard deviations, and assign it back to the data frame with a new name
-for (var in variables_to_scale) {
-  # Check if the column exists and is numeric
-  if (var %in% names(bm2) && is.numeric(bm2[[var]])) {
-    mean_val <- mean(bm2[[var]], na.rm = TRUE)
-    sd_val <- sd(bm2[[var]], na.rm = TRUE)
-    bm2[[paste0(var, "_s")]] <- (bm2[[var]] - mean_val) / (2 * sd_val)
-  } else {
-    warning(paste("Column", var, "is not numeric or does not exist in the data frame."))
-  }
-}
+
+# 
+# # Loop over each variable, scale it by dividing by two standard deviations, and assign it back to the data frame with a new name
+# for (var in variables_to_scale) {
+#   # Check if the column exists and is numeric
+#   if (var %in% names(bm2) && is.numeric(bm2[[var]])) {
+#     mean_val <- mean(bm2[[var]], na.rm = TRUE)
+#     sd_val <- sd(bm2[[var]], na.rm = TRUE)
+#     bm2[[paste0(var, "_s")]] <- (bm2[[var]] - mean_val) / (2 * sd_val)
+#   } else {
+#     warning(paste("Column", var, "is not numeric or does not exist in the data frame."))
+#   }
+# }
 
 # make treatment -1 to 1
 
 bm2$trmt_bin <- ifelse(bm2$trmt_bin == 1, 1, -1)
 
-
-
-
-# year as factor 
-
-bm2$yr<- as.factor(bm2$yr)
-bm2$sp<- as.factor(bm2$sp)
-bm2$sp<- as.factor(bm2$site)
+# make year between -1:1
+bm2 <- bm2 %>%
+  mutate(yr_s = case_when(
+    yr == 2021 ~ -1,
+    yr == 2022 ~ 0,
+    TRUE ~ 1
+  ))
 
 
 
@@ -204,136 +201,38 @@ ggplot(bm2, aes(x = n)) +
 
 ggplot(bm2, aes(x=jday, y=n, col=treatmt))+
   geom_point()+
-  facet_wrap("site")
-
-
-
+  facet_wrap(~site)+
+  theme_blank()+
+  scale_color_manual(values = c("#0033A0", "#D64309"))+
+  labs(title = "Bat acoustic activity 2021-2023",
+       x = "Julian Day",
+       y = "n calls",
+       color = "Treatment")
+  
+ggplot(bm2, aes(x=jday, y=n, col=treatmt))+
+  geom_point()+
+  facet_wrap(~sp, scales = "free_y")+
+  theme_blank()+
+  scale_color_manual(values = c("#0033A0", "#D64309"))+
+  labs(title = "Bat acoustic activity 2021-2023",
+       x = "Julian Day",
+       y = "n calls",
+       color = "Treatment")
 
 # models -------------------------------------------------------------------
-
-# Fit a Poisson model intercept model. 
-m1 <- glmer(n ~ (1|site),
-                     data = bm2, 
-                     family = poisson)
-exp(m1@beta)# base line for bats at all sites. 
-
-summary(m1)
-
-
-
-m1.1<- glmer(n ~ trmt_bin * jday_s + percent_s +elev_mean_s+  (1|site),
-                   data = bm2, 
-                   family = poisson)
-
-plot_model(m1.1)
-
-exp(m1.1@beta)
-summary(m1.1)
-
-plot(fitted(m1.1), residuals(m1.1), main = "Residuals vs Fitted", 
-     xlab = "Fitted values", ylab = "Residuals")
-abline(h = 0, col = "red")
-
-qqnorm(residuals(m1.1), main = "Normal Q-Q Plot")
-qqline(residuals(m1.1), col = "red")
-
-# Histogram of residuals
-hist(residuals(m1.1), breaks = 30, main = "Histogram of Residuals", 
-     xlab = "Residuals")
-
-# Scale-Location Plot
-plot(fitted(m1.1), sqrt(abs(residuals(m1.2))), main = "Scale-Location Plot",
-     xlab = "Fitted values", ylab = "Square Root of |Residuals|")
-abline(h = 0, col = "red")
-
-# Calculate VIF
-vif(m1.1)
-
-
-
-# quasipoisson -------------------------------------------------------
-
-#trying to make a quasi poisson.
-
-m1.2 <- glmer(
-  n ~ trmt_bin + jday_s + I(jday_s^2) + ndvi_mean_s + percent_s + PeakFreq_s + l.illum_s +
-    avg_wind_speed_s + avg_temperature_s + (1 | site) + (1 + trmt_bin + ndvi_mean_s | sp ),
-  data = bm2,
-  family = 'poisson',
-)
-
-summary(m1.2)
-
-exp(coef(m1.2))
-
-plot_model(m1.2,)
-
-model_convergence <- m1.2@optinfo$conv$opt
-print(model_convergence)
-
-# Check if the Hessian matrix is positive definite
-is_positive_definite <- all(eigen(m1.2@optinfo$derivs$Hessian)$values > 0)
-print(is_positive_definite)
-
-
-quasi_table <- function(m1.2,ctab=coef(summary(m1.2))) {
-  phi <- sum(residuals(m1.2, type="pearson")^2)/df.residual(m1.2)
-  qctab <- within(as.data.frame(ctab),
-                  {   `Std. Error` <- `Std. Error`*sqrt(phi)
-                  `z value` <- Estimate/`Std. Error`
-                  `Pr(>|z|)` <- 2*pnorm(abs(`z value`), lower.tail=FALSE)
-                  })
-  print(phi)
-  return(qctab)
-}
-
-printCoefmat(quasi_table(m1.2),digits=2)
-
-
-
-
-
-
-
-m1.3 <- glmer(
-  n ~ trmt_bin + jday_s + I(jday_s ^ 2) + ndvi_mean_s + percent_s + PeakFreq_s + l.illum_s +
-    avg_wind_speed_s + avg_temperature_s + (1 |site) + (1 + trmt_bin + ndvi_mean_s + jday_s + I(jday_s ^ 2) |sp),
-  data = bm2,
-  family = 'poisson',
-  #  control = glmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 100000))
-)
-
-summary(m1.3)
-
-printCoefmat(quasi_table(m1.3),digits=2)
-
-model_convergence <- m1.3@optinfo$conv$opt
-print(model_convergence)
-
-
-# calculate c-hat
-# Calculate residual deviance and residual degrees of freedom
-residual_deviance <- deviance(m1.3)
-residual_df <- df.residual(m1.3)
-
-# Calculate c-hat using residual deviance
-c_hat_deviance <- residual_deviance / residual_df
-print(c_hat_deviance)
-
-
 
 
 # glm no random effects ---------------------------------------------------
 
 
 # the model below is severely over-disperse. 
-m1.4 <- glm(
-  n ~ trmt_bin + jday_s + I(jday_s ^ 2) + ndvi_mean_s + percent_s  + l.illum_s +
-    avg_wind_speed_s + avg_temperature_s ,
+m1.4 <- glmmTMB(
+  n ~ trmt_bin + jday_s + I(jday_s ^ 2) + percent_s + l.illum_s + elev_mean_s+
+    avg_wind_speed_s + avg_temperature_s+ yr_s,
   data = bm2,
-  family = 'poisson',
-  #  control = glmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 100000))
-)
+  nbinom2(link = "log"))
+          
+
 summary(m1.4)
 
 # calculate c-hat
@@ -352,25 +251,13 @@ pearson_chisq <- sum(residuals(m1.4, type = "pearson")^2)
 c_hat_pearson <- pearson_chisq / residual_df
 print(c_hat_pearson)
 
+plot_model(m1.4, vline.color = "grey", transform = "exp")
 
-#---------------------------------------------------------------#
+plot_model(m1.4, type = "pred", terms = c("trmt_bin[exp]"), ci.lvl = NA)
+plot_residuals(m1.4)
+get_model_data(m1.4)
 
-m1.4_quasi <- glm(
-  n ~ trmt_bin + jday_s + I(jday_s^2) + ndvi_mean_s + percent_s + PeakFreq_s + l.illum_s +
-    avg_wind_speed_s + avg_temperature_s,
-  data = bm2,
-  family = quasipoisson()
-)
-summary(m1.4_quasi)
-
-
-# Calculate residual deviance and residual degrees of freedom
-residual_deviance <- deviance(m1.4_quasi)
-residual_df <- df.residual(m1.4_quasi)
-
-# Calculate c-hat using residual deviance
-c_hat_deviance <- residual_deviance / residual_df
-print(c_hat_deviance)
+#----#----#---------------------------------------------------------------#
 
 
 
@@ -405,10 +292,15 @@ mcoef<-coef(m1.4_nb)
 
 
 # m1.5nb ------------------------------------------------------------------
-
+m1.5anb <- glmmTMB(
+  n ~ trmt_bin + jday + I(jday_s ^ 2) + percent_s  + l.illum_s + 
+    avg_wind_speed_s + avg_temperature_s + yr + elev_mean_s +
+    (1 |site) + (1 | sp),
+  data = bm2,
+  nbinom2(link = "log"))
  
 m1.5nb <- glmmTMB(
-  n ~ trmt_bin + cday_s + I(jday_s ^ 2) + percent_s + PeakFreq_s + l.illum_s + # maybe preak frq is not a good idea take it out and rerun. 
+  n ~ trmt_bin + jday + I(jday_s ^ 2) + percent_s  + l.illum_s + 
     avg_wind_speed_s + avg_temperature_s + yr + elev_mean_s +
   (1 |site) + (1 + trmt_bin + ndvi_mean_s + jday_s + I(jday_s ^ 2) | sp),
   data = bm2,
@@ -430,6 +322,8 @@ print(c_hat_deviance)
 saveRDS(m1.5nb,"models/m1.5nb")
 
 plot_model(m1.5nb)
+
+
 # model with offset effort  -------------------------------------------------------
 
 
@@ -867,7 +761,10 @@ ggplot(marginal_effects, aes(x = x, y = predicted, color = group)) +
 
 plot_model(m1.5nb, type = "pred", terms = c("trmt_bin [all]", "sp"))
 
-
+mydf<-predict_response(m1.5nb, terms = "trmt_bin[all]")
+ggplot(mydf, aes(x, predicted)) +
+  geom_line() +
+  geom_ribbon(aes(ymin = conf.low, ymax = conf.high), alpha = 0.1)
 
 # save models -------------------------------------------------------------
 
@@ -914,3 +811,128 @@ load("models/glmm_v1.RData")
 #     NULL
 #   }
 # })
+# 
+# 
+# # m1 <- glmer(n ~ (1|site),
+# data = bm2, 
+# family = poisson)
+# exp(m1@beta)# base line for bats at all sites. 
+# 
+# summary(m1)
+# 
+# 
+# 
+# m1.1<- glmer(n ~ trmt_bin * jday_s + percent_s +elev_mean_s+  (1|site),
+#              data = bm2, 
+#              family = poisson)
+# 
+# plot_model(m1.1)
+# 
+# exp(m1.1@beta)
+# summary(m1.1)
+# 
+# plot(fitted(m1.1), residuals(m1.1), main = "Residuals vs Fitted", 
+#      xlab = "Fitted values", ylab = "Residuals")
+# abline(h = 0, col = "red")
+# 
+# qqnorm(residuals(m1.1), main = "Normal Q-Q Plot")
+# qqline(residuals(m1.1), col = "red")
+# 
+# # Histogram of residuals
+# hist(residuals(m1.1), breaks = 30, main = "Histogram of Residuals", 
+#      xlab = "Residuals")
+# 
+# # Scale-Location Plot
+# plot(fitted(m1.1), sqrt(abs(residuals(m1.2))), main = "Scale-Location Plot",
+#      xlab = "Fitted values", ylab = "Square Root of |Residuals|")
+# abline(h = 0, col = "red")
+# 
+# # Calculate VIF
+# vif(m1.1)
+# 
+#trying to make a quasi poisson.
+# 
+# m1.2 <- glmer(
+#   n ~ trmt_bin + jday_s + I(jday_s^2) + ndvi_mean_s + percent_s + PeakFreq_s + l.illum_s +
+#     avg_wind_speed_s + avg_temperature_s + (1 | site) + (1 + trmt_bin + ndvi_mean_s | sp ),
+#   data = bm2,
+#   family = 'poisson',
+# )
+# 
+# summary(m1.2)
+# 
+# exp(coef(m1.2))
+# 
+# plot_model(m1.2,)
+# 
+# model_convergence <- m1.2@optinfo$conv$opt
+# print(model_convergence)
+# 
+# # Check if the Hessian matrix is positive definite
+# is_positive_definite <- all(eigen(m1.2@optinfo$derivs$Hessian)$values > 0)
+# print(is_positive_definite)
+# 
+# 
+# quasi_table <- function(m1.2,ctab=coef(summary(m1.2))) {
+#   phi <- sum(residuals(m1.2, type="pearson")^2)/df.residual(m1.2)
+#   qctab <- within(as.data.frame(ctab),
+#                   {   `Std. Error` <- `Std. Error`*sqrt(phi)
+#                   `z value` <- Estimate/`Std. Error`
+#                   `Pr(>|z|)` <- 2*pnorm(abs(`z value`), lower.tail=FALSE)
+#                   })
+#   print(phi)
+#   return(qctab)
+# }
+# 
+# printCoefmat(quasi_table(m1.2),digits=2)
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# m1.3 <- glmer(
+#   n ~ trmt_bin + jday_s + I(jday_s ^ 2) + ndvi_mean_s + percent_s + PeakFreq_s + l.illum_s +
+#     avg_wind_speed_s + avg_temperature_s + (1 |site) + (1 + trmt_bin + ndvi_mean_s + jday_s + I(jday_s ^ 2) |sp),
+#   data = bm2,
+#   family = 'poisson',
+#   #  control = glmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 100000))
+# )
+# 
+# summary(m1.3)
+# 
+# printCoefmat(quasi_table(m1.3),digits=2)
+# 
+# model_convergence <- m1.3@optinfo$conv$opt
+# print(model_convergence)
+# 
+# 
+# # calculate c-hat
+# # Calculate residual deviance and residual degrees of freedom
+# residual_deviance <- deviance(m1.3)
+# residual_df <- df.residual(m1.3)
+# 
+# # Calculate c-hat using residual deviance
+# c_hat_deviance <- residual_deviance / residual_df
+# print(c_hat_deviance)
+
+
+
+# m1.4_quasi <- glm(
+#   n ~ trmt_bin + jday_s + I(jday_s^2) + ndvi_mean_s + percent_s + PeakFreq_s + l.illum_s +
+#     avg_wind_speed_s + avg_temperature_s,
+#   data = bm2,
+#   family = quasipoisson()
+# )
+# summary(m1.4_quasi)
+# 
+# 
+# # Calculate residual deviance and residual degrees of freedom
+# residual_deviance <- deviance(m1.4_quasi)
+# residual_df <- df.residual(m1.4_quasi)
+# 
+# # Calculate c-hat using residual deviance
+# c_hat_deviance <- residual_deviance / residual_df
+# print(c_hat_deviance)
+# 
