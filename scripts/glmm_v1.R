@@ -37,6 +37,7 @@ library(ggeffects)
 library(car)
 library(glmmTMB)
 library(corrplot)
+library(effects)
 
 
 #load environment 
@@ -293,21 +294,20 @@ mcoef<-coef(m1.4_nb)
 
 # m1.5nb ------------------------------------------------------------------
 m1.5anb <- glmmTMB(
-  n ~ trmt_bin + jday + I(jday_s ^ 2) + percent_s  + l.illum_s + 
+  n ~ trmt_bin + jday_s + I(jday_s ^ 2) + percent_s  + l.illum_s + 
     avg_wind_speed_s + avg_temperature_s + yr + elev_mean_s +
     (1 |site) + (1 | sp),
   data = bm2,
   nbinom2(link = "log"))
  
 m1.5nb <- glmmTMB(
-  n ~ trmt_bin + jday + I(jday_s ^ 2) + percent_s  + l.illum_s + 
+  n ~ trmt_bin + jday_s + I(jday_s ^ 2) + percent_s  + l.illum_s + 
     avg_wind_speed_s + avg_temperature_s + yr + elev_mean_s +
   (1 |site) + (1 + trmt_bin + ndvi_mean_s + jday_s + I(jday_s ^ 2) | sp),
   data = bm2,
   nbinom2(link = "log")
 )
-
-
+AIC(m1.5anb, m1.5nb)
 summary(m1.5nb)
 confint(m1.5nb)
 
@@ -324,33 +324,7 @@ saveRDS(m1.5nb,"models/m1.5nb")
 plot_model(m1.5nb)
 
 
-# model with offset effort  -------------------------------------------------------
 
-
-m1.4_off <- glmer.nb(
-  n ~ trmt_bin + jday_s + I(jday_s ^ 2) + ndvi_mean_s + percent_s  + l.illum_s +
-    avg_wind_speed_s + avg_temperature_s + (1 | site) + (1 + trmt_bin + ndvi_mean_s + jday_s + I(jday_s^2) | sp),
-   offset = eff.hrs_s,
-  data = bm2,
-)
-
-summary(m1.4_off)
-
-# Calculate residual deviance and residual degrees of freedom
-residual_deviance <- deviance(m1.4_off)
-residual_df <- df.residual(m1.4_off)
-
-# Calculate c-hat using residual deviance
-c_hat_deviance <- residual_deviance / residual_df
-print(c_hat_deviance)
-
-model_convergence <- m1.4_nb@optinfo$conv$opt
-print(model_convergence)
-
-
-
-#rstan
-library(rstanarm)
 
 # rstan_models ------------------------------------------------------------
 
@@ -377,11 +351,11 @@ plot_model(m1.4_off)
 # plots -------------------------------------------------------------------
 
 
-# plots with SJplot to see what I need to get manally
+# plots with SJplot to see what I need to get manually
 # model m1.4_nb
 sjPlot::plot_model(m1.5nb, type = "re")
 
-plot_jday <- effect("jday_s", m1.4_nb, xlevels = list(jday_s = seq(
+plot_jday <- effect("jday_s", m1.5nb, xlevels = list(jday_s = seq(
   min(bm2$jday_s), max(bm2$jday_s), length.out = 100
 )))
 
@@ -433,7 +407,7 @@ b<-plot_model(m1.5nb, type =c("re"), show.p = T)
 a<-plot_model(m1.5nb, type =c("est"), se=T, show.p = T)
 
 # marginal effectrs
-c<-plot_model(m1.5nb, type = "pred")
+c<-plot_model(m1.5nb, type = "pred", terms = "jday_s[all]", transform = "exp", )
 c <- plot_model(m1.5nb, type = "pred", terms = c("trmt_bin [all]", "jday_s [all]", "ndvi_mean_s [all]"))
 
 
@@ -461,11 +435,11 @@ ord.day.sqr<-ord.day^2
 jday.s <- scale(ord.day)
 jday.sqr<- scale(ord.day.sqr)
 #extract fixed coef jday
-f.jday <- fixef(m1.4_nb)[c(1, 3,4)] # extract the intercept and the coeficient for jday
-
+f.jday <- fixef(m1.5nb) # extract the intercept and the coeficient for jday
+f.day<-f.jday$cond[c(1,3,4)]
 #predicted ab
 
-predabund <- exp(f.jday %*% t(cbind(int, jday.s, jday.sqr)))
+predabund <- exp(f.day %*% t(cbind(int, jday.s, jday.sqr)))
 
 # mean abu
 
@@ -497,21 +471,34 @@ ggplot(abunddf, aes(x = ord.day, y = Mean)) +
 
 
 
-# treatment partial prfedictor
+# treatment partial predictor 
+# using ggeffects
+plt<-predict_response(m1.5nb, terms = c("trmt_bin[all]"))
+plot(plt)
+
 
 # obs. values
 trmt_bin<-c("dark", "light") # how do you plot the obs. values when you have
-trmt_bin_s<- c(0,1) # this should be -1 and 1  and remember to rerun the model for that 
+trmt_bin_s<- c(-1,1) # this should be -1 and 1  and remember to rerun the model for that 
 f.trmt <- fixef(m1.4_nb)[c(1,2 )]
-
 t<-confint(m1.4_nb)
 
+
+summary_m1.5nb <- summary(m1.5nb)
+feff<-summary_m1.5nb$coefficients$cond
+c0<-feff["(Intercept)","Estimate"]
+b2<-feff["trmt_bin", "Estimate"]
+t<-confint(m1.5nb)
+
 mean.pred <- c(exp( trmt_bin_s[1]*f.trmt[1]), exp(trmt_bin_s[2]*(f.trmt[1]+f.trmt[2]) ))
+mean.pred <- c(exp( trmt_bin_s[1]*c0), exp(trmt_bin_s[2]*(c0+b2) ))
+
 lowCI <-  c(exp( trmt_bin_s[1]*t[1,1]), exp(trmt_bin_s[2]*(t[1,1]+t[2,1]) ))
-highCI <- c(exp( trmt_bin_s[1]*f.trmt[1]), exp(trmt_bin_s[2]*(f.trmt[1]+f.trmt[2]) ))
+
+highCI <- c(exp( trmt_bin_s[1]*c0), exp(trmt_bin_s[2]*(c0+b2) ))
 abunddf <- data.frame(mean.pred, lowCI, highCI, trmt_bin)
 
-colnames(abunddf )[1:3] <- c(  "Mean", "lowCI", "highCI" )
+colnames(abunddf )[1:3] <- c( "Mean", "lowCI", "highCI" )
 
 ggplot( abunddf, aes( x = trmt_bin, y = Mean) ) +
   theme_classic( base_size = 17) +
@@ -936,3 +923,30 @@ load("models/glmm_v1.RData")
 # c_hat_deviance <- residual_deviance / residual_df
 # print(c_hat_deviance)
 # 
+# model with offset effort  -------------------------------------------------------
+
+
+# m1.4_off <- glmer.nb(
+#   n ~ trmt_bin + jday_s + I(jday_s ^ 2) + ndvi_mean_s + percent_s  + l.illum_s +
+#     avg_wind_speed_s + avg_temperature_s + (1 | site) + (1 + trmt_bin + ndvi_mean_s + jday_s + I(jday_s^2) | sp),
+#   offset = eff.hrs_s,
+#   data = bm2,
+# )
+# 
+# summary(m1.4_off)
+# 
+# # Calculate residual deviance and residual degrees of freedom
+# residual_deviance <- deviance(m1.4_off)
+# residual_df <- df.residual(m1.4_off)
+# 
+# # Calculate c-hat using residual deviance
+# c_hat_deviance <- residual_deviance / residual_df
+# print(c_hat_deviance)
+# 
+# model_convergence <- m1.4_nb@optinfo$conv$opt
+# print(model_convergence)
+# 
+# 
+# 
+# #rstan
+# library(rstanarm)
