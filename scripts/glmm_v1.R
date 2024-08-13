@@ -293,20 +293,21 @@ mcoef<-coef(m1.4_nb)
 
 
 # m1.5nb ------------------------------------------------------------------
-m1.5anb <- glmmTMB(
-  n ~ trmt_bin + jday_s + I(jday_s ^ 2) + percent_s  + l.illum_s + 
-    avg_wind_speed_s + avg_temperature_s + yr + elev_mean_s +
-    (1 |site) + (1 | sp),
-  data = bm2,
-  nbinom2(link = "log"))
+
+# m1.5anb <- glmmTMB(
+#   n ~ trmt_bin + jday_s + I(jday_s ^ 2) + percent_s  + l.illum_s +  # model with no varialbes in the random slopes by sp. 
+#     avg_wind_speed_s + avg_temperature_s + yr + elev_mean_s +
+#     (1 |site) + (1 | sp),
+#   data = bm2,
+#   nbinom2(link = "log"))
  
 m1.5nb <- glmmTMB(
-  n ~ trmt_bin + jday_s + I(jday_s ^ 2) + percent_s  + l.illum_s + 
-    avg_wind_speed_s + avg_temperature_s + yr + elev_mean_s +
-  (1 |site) + (1 + trmt_bin + ndvi_mean_s + jday_s + I(jday_s ^ 2) | sp),
-  data = bm2,
-  nbinom2(link = "log")
+  n ~ trmt_bin + jday_s + I(jday_s ^ 2) + percent_s  + l.illum_s +
+    avg_wind_speed_s + avg_temperature_s + yr_s + elev_mean_s +
+    (1 |site) + (1 + trmt_bin + ndvi_mean_s + jday_s + I(jday_s ^ 2) | sp),
+  data = bm2,   nbinom2(link = "log")
 )
+
 AIC(m1.5anb, m1.5nb)
 summary(m1.5nb)
 confint(m1.5nb)
@@ -349,54 +350,6 @@ print(loo_m1.4_off)
 
 plot_model(m1.4_off)
 # plots -------------------------------------------------------------------
-
-
-# plots with SJplot to see what I need to get manually
-# model m1.4_nb
-sjPlot::plot_model(m1.5nb, type = "re")
-
-plot_jday <- effect("jday_s", m1.5nb, xlevels = list(jday_s = seq(
-  min(bm2$jday_s), max(bm2$jday_s), length.out = 100
-)))
-
-plot_trmt_bin <- effect("trmt_bin", m1.4_nb, xlevels = list(trmt_bin = seq(
-  min(bm2$trmt_bin), max(bm2$trmt_bin), length.out = 100
-)))
-
-plot_ndvi <- effect("ndvi_mean_s", m1.4_nb, xlevels = list(ndvi_mean_s = seq(
-  min(bm2$ndvi_mean_s), max(bm2$ndvi_mean_s), length.out = 100
-)))
-
-plot_percent_s <- effect("percent_s", m1.4_nb, xlevels = list(percent_s = seq(
-  min(bm2$percent_s), max(bm2$percent_s), length.out = 100
-)))
-
-plot_PeakFreq_s  <- effect("PeakFreq_s ", m1.4_nb, xlevels = list(PeakFreq_s  = seq(
-  min(bm2$PeakFreq_s,na.rm = TRUE), max(bm2$PeakFreq_s,na.rm = TRUE ), length.out = 100
-)))
-
-plot_l.illum_s  <- effect("l.illum_s ", m1.4_nb, xlevels = list(l.illum_s  = seq(
-  min(bm2$l.illum_s,na.rm = TRUE), max(bm2$l.illum_s,na.rm = TRUE ), length.out = 100
-)))
-
-plot_avg_wind_speed_s   <- effect("avg_wind_speed_s  ", m1.4_nb, xlevels = list(avg_wind_speed_s   = seq(
-  min(bm2$avg_wind_speed_s ,na.rm = TRUE), max(bm2$avg_wind_speed_s ,na.rm = TRUE ), length.out = 100
-)))
-
-plot_avg_temperature_s     <- effect("avg_temperature_s    ", m1.4_nb, xlevels = list(avg_temperature_s     = seq(
-  min(bm2$avg_temperature_s   ,na.rm = TRUE), max(bm2$avg_temperature_s   ,na.rm = TRUE ), length.out = 100
-)))
-
-plot(plot_jday, multiline = TRUE)
-plot(plot_trmt_bin, multiline = TRUE)
-plot(plot_ndvi, multiline = TRUE)
-plot(plot_percent_s, multiline = T)
-plot(plot_PeakFreq_s, multiline = T)
-plot(plot_l.illum_s, multiline = T)
-plot(plot_avg_wind_speed_s, multiline = T)
-plot(plot_avg_temperature_s, multiline = T)
-
-
 
 
 
@@ -471,6 +424,9 @@ ggplot(abunddf, aes(x = ord.day, y = Mean)) +
 
 
 
+# trmt_bin partial predictor ----------------------------------------------
+
+
 # treatment partial predictor 
 # using ggeffects
 plt<-predict_response(m1.5nb, terms = c("trmt_bin[all]"))
@@ -480,17 +436,16 @@ plot(plt)
 # obs. values
 trmt_bin<-c("dark", "light") # how do you plot the obs. values when you have
 trmt_bin_s<- c(-1,1) # this should be -1 and 1  and remember to rerun the model for that 
-f.trmt <- fixef(m1.4_nb)[c(1,2 )]
-t<-confint(m1.4_nb)
 
 
-summary_m1.5nb <- summary(m1.5nb)
-feff<-summary_m1.5nb$coefficients$cond
-c0<-feff["(Intercept)","Estimate"]
-b2<-feff["trmt_bin", "Estimate"]
+
+summary_m1.5nb <- summary(m1.5nb) # save the summary of the model
+feff<-summary_m1.5nb$coefficients$cond # get fixed eff
+c0<-feff["(Intercept)","Estimate"] # get intercept
+b2<-feff["trmt_bin", "Estimate"]   # get slope for treatment
 t<-confint(m1.5nb)
 
-mean.pred <- c(exp( trmt_bin_s[1]*f.trmt[1]), exp(trmt_bin_s[2]*(f.trmt[1]+f.trmt[2]) ))
+# mean.pred <- c(exp( trmt_bin_s[1]*f.trmt[1]), exp(trmt_bin_s[2]*(f.trmt[1]+f.trmt[2]) )) example 
 mean.pred <- c(exp( trmt_bin_s[1]*c0), exp(trmt_bin_s[2]*(c0+b2) ))
 
 lowCI <-  c(exp( trmt_bin_s[1]*t[1,1]), exp(trmt_bin_s[2]*(t[1,1]+t[2,1]) ))
@@ -500,7 +455,7 @@ abunddf <- data.frame(mean.pred, lowCI, highCI, trmt_bin)
 
 colnames(abunddf )[1:3] <- c( "Mean", "lowCI", "highCI" )
 
-ggplot( abunddf, aes( x = trmt_bin, y = Mean) ) +
+ggplot( abunddf, aes( x = trmt_bin, y = Mean) ) +  
   theme_classic( base_size = 17) +
   ylab( "bat calls" ) +
   xlab( "treatment" ) +
@@ -510,25 +465,98 @@ ggplot( abunddf, aes( x = trmt_bin, y = Mean) ) +
 
 
 
-# marginal effects  -------------------------------------------------------
+# lunar illumination partial predictor ------------------------------------
 
-day<-seq(min(bm2[,"jday"]), max(bm2[,"jday"]), length.out=n) # how do you plot the obs. values when you have
-day.s<- scale(day)
-f.day <- fixef(m1.4_nb)[c(1,2 )]
-predabund <- exp( f.trmt %*% t( cbind( int, trmt_bin_s) ) )
-mabund <- apply( predabund, MARGIN = 2, FUN = mean )
-CIabund <- apply( predabund, MARGIN = 2, FUN = quantile, 
-                  probs = c(0.025, 0.975) )
-abunddf <- data.frame(mabund, t(CIabund), trmt_bin_s, trmt_bin)
+# obs. values
 
-colnames(abunddf )[1:3] <- c(  "Mean", "lowCI", "highCI" )
+l.illum<-seq(min(bm2$l.illum), max(bm2$l.illum),length.out = n)
+# standardize l.illum
+l.illum_s<- scale(l.illum)
 
-ggplot( abunddf, aes( x = trmt_bin_s, y = Mean) ) +
-  theme_classic( base_size = 17) +
-  ylab( "bat calls" ) +
-  xlab( "treatment" ) +
-  geom_line( size = 1.5) +
-  geom_ribbon( alpha = 0.3, aes( ymin = lowCI, ymax = highCI ) )
+# extract fixed coefficients
+
+sum_m1.5nb<- summary(m1.5nb)
+feff<-sum_m1.5nb$coefficients$cond # get fixed eff
+
+c0<-feff["(Intercept)","Estimate"] # get intercept
+b2<-feff["l.illum_s", "Estimate"]   # get slope for treatment
+t<-confint(m1.5nb)
+
+c0b2<-cbind(c0,b2)
+
+predcalls <- exp(c0b2 %*% t(cbind(int, l.illum_s)))
+
+# mean abu
+
+mcalls <- apply(predcalls, MARGIN = 2, FUN = mean)
+
+#95% CI
+
+CIcalls <- apply(
+  predcalls,
+  MARGIN = 2,
+  FUN = quantile,
+  probs = c(0.025, 0.975)
+)
+
+#Data
+
+l.illumdf <- data.frame(mcalls, t(CIcalls), l.illum_s, l.illum) # make a df with all the above
+
+colnames(l.illumdf)[1:3] <- c("Mean", "lowCI", "highCI")
+
+ggplot(l.illumdf, aes(x = l.illum, y = Mean)) +
+  theme_classic(base_size = 17) +
+  ylab("bat calls") +
+  xlab("l.illum") +
+  geom_line(size = 1.5) +
+  geom_ribbon(alpha = 0.3, aes(ymin = lowCI, ymax = highCI))
+
+
+
+
+# year marginal effect ----------------------------------------------------
+
+# obs. values
+yr<- unique(bm2$yr)
+yr_s<- unique(bm2$yr_s)
+yr_s <- scale(yr)
+
+summary_m1.5nb <- summary(m1.5nb) # save the summary of the model
+feff<-summary_m1.5nb$coefficients$cond # get fixed eff
+c0<-feff["(Intercept)","Estimate"] # get intercept
+b2<-feff["yr_s", "Estimate"]   # get slope for treatment
+t<-confint(m1.5nb)
+
+
+pred_year <- c(exp( yr_s[1]*c0), exp(yr_s[2]*(c0+b2)), exp(yr_s[3]*(c0+b2)) )
+lowCI <-  c(exp( trmt_bin_s[1]*t[1,1]), exp(trmt_bin_s[2]*(t[1,1]+t[2,1]) ))
+
+
+
+
+highCI <- c(exp( trmt_bin_s[1]*c0), exp(trmt_bin_s[2]*(c0+b2) ))
+abunddf <- data.frame(mean.pred, lowCI, highCI, trmt_bin)
+# Create a data frame for plotting
+year_df <- data.frame(
+  Mean = mean_pred,
+  lowCI = CI_year[1, ],
+  highCI = CI_year[2, ],
+  yr = yr  # use original year values for plotting
+)
+
+# Plot the results
+ggplot(year_df, aes(x = yr, y = Mean)) +
+  theme_classic(base_size = 17) +
+  ylab("Predicted Bat Calls") +
+  xlab("Year") +
+  geom_line(size = 1.5) +
+  geom_ribbon(aes(ymin = lowCI, ymax = highCI), alpha = 0.3) +
+  labs(title = "Predicted Bat Calls Over Years")
+
+
+
+
 
 
 
@@ -579,40 +607,6 @@ plot(eff_jday, rug = TRUE, main = "Partial Predictor Plot for jday_s and I(jday_
 
 
 # plotting partial predictors manually
-
-# values to use
-n <- 100
-int <- rep(1, n)
-
-# obs. values
-jday_s_values <- seq(from = min(bm2$jday_s), to = max(bm2$jday_s), length.out = 100)
-
-new_data <- data.frame(
-  jday_s = jday_s_values,
-  jday_s2 = jday_s_values^2,
-  # Set other variables to their mean or reference values
-  trmt_bin = -1,  # or the most common value
-  ndvi_mean_s = mean(bm2$ndvi_mean_s),
-  percent_s = mean(bm2$percent_s),
-  PeakFreq_s = 0 ,
-  l.illum_s = mean(bm2$l.illum_s),
-  avg_wind_speed_s = 0,
-  avg_temperature_s = 0,
-  site = factor("long04"),  # or an appropriate reference level
-  sp = factor("NoID")  # or an appropriate reference level
-)
-
-predictions <- predict(m1.5nb, newdata = new_data, type = "response", se.fit = TRUE)
-new_data$fit <- predictions$fit
-new_data$se.fit <- predictions$se.fit
-
-ggplot(new_data, aes(x = jday_s, y = fit)) +
-  geom_line() +
-  geom_ribbon(aes(ymin = fit - 1.96 * se.fit, ymax = fit + 1.96 * se.fit), alpha = 0.2) +
-  labs(title = "Partial Predictor Plot for jday_s and I(jday_s^2)",
-       x = "Standardized Julian Day (jday_s)",
-       y = "Predicted Response") +
-  theme_minimal()
 
 
 
@@ -667,98 +661,13 @@ ggplot(abunddf, aes(x = jday_s_values, y = Mean)) +
 
 
 
-# partial predictor trmt_bin
-
-trmt_levels<- unique(bm2$trmt_bin)
-
-
-new_data_trmt <- data.frame(
-  trmt_bin = trmt_levels,
-  jday_s = mean(bm2$jday_s),
-  jday_s2 = mean(bm2$jday_s)^2,
-  ndvi_mean_s = mean(bm2$ndvi_mean_s),
-  percent_s = mean(bm2$percent_s),
-  PeakFreq_s = 0,
-  l.illum_s = mean(bm2$l.illum_s),
-  avg_wind_speed_s = 0,
-  avg_temperature_s = 0,
-  site = factor("long04"),  # Use an appropriate reference level or the most common level
-  sp = factor("NoID")  # Use an appropriate reference level or the most common level
-)
-
-predictions_trmt <- predict(m1.5nb, newdata = new_data_trmt, type = "response", se.fit = TRUE)
-
-# Combine predictions with the new data
-new_data_trmt$fit <- predictions_trmt$fit
-new_data_trmt$se.fit <- predictions_trmt$se.fit
-
-# Plot the predictions
-
-ggplot(new_data_trmt, aes(x = factor(trmt_bin), y = fit)) +
-  geom_point(size = 4) +
-  geom_errorbar(aes(ymin = fit - 1.96 * se.fit, ymax = fit + 1.96 * se.fit), width = 0.1) +
-  labs(title = "Partial Predictor Plot for trmt_bin",
-       x = "Treatment (trmt_bin)",
-       y = "Predicted Response") +
-  theme_minimal()
-
-
-#chat gpt code
-# Extract random effects for sp (intercept only)
-re_sp <- coef(m1.5nb)$cond$sp
-
-# Plot random intercepts for sp
-plot(re_sp$'(Intercept)', xlab = "Species", ylab = "Random Intercept", main = "Random Intercept Variability: Species")
-abline(h = 0, col = "red", lty = 2)  # Add a reference line at zero
-
-# Extract random effects for sp (slopes)
-re_sp_slopes <- coef(m1.5nb)$cond$sp
-
-# Plot random slopes for trmt_bin, jday_s, I(jday_s^2), ndvi_mean_s
-par(mfrow = c(2, 2))  # Set up a 2x2 plot layout
-
-plot(re_sp_slopes$trmt_bin, main = "Random Slope: trmt_bin", xlab = "Species")
-abline(h = 0, col = "red", lty = 2)
-
-plot(re_sp_slopes$jday_s, main = "Random Slope: jday_s", xlab = "Species")
-abline(h = 0, col = "red", lty = 2)
-
-plot(re_sp_slopes$I(jday_s^2), main = "Random Slope: I(jday_s^2)", xlab = "Species")
-abline(h = 0, col = "red", lty = 2)
-
-plot(re_sp_slopes$ndvi_mean_s, main = "Random Slope: ndvi_mean_s", xlab = "Species")
-abline(h = 0, col = "red", lty = 2)
-
-par(mfrow = c(1, 1))  # Reset plotting layout to default
-
-
-
-# extracting marginal effects 
-## Generate marginal effects for each species
-library(ggeffects)
-marginal_effects <- ggpredict(m1.5nb, terms = c("trmt_bin", "sp")) # this did not worked...
-
-ggplot(marginal_effects, aes(x = x, y = predicted, color = group)) +
-  geom_line() +
-  facet_wrap(~ group, scales = "free") +  # Facet by species
-  labs(title = "Marginal Effects by Species",
-       x = "Predictor Variable",
-       y = "Predicted Value") +
-  theme_minimal()
-
-plot_model(m1.5nb, type = "pred", terms = c("trmt_bin [all]", "sp"))
-
-mydf<-predict_response(m1.5nb, terms = "trmt_bin[all]")
-ggplot(mydf, aes(x, predicted)) +
-  geom_line() +
-  geom_ribbon(aes(ymin = conf.low, ymax = conf.high), alpha = 0.1)
 
 # save models -------------------------------------------------------------
 
 #save image 
 save.image(file = "working_env/glmm_v1.RData")
 
-save(c(m1.2,m1.3,m1.4,m1.4_nb,m1.4_quasi, m1.5nb), file = 'models/glmm_v1.RData')
+save(m1.5nb, file = 'models/glmm_v1.RData')
 load("models/glmm_v1.RData")
 
 
@@ -950,3 +859,55 @@ load("models/glmm_v1.RData")
 # 
 # #rstan
 # library(rstanarm)
+# 
+# 
+# 
+# 
+# 
+# 
+# # plots with SJplot to see what I need to get manually
+# # model m1.4_nb
+# sjPlot::plot_model(m1.5nb, type = "re")
+# 
+# plot_jday <- effect("jday_s", m1.5nb, xlevels = list(jday_s = seq(
+#   min(bm2$jday_s), max(bm2$jday_s), length.out = 100
+# )))
+# 
+# plot_trmt_bin <- effect("trmt_bin", m1.4_nb, xlevels = list(trmt_bin = seq(
+#   min(bm2$trmt_bin), max(bm2$trmt_bin), length.out = 100
+# )))
+# 
+# plot_ndvi <- effect("ndvi_mean_s", m1.4_nb, xlevels = list(ndvi_mean_s = seq(
+#   min(bm2$ndvi_mean_s), max(bm2$ndvi_mean_s), length.out = 100
+# )))
+# 
+# plot_percent_s <- effect("percent_s", m1.4_nb, xlevels = list(percent_s = seq(
+#   min(bm2$percent_s), max(bm2$percent_s), length.out = 100
+# )))
+# 
+# plot_PeakFreq_s  <- effect("PeakFreq_s ", m1.4_nb, xlevels = list(PeakFreq_s  = seq(
+#   min(bm2$PeakFreq_s,na.rm = TRUE), max(bm2$PeakFreq_s,na.rm = TRUE ), length.out = 100
+# )))
+# 
+# plot_l.illum_s  <- effect("l.illum_s ", m1.4_nb, xlevels = list(l.illum_s  = seq(
+#   min(bm2$l.illum_s,na.rm = TRUE), max(bm2$l.illum_s,na.rm = TRUE ), length.out = 100
+# )))
+# 
+# plot_avg_wind_speed_s   <- effect("avg_wind_speed_s  ", m1.4_nb, xlevels = list(avg_wind_speed_s   = seq(
+#   min(bm2$avg_wind_speed_s ,na.rm = TRUE), max(bm2$avg_wind_speed_s ,na.rm = TRUE ), length.out = 100
+# )))
+# 
+# plot_avg_temperature_s     <- effect("avg_temperature_s    ", m1.4_nb, xlevels = list(avg_temperature_s     = seq(
+#   min(bm2$avg_temperature_s   ,na.rm = TRUE), max(bm2$avg_temperature_s   ,na.rm = TRUE ), length.out = 100
+# )))
+# 
+# plot(plot_jday, multiline = TRUE)
+# plot(plot_trmt_bin, multiline = TRUE)
+# plot(plot_ndvi, multiline = TRUE)
+# plot(plot_percent_s, multiline = T)
+# plot(plot_PeakFreq_s, multiline = T)
+# plot(plot_l.illum_s, multiline = T)
+# plot(plot_avg_wind_speed_s, multiline = T)
+# plot(plot_avg_temperature_s, multiline = T)
+# 
+
