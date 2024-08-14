@@ -295,3 +295,13 @@ The next step should be rerun the model with the data from 2022 and 2023. I am b
 -   remove ndvi and max-freq from the model m1.5nb. I also filtered out the "no-Id" calls from the model before running it.
 
 -   I need to code the treatment as -1, 0, 1 for sites close to lit sites and control sites. I needto check the time and date inthe raw data. when parsing these from the robomoth they did not work well but it could be due to the recordings comming from audiomoths.
+
+------------------------------------------------------------------------
+
+08/14/2024
+
+-   from the m1.5nb model, I should plot the marginal effects for the variables that are not in the random effects but have an significan effect. For exampl (elevation, tem, wind, year)
+
+-   I plotted yr
+
+![](images/clipboard-1745413645.png)

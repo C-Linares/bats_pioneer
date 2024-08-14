@@ -187,7 +187,19 @@ bm2 <- bm2 %>%
     TRUE ~ 1
   ))
 
+cattle <- c( # sites with cattle
+  "long01",
+  "long02",
+  "long03" ,
+  "long04",
+  "long05",
+  "vizc01",
+  "vizc03" ,
+  "vizc04",
+  "vizc02"
+)
 
+bm2$moo<- ifelse(bm2$site %in% cattle, 1, -1)
 
 # explore data ------------------------------------------------------------
 
@@ -294,21 +306,22 @@ mcoef<-coef(m1.4_nb)
 
 # m1.5nb ------------------------------------------------------------------
 
-# m1.5anb <- glmmTMB(
-#   n ~ trmt_bin + jday_s + I(jday_s ^ 2) + percent_s  + l.illum_s +  # model with no varialbes in the random slopes by sp. 
-#     avg_wind_speed_s + avg_temperature_s + yr + elev_mean_s +
-#     (1 |site) + (1 | sp),
-#   data = bm2,
-#   nbinom2(link = "log"))
+ m1.5anb <- glmmTMB(
+   n ~ trmt_bin + jday_s + I(jday_s ^ 2) + percent_s  + l.illum_s +  # less complex model 
+     avg_wind_speed_s + avg_temperature_s + yr_s + elev_mean_s +
+     (1 |site) + (1 | sp),
+   data = bm2,
+   nbinom2(link = "log"))
+
  
 m1.5nb <- glmmTMB(
   n ~ trmt_bin + jday_s + I(jday_s ^ 2) + percent_s  + l.illum_s +
     avg_wind_speed_s + avg_temperature_s + yr_s + elev_mean_s +
-    (1 |site) + (1 + trmt_bin + ndvi_mean_s + jday_s + I(jday_s ^ 2) | sp),
+    (1 |site) + (1 + trmt_bin + jday_s + I(jday_s ^ 2) | sp),
   data = bm2,   nbinom2(link = "log")
 )
 
-AIC(m1.5anb, m1.5nb)
+AIC( m1.5nb,m1.5anb) 
 summary(m1.5nb)
 confint(m1.5nb)
 
@@ -323,22 +336,21 @@ print(c_hat_deviance)
 saveRDS(m1.5nb,"models/m1.5nb")
 
 plot_model(m1.5nb)
+load('models/m1.5nb')
 
-
-
+tab_model(m1.5nb)
 
 # rstan_models ------------------------------------------------------------
 
 
 # Define the formula
-formula <- n ~ trmt_bin + jday_s + I(jday_s^2) + ndvi_mean_s + percent_s + l.illum_s +
-  avg_wind_speed_s + avg_temperature_s + (1 | site) + (1 + trmt_bin + ndvi_mean_s + jday_s + I(jday_s^2) | sp)
+formula <- n ~ trmt_bin + jday_s + I(jday_s^2)  + percent_s + l.illum_s +
+  avg_wind_speed_s + avg_temperature_s + (1 | site) + (1 + trmt_bin + jday_s + I(jday_s^2) | sp)
 
 # Fit the negative binomial model using rstanarm
 m1.4_off <- stan_glmer(
   formula,
   family = neg_binomial_2(),  # Negative binomial family with log-link
-  # offset = log(scale(bm2$eff.hrs)),    # Offset term
   data = bm2,
   chains = 4,                 # Number of Markov chains
   cores = 4                    # Number of cores to use (adjust as needed)
@@ -350,24 +362,6 @@ print(loo_m1.4_off)
 
 plot_model(m1.4_off)
 # plots -------------------------------------------------------------------
-
-
-
-# Sjplots  ----------------------------------------------------------------
-#Here we plot the negative binomial model using sjplot
-# coeffsicients
-b<-plot_model(m1.5nb, type =c("re"), show.p = T)
-a<-plot_model(m1.5nb, type =c("est"), se=T, show.p = T)
-
-# marginal effectrs
-c<-plot_model(m1.5nb, type = "pred", terms = "jday_s[all]", transform = "exp", )
-c <- plot_model(m1.5nb, type = "pred", terms = c("trmt_bin [all]", "jday_s [all]", "ndvi_mean_s [all]"))
-
-
-#diagnostics 
-
-d<-plot_model(m1.5nb, type = "diag")
-
 
 
 
@@ -388,30 +382,20 @@ ord.day.sqr<-ord.day^2
 jday.s <- scale(ord.day)
 jday.sqr<- scale(ord.day.sqr)
 #extract fixed coef jday
-f.jday <- fixef(m1.5nb) # extract the intercept and the coeficient for jday
-f.day<-f.jday$cond[c(1,3,4)]
+
 #predicted ab
+#
+fday<-confint(m1.5nb)
 
-predabund <- exp(f.day %*% t(cbind(int, jday.s, jday.sqr)))
 
-# mean abu
+predabund <- exp(t(fday[c(1,3,4),]) %*% t(cbind(int, jday.s, jday.sqr)))
 
-mabund <- apply(predabund, MARGIN = 2, FUN = mean)
-
-#95% CI
-
-CIabund <- apply(
-  predabund,
-  MARGIN = 2,
-  FUN = quantile,
-  probs = c(0.025, 0.975)
-)
 
 #Data
 
-abunddf <- data.frame(mabund, t(CIabund), jday.s, ord.day) # make a df with all the above
+abunddf <- data.frame(t(predabund), jday.s, ord.day) # make a df with all the above
 
-colnames(abunddf)[1:3] <- c("Mean", "lowCI", "highCI")
+colnames(abunddf)[1:3] <- c( "lowCI", "highCI", "Mean")
 
 ggplot(abunddf, aes(x = ord.day, y = Mean)) +
   theme_classic(base_size = 17) +
@@ -427,12 +411,6 @@ ggplot(abunddf, aes(x = ord.day, y = Mean)) +
 # trmt_bin partial predictor ----------------------------------------------
 
 
-# treatment partial predictor 
-# using ggeffects
-plt<-predict_response(m1.5nb, terms = c("trmt_bin[all]"))
-plot(plt)
-
-
 # obs. values
 trmt_bin<-c("dark", "light") # how do you plot the obs. values when you have
 trmt_bin_s<- c(-1,1) # this should be -1 and 1  and remember to rerun the model for that 
@@ -443,14 +421,14 @@ summary_m1.5nb <- summary(m1.5nb) # save the summary of the model
 feff<-summary_m1.5nb$coefficients$cond # get fixed eff
 c0<-feff["(Intercept)","Estimate"] # get intercept
 b2<-feff["trmt_bin", "Estimate"]   # get slope for treatment
-t<-confint(m1.5nb)
+cint<-confint(m1.5nb)
 
 # mean.pred <- c(exp( trmt_bin_s[1]*f.trmt[1]), exp(trmt_bin_s[2]*(f.trmt[1]+f.trmt[2]) )) example 
 mean.pred <- c(exp( trmt_bin_s[1]*c0), exp(trmt_bin_s[2]*(c0+b2) ))
 
-lowCI <-  c(exp( trmt_bin_s[1]*t[1,1]), exp(trmt_bin_s[2]*(t[1,1]+t[2,1]) ))
+lowCI <-  c(exp( trmt_bin_s[1]*cint[1,1]), exp(trmt_bin_s[2]*(cint[1,1]+cint[2,1]) ))
 
-highCI <- c(exp( trmt_bin_s[1]*c0), exp(trmt_bin_s[2]*(c0+b2) ))
+highCI <- c(exp( trmt_bin_s[1]*cint[1,2]), exp(trmt_bin_s[2]*(cint[1,2]+cint[2,2]) ))
 abunddf <- data.frame(mean.pred, lowCI, highCI, trmt_bin)
 
 colnames(abunddf )[1:3] <- c( "Mean", "lowCI", "highCI" )
@@ -480,30 +458,19 @@ feff<-sum_m1.5nb$coefficients$cond # get fixed eff
 
 c0<-feff["(Intercept)","Estimate"] # get intercept
 b2<-feff["l.illum_s", "Estimate"]   # get slope for treatment
-t<-confint(m1.5nb)
+cint<-confint(m1.5nb)
 
 c0b2<-cbind(c0,b2)
 
-predcalls <- exp(c0b2 %*% t(cbind(int, l.illum_s)))
+predcalls <- exp(t(cint[c(1,6),]) %*% t(cbind(int, l.illum_s)))
 
-# mean abu
 
-mcalls <- apply(predcalls, MARGIN = 2, FUN = mean)
-
-#95% CI
-
-CIcalls <- apply(
-  predcalls,
-  MARGIN = 2,
-  FUN = quantile,
-  probs = c(0.025, 0.975)
-)
 
 #Data
 
-l.illumdf <- data.frame(mcalls, t(CIcalls), l.illum_s, l.illum) # make a df with all the above
+l.illumdf <- data.frame(t(predcalls), l.illum_s, l.illum) # make a df with all the above
 
-colnames(l.illumdf)[1:3] <- c("Mean", "lowCI", "highCI")
+colnames(l.illumdf)[1:3] <- c( "lowCI", "highCI", "Mean")
 
 ggplot(l.illumdf, aes(x = l.illum, y = Mean)) +
   theme_classic(base_size = 17) +
@@ -517,45 +484,34 @@ ggplot(l.illumdf, aes(x = l.illum, y = Mean)) +
 
 # year marginal effect ----------------------------------------------------
 
+# it is signinficant and it is not in the  random effects. 
+
 # obs. values
 yr<- unique(bm2$yr)
+yr
 yr_s<- unique(bm2$yr_s)
-yr_s <- scale(yr)
+yr_s
 
-summary_m1.5nb <- summary(m1.5nb) # save the summary of the model
-feff<-summary_m1.5nb$coefficients$cond # get fixed eff
-c0<-feff["(Intercept)","Estimate"] # get intercept
-b2<-feff["yr_s", "Estimate"]   # get slope for treatment
-t<-confint(m1.5nb)
+cint <- confint(m1.5nb)[c(1, 9), ]
+cint
 
+mcalls <- c(exp( yr_s[1]*cint[1,3]), exp(yr_s[2]*(cint[1,3]+cint[2,3])), exp(yr_s[3]*(cint[1,3]+cint[2,3])))
 
-pred_year <- c(exp( yr_s[1]*c0), exp(yr_s[2]*(c0+b2)), exp(yr_s[3]*(c0+b2)) )
-lowCI <-  c(exp( trmt_bin_s[1]*t[1,1]), exp(trmt_bin_s[2]*(t[1,1]+t[2,1]) ))
+lowCI <-  c(exp( yr_s[1]*cint[1,1]), exp(yr_s[2]*(cint[1,1]+cint[2,1])), exp(yr_s[3]*(cint[1,1]+cint[2,1])))
 
+highCI<- c(exp( yr_s[1]*cint[1,2]), exp(yr_s[2]*(cint[1,2]+cint[2,2])), exp(yr_s[3]*(cint[1,2]+cint[2,2])))
 
 
+abunddf <- data.frame(mcalls, lowCI, highCI, yr)
 
-highCI <- c(exp( trmt_bin_s[1]*c0), exp(trmt_bin_s[2]*(c0+b2) ))
-abunddf <- data.frame(mean.pred, lowCI, highCI, trmt_bin)
-# Create a data frame for plotting
-year_df <- data.frame(
-  Mean = mean_pred,
-  lowCI = CI_year[1, ],
-  highCI = CI_year[2, ],
-  yr = yr  # use original year values for plotting
-)
+colnames(abunddf )[1:3] <- c( "Mean", "lowCI", "highCI" )
 
-# Plot the results
-ggplot(year_df, aes(x = yr, y = Mean)) +
-  theme_classic(base_size = 17) +
-  ylab("Predicted Bat Calls") +
-  xlab("Year") +
-  geom_line(size = 1.5) +
-  geom_ribbon(aes(ymin = lowCI, ymax = highCI), alpha = 0.3) +
-  labs(title = "Predicted Bat Calls Over Years")
-
-
-
+ggplot( abunddf, aes( x = yr, y = Mean) ) +  
+  theme_classic( base_size = 17) +
+  ylab( "bat calls" ) +
+  xlab( "year" ) +
+  geom_point()+
+  geom_errorbar( aes( ymin = lowCI, ymax = highCI ) )
 
 
 
@@ -563,19 +519,45 @@ ggplot(year_df, aes(x = yr, y = Mean)) +
 
 # random effects plot
 
-re_site <- ranef(m1.4_nb)$site
-re_sp <-ranef(m1.4_nb)$sp
-# Plot random intercepts for site
 
-fixefs<-fixef(m1.4_nb)
+#pull out random effects at the id level #
+ran.efs <- ranef( m1.5nb )$cond$sp
 
-rss.light<- exp(re_sp[,1] + fixefs[1]+  re_sp[,2]+fixefs[2])
-rss.nolight <- exp(re_sp[,1]+ fixefs[1])
+#pull out fixed effects
+fix.efs <- fixef( m1.5nb )$cond
+#view
+fix.efs
+
+rss <- ran.efs
+rss[,1 ] <- exp( rss[,1] + fix.efs[1] )
+rss[,2 ] <- exp( rss[,2] + fix.efs[2] )
+rss[,3 ] <- exp( rss[,3] + fix.efs[3] )
+rss[,4]<- exp(rss[,4]+ fix.efs[4])
+
+#create id column
+rss$id <- as.numeric(  as.factor(rownames( rss )) )  
+#view
+rss
+
+iddf <- bm2 %>% 
+  group_by( sp ) %>% 
+  summarise( trmt_bin_m = mean( trmt_bin, na.rm = TRUE),
+             jday_s_mean = mean( jday_s, na.rm = TRUE),
+             jday_s_sqr_m = mean( jday_s^2, na.rm = TRUE)
+  )
+iddf$id <- as.numeric(  as.factor(rownames( rss )) )
+iddf
+
+iddf<- left_join(rss, iddf, by= "id")
 
 
-plot(re_site$'(Intercept)', xlab = "Site", ylab = "Random Intercept", main = "Random Intercept Variability: Site")
-abline(h = 0, col = "red", lty = 2)  # Add a reference line at zero
 
+ggplot( iddf ) +
+  theme_classic( base_size = 15 ) +
+  labs( x = "Mean trmt", 
+        y = "Resource selection strength" ) +
+  geom_point( aes( x = annual_30m_mean , y = annual_30m, color = sex ) ) +
+  geom_hline( yintercept = 1, linewidth = 1 )
 
 
 
@@ -667,7 +649,8 @@ ggplot(abunddf, aes(x = jday_s_values, y = Mean)) +
 #save image 
 save.image(file = "working_env/glmm_v1.RData")
 
-save(m1.5nb, file = 'models/glmm_v1.RData')
+save(m1.5nb, file = 'models/m1.5nb')
+load('models/m1.5nb')
 load("models/glmm_v1.RData")
 
 
