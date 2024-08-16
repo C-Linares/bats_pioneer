@@ -320,7 +320,7 @@ m1.5nb <- glmmTMB(
     (1 |site) + (1 + trmt_bin + jday_s + I(jday_s ^ 2) | sp),
   data = bm2,   nbinom2(link = "log")
 )
-
+save(m1.5nb, 'models/')
 AIC( m1.5nb,m1.5anb) 
 summary(m1.5nb)
 confint(m1.5nb)
@@ -421,20 +421,19 @@ trmt_bin_s<- c(-1,1) # this should be -1 and 1  and remember to rerun the model 
 # feff<-summary_m1.5nb$coefficients$cond # get fixed eff
 # c0<-feff["(Intercept)","Estimate"] # get intercept
 # b2<-feff["trmt_bin", "Estimate"]   # get slope for treatment
-cint<- confint(m1.5nb)[c(1, ), ]
+cint<- confint(m1.5nb)[c(1,2 ), ]
+cint
 
 # mean.pred <- c(exp( trmt_bin_s[1]*f.trmt[1]), exp(trmt_bin_s[2]*(f.trmt[1]+f.trmt[2]) )) example 
-mean.pred <- c(exp( trmt_bin_s[1]*c0), exp(trmt_bin_s[2]*(c0+b2) ))
-mean.pred <- c(exp( trmt_bin_s[1]*c0), exp(trmt_bin_s[2]*(c0+b2) ))
+# mean.pred <- c(exp( trmt_bin_s[1]*c0), exp(trmt_bin_s[2]*(c0+b2) ))
 
-mean.pred <- c(exp(cint[1, 3] + yr_s[1] * cint[2, 3]),
-            exp(cint[1, 3] + yr_s[2] * cint[2, 3]),
-            exp(cint[1, 3] + yr_s[3] * cint[2, 3]))# after Jen's correction
+mean.pred <- c(exp(cint[1,3]+trmt_bin_s[1]*cint[2,3]),
+               exp(cint[1,3]+trmt_bin_s[2]*cint[2,3]))
 
 
-lowCI <-  c(exp( trmt_bin_s[1]*cint[1,1]), exp(trmt_bin_s[2]*(cint[1,1]+cint[2,1]) ))
+lowCI <-  c(exp( cint[1,1]+trmt_bin_s[1]*cint[2,1]), exp(cint[1,1]+trmt_bin_s[2]*cint[2,1] ))
 
-highCI <- c(exp( trmt_bin_s[1]*cint[1,2]), exp(trmt_bin_s[2]*(cint[1,2]+cint[2,2]) ))
+highCI <- c(exp( cint[1,2]+trmt_bin_s[1]*cint[2,2]), exp(cint[1,2]+trmt_bin_s[2]*cint[2,2] ))
 abunddf <- data.frame(mean.pred, lowCI, highCI, trmt_bin)
 
 colnames(abunddf )[1:3] <- c( "Mean", "lowCI", "highCI" )
@@ -531,7 +530,18 @@ m1.5nb
 
 # random effects plot
 
+sl=100
+ones = rep(1,100)
 
+# obs. values
+ord.day <- seq(min(bm2[, "jday"]), max(bm2[, "jday"]), length.out = n)
+# extraer el jday sqr 
+ord.day.sqr<-ord.day^2
+#std pred
+jday.s <- scale(ord.day)
+jday.sqr<- scale(ord.day.sqr)
+
+#extract fixed coef jday
 #pull out random effects at the sp level #
 ran.efs <- ranef( m1.5nb )$cond$sp
 
@@ -540,41 +550,42 @@ fix.efs <- fixef( m1.5nb )$cond
 #view
 fix.efs
 
+cint<-confint(m1.5nb)
+
 rss <- ran.efs
-rss
-rss[,1 ] <- exp( rss[,1] + fix.efs[1] ) #adding fixed effects 
-rss[,2 ] <- exp( rss[,2] + fix.efs[2] )
-rss[,3 ] <- exp( rss[,3] + fix.efs[3] )
-rss[,4]<- exp(rss[,4]+ fix.efs[4])
+
+rss[, 1] <- rss[, 1] + fix.efs[1]  #adding fixed effects to each of the random effects
+rss[, 2] <- rss[, 2] + fix.efs[2]
+rss[, 3] <- rss[, 3] + fix.efs[3]
+rss[, 4] <- rss[, 4] + fix.efs[4]
 
 #create id column
-rss$id <- as.numeric(  as.factor(rownames( rss )) )  
 #view
 rss
+a<-rss[,1:3]
+b<-t( cbind( ones, jday.s, jday.sqr))
+indpred<- exp( as.matrix(a) %*% as.matrix(b) )
 
-iddf <- bm2 %>% 
-  group_by( sp ) %>% 
-  summarise( trmt_bin_m = mean( trmt_bin, na.rm = TRUE),
-             jday_s_mean = mean( jday_s, na.rm = TRUE),
-             jday_s_sqr_m = mean( jday_s^2, na.rm = TRUE)
-  )
-iddf$id <- as.numeric(  as.factor(rownames( rss )) )
-iddf
+abunddf <- data.frame(t(indpred), jday.s, ord.day)
 
-iddf<- left_join(rss, iddf, by= "id")
-
-
-
-ggplot( iddf ) +
-  theme_classic( base_size = 15 ) +
-  labs( x = "Mean trmt", 
-        y = "Resource selection strength" ) +
-  geom_point( aes( x = annual_30m_mean , y = annual_30m, color = sex ) ) +
-  geom_hline( yintercept = 1, linewidth = 1 )
+ggplot(abunddf, aes(x = ord.day, y = ANTPAL)) +
+  theme_classic(base_size = 17) +
+  ylab("bat calls") +
+  xlab("jday") +
+  geom_line(size = 1.5) 
 
 
-
-
+# Create the melted data for plotting all columns
+abunddf_melted <- melt(abunddf, id.vars = "jday.s", measure.vars = names(abunddf)[-1])
+# Create the ggplot object
+ggplot(abunddf_melted, aes(x = jday.s, y = value, color = variable)) +
+  # Add geom_point to plot points for each variable
+  geom_point(size = 3) +
+  # Set labels and title
+  labs(title = "Abundance by Day", x = "Day", y = "Abundance") +
+  # Set theme for better visuals (optional)
+  theme_classic()
+rm(abunddf)
 
 # plot model m1.5nb --------------------------------------------------------
 
@@ -662,9 +673,8 @@ ggplot(abunddf, aes(x = jday_s_values, y = Mean)) +
 #save image 
 save.image(file = "working_env/glmm_v1.RData")
 
-save(m1.5nb, file = 'models/m1.5nb')
-load('models/m1.5nb')
-
+save(m1.5nb, file = "models/my_models.RData")
+load("models/my_models.RData")
 
 
 
