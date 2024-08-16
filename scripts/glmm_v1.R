@@ -42,7 +42,7 @@ library(effects)
 
 #load environment 
 #last worked 08/01/2024
-load(file = "working_env/glmm_v1.RData")
+# load(file = "working_env/glmm_v1.RData")
 
 # data --------------------------------------------------------------------
 
@@ -417,14 +417,20 @@ trmt_bin_s<- c(-1,1) # this should be -1 and 1  and remember to rerun the model 
 
 
 
-summary_m1.5nb <- summary(m1.5nb) # save the summary of the model
-feff<-summary_m1.5nb$coefficients$cond # get fixed eff
-c0<-feff["(Intercept)","Estimate"] # get intercept
-b2<-feff["trmt_bin", "Estimate"]   # get slope for treatment
-cint<-confint(m1.5nb)
+# summary_m1.5nb <- summary(m1.5nb) # save the summary of the model
+# feff<-summary_m1.5nb$coefficients$cond # get fixed eff
+# c0<-feff["(Intercept)","Estimate"] # get intercept
+# b2<-feff["trmt_bin", "Estimate"]   # get slope for treatment
+cint<- confint(m1.5nb)[c(1, ), ]
 
 # mean.pred <- c(exp( trmt_bin_s[1]*f.trmt[1]), exp(trmt_bin_s[2]*(f.trmt[1]+f.trmt[2]) )) example 
 mean.pred <- c(exp( trmt_bin_s[1]*c0), exp(trmt_bin_s[2]*(c0+b2) ))
+mean.pred <- c(exp( trmt_bin_s[1]*c0), exp(trmt_bin_s[2]*(c0+b2) ))
+
+mean.pred <- c(exp(cint[1, 3] + yr_s[1] * cint[2, 3]),
+            exp(cint[1, 3] + yr_s[2] * cint[2, 3]),
+            exp(cint[1, 3] + yr_s[3] * cint[2, 3]))# after Jen's correction
+
 
 lowCI <-  c(exp( trmt_bin_s[1]*cint[1,1]), exp(trmt_bin_s[2]*(cint[1,1]+cint[2,1]) ))
 
@@ -495,11 +501,17 @@ yr_s
 cint <- confint(m1.5nb)[c(1, 9), ]
 cint
 
-mcalls <- c(exp( yr_s[1]*cint[1,3]), exp(yr_s[2]*(cint[1,3]+cint[2,3])), exp(yr_s[3]*(cint[1,3]+cint[2,3])))
+mcalls <- c(exp(cint[1, 3] + yr_s[1] * cint[2, 3]),
+            exp(cint[1, 3] + yr_s[2] * cint[2, 3]),
+            exp(cint[1, 3] + yr_s[3] * cint[2, 3]))# after Jen's correction
 
-lowCI <-  c(exp( yr_s[1]*cint[1,1]), exp(yr_s[2]*(cint[1,1]+cint[2,1])), exp(yr_s[3]*(cint[1,1]+cint[2,1])))
+lowCI <-  c(exp(cint[1, 1] + yr_s[1] * cint[2, 1]),
+            exp(cint[1, 1] + yr_s[2] * cint[2, 1]),
+            exp(cint[1, 1] + yr_s[3] * cint[2, 1]))
 
-highCI<- c(exp( yr_s[1]*cint[1,2]), exp(yr_s[2]*(cint[1,2]+cint[2,2])), exp(yr_s[3]*(cint[1,2]+cint[2,2])))
+highCI <- c(exp(cint[1, 2] + yr_s[1] * cint[2, 2]),
+            exp(cint[1, 2] + yr_s[2] * cint[2, 2]),
+            exp(cint[1, 2] + yr_s[3] * cint[2, 2]))
 
 
 abunddf <- data.frame(mcalls, lowCI, highCI, yr)
@@ -514,13 +526,13 @@ ggplot( abunddf, aes( x = yr, y = Mean) ) +
   geom_errorbar( aes( ymin = lowCI, ymax = highCI ) )
 
 
-
+m1.5nb
 
 
 # random effects plot
 
 
-#pull out random effects at the id level #
+#pull out random effects at the sp level #
 ran.efs <- ranef( m1.5nb )$cond$sp
 
 #pull out fixed effects
@@ -529,7 +541,8 @@ fix.efs <- fixef( m1.5nb )$cond
 fix.efs
 
 rss <- ran.efs
-rss[,1 ] <- exp( rss[,1] + fix.efs[1] )
+rss
+rss[,1 ] <- exp( rss[,1] + fix.efs[1] ) #adding fixed effects 
 rss[,2 ] <- exp( rss[,2] + fix.efs[2] )
 rss[,3 ] <- exp( rss[,3] + fix.efs[3] )
 rss[,4]<- exp(rss[,4]+ fix.efs[4])
@@ -651,7 +664,6 @@ save.image(file = "working_env/glmm_v1.RData")
 
 save(m1.5nb, file = 'models/m1.5nb')
 load('models/m1.5nb')
-load("models/glmm_v1.RData")
 
 
 
