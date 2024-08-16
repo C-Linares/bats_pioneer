@@ -305,3 +305,35 @@ The next step should be rerun the model with the data from 2022 and 2023. I am b
 -   I plotted yr
 
 ![](images/clipboard-1745413645.png)
+
+------------------------------------------------------------------------
+
+8/16/2024
+
+I learned to use the line equation to predict the values for building the marginal predictors plot and the random effect plots. for example:\
+
+fday\<-confint(m1.5nb)
+
+predabund \<- exp(t(fday[c(1,3,4),]) %\*% t(cbind(int, jday.s, jday.sqr)))
+
+Here we are using the intecept and slope matrix to multiply it by obseved values and get the predicted values.
+
+Below we are doing something similar but for the randome effects where we are addign the fixed coefficients to the random effects coefficients (rss) then we are pedicting the response based on observed values and the coeficients that we have so we can create a plot.
+
+``` R
+ rss <- ran.efs
+
+rss[, 1] <- rss[, 1] + fix.efs[1]  #adding fixed effects to each of the random effects
+rss[, 2] <- rss[, 2] + fix.efs[2]
+rss[, 3] <- rss[, 3] + fix.efs[3]
+rss[, 4] <- rss[, 4] + fix.efs[4]
+
+#create id column
+#view
+rss
+a<-rss[,1:3]
+b<-t( cbind( ones, jday.s, jday.sqr))
+indpred<- exp( as.matrix(a) %*% as.matrix(b) )
+
+abunddf <- data.frame(t(indpred), jday.s, ord.day)
+```

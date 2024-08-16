@@ -41,8 +41,8 @@ library(effects)
 
 
 #load environment 
-#last worked 08/01/2024
-# load(file = "working_env/glmm_v1.RData")
+#last worked 08/16/2024
+load(file = "working_env/glmm_v1.RData")
 
 # data --------------------------------------------------------------------
 
