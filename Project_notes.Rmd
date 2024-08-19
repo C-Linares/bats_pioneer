@@ -310,7 +310,7 @@ The next step should be rerun the model with the data from 2022 and 2023. I am b
 
 8/16/2024
 
-I learned to use the line equation to predict the values for building the marginal predictors plot and the random effect plots. for example:\
+I learned to use the line equation to predict the values for building the marginal predictors plot and the random effect plots. for [example:\\](example:\){.uri}
 
 fday\<-confint(m1.5nb)
 
@@ -320,7 +320,7 @@ Here we are using the intecept and slope matrix to multiply it by obseved values
 
 Below we are doing something similar but for the randome effects where we are addign the fixed coefficients to the random effects coefficients (rss) then we are pedicting the response based on observed values and the coeficients that we have so we can create a plot.
 
-``` R
+``` r
  rss <- ran.efs
 
 rss[, 1] <- rss[, 1] + fix.efs[1]  #adding fixed effects to each of the random effects
@@ -337,3 +337,10 @@ indpred<- exp( as.matrix(a) %*% as.matrix(b) )
 
 abunddf <- data.frame(t(indpred), jday.s, ord.day)
 ```
+
+------------------------------------------------------------------------
+
+08/19/2024
+
+tried the random effets plot for the sp. \
+I got stuck... it is not working very well.

@@ -38,6 +38,7 @@ library(car)
 library(glmmTMB)
 library(corrplot)
 library(effects)
+library(reshape2)
 
 
 #load environment 
@@ -562,7 +563,7 @@ rss[, 4] <- rss[, 4] + fix.efs[4]
 #create id column
 #view
 rss
-a<-rss[,1:3]
+a<-rss[,c(1,3,4)]
 b<-t( cbind( ones, jday.s, jday.sqr))
 indpred<- exp( as.matrix(a) %*% as.matrix(b) )
 
@@ -576,16 +577,76 @@ ggplot(abunddf, aes(x = ord.day, y = ANTPAL)) +
 
 
 # Create the melted data for plotting all columns
-abunddf_melted <- melt(abunddf, id.vars = "jday.s", measure.vars = names(abunddf)[-1])
+abunddf_melted <- melt(abunddf, id.vars = "ord.day",variable.name = "sp", value.name ="predicted calls" )
+unique(abunddf_melted$variable)
+
+abunddf_long<- pivot_longer(abunddf, cols= 1:14, names_to = "sp", values_to = "predicted calls")
+
+
 # Create the ggplot object
-ggplot(abunddf_melted, aes(x = jday.s, y = value, color = variable)) +
+ggplot(abunddf_melted, aes(x = ord.day, y = `predicted calls`, color = sp)) +
   # Add geom_point to plot points for each variable
-  geom_point(size = 3) +
+  geom_point(size = 1) +
   # Set labels and title
   labs(title = "Abundance by Day", x = "Day", y = "Abundance") +
   # Set theme for better visuals (optional)
   theme_classic()
+
+ggplot(abunddf_long, aes(x = ord.day, y = `predicted calls`, color = sp)) +
+  # Add geom_point to plot points for each variable
+  geom_point(size = 1) +
+   facet_wrap(~ sp,scales = "free_y")+
+  # Set labels and title
+  labs(title = "Bat calls by julian day", x = "julian day", y = "Abundance") +
+  # Set theme for better visuals (optional)
+  theme_classic()
 rm(abunddf)
+
+
+# treatment 
+trmt_bin_s
+a<-rss[,1:2]
+a
+b<-t( cbind( ones, trmt_bin_s))
+b
+indpred<- exp( as.matrix(a) %*% as.matrix(b) )
+head(indpred)
+
+abunddf <- data.frame(t(indpred), trmt_bin_s)
+head(abunddf)
+
+ggplot(abunddf, aes(x = trmt_bin_s, y = ANTPAL)) +
+  theme_classic(base_size = 17) +
+  ylab("bat calls") +
+  xlab("jday") +
+  geom_line(size = 1.5) 
+
+
+# Create the melted data for plotting all columns
+abunddf_melted <- melt(abunddf, id.vars = "ord.day", measure.vars = names(abunddf))
+abunddf_long<- pivot_longer(abunddf, cols= 1:14, names_to = "sp", values_to = "predicted calls")
+
+
+# Create the ggplot object
+ggplot(abunddf_melted, aes(x = ord.day, y = `predicted calls`, color = sp)) +
+  # Add geom_point to plot points for each variable
+  geom_point(size = 1) +
+  # Set labels and title
+  labs(title = "Abundance by Day", x = "Day", y = "Abundance") +
+  # Set theme for better visuals (optional)
+  theme_classic()
+
+ggplot(abunddf_long, aes(x = trmt_bin_s, y = `predicted calls`)) +
+  # Add geom_point to plot points for each variable
+geom_boxplot()+
+   # facet_wrap(~ sp)+
+  # Set labels and title
+  labs(title = "Bat calls by ", x = "", y = "") +
+  # Set theme for better visuals (optional)
+  theme_classic()
+rm(abunddf)
+
+
 
 # plot model m1.5nb --------------------------------------------------------
 
