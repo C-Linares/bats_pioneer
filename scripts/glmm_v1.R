@@ -321,10 +321,18 @@ m1.5nb <- glmmTMB(
     (1 |site) + (1 + trmt_bin + jday_s + I(jday_s ^ 2) | sp),
   data = bm2,   nbinom2(link = "log")
 )
+
+m1.6nb <- glmmTMB(
+  n ~ trmt_bin + jday_s + I(jday_s ^ 2) + percent_s  + l.illum_s + # this one didn't even converge. 
+    avg_wind_speed_s + avg_temperature_s + yr_s + elev_mean_s +
+    (1 |site) + (1 + trmt_bin + jday_s + I(jday_s ^ 2) | sp),
+  data = bm2,   nbinom1(link = "log")
+)
 save(m1.5nb, 'models/')
-AIC( m1.5nb,m1.5anb) 
+AIC( m1.5nb,m1.5anb,m1.6nb) 
 summary(m1.5nb)
 confint(m1.5nb)
+
 
 # Calculate residual deviance and residual degrees of freedom
 residual_deviance <- deviance(m1.5nb)
@@ -341,27 +349,16 @@ load('models/m1.5nb')
 
 tab_model(m1.5nb)
 
-# rstan_models ------------------------------------------------------------
+emmeans::emmeans(m1.5nb, "percent_s",type="response")
+
+plot(ggeffects::ggpredict(m1.5nb, "percent_s [all]"))
+plot(ggeffects::ggpredict(m1.5nb, "l.illum_s [all]"))
+plot(ggeffects::ggpredict(m1.5nb, "avg_wind_speed_s [all]"))
+plot(ggeffects::ggpredict(m1.5nb, "avg_temperature_s [all]"))
 
 
-# Define the formula
-formula <- n ~ trmt_bin + jday_s + I(jday_s^2)  + percent_s + l.illum_s +
-  avg_wind_speed_s + avg_temperature_s + (1 | site) + (1 + trmt_bin + jday_s + I(jday_s^2) | sp)
-
-# Fit the negative binomial model using rstanarm
-m1.4_off <- stan_glmer(
-  formula,
-  family = neg_binomial_2(),  # Negative binomial family with log-link
-  data = bm2,
-  chains = 4,                 # Number of Markov chains
-  cores = 4                    # Number of cores to use (adjust as needed)
-)
 
 
-loo_m1.4_off <- loo(m1.4_off)
-print(loo_m1.4_off)
-
-plot_model(m1.4_off)
 # plots -------------------------------------------------------------------
 
 
@@ -369,7 +366,9 @@ plot_model(m1.4_off)
 # partial predictor manual jday -------------------------------------------
 
 
-# plotting partial predictors manually
+
+# jday --------------------------------------------------------------------
+
 
 # values to use
 n <- 100
@@ -452,21 +451,19 @@ ggplot( abunddf, aes( x = trmt_bin, y = Mean) ) +
 # lunar illumination partial predictor ------------------------------------
 
 # obs. values
+n<-100
+int <- rep(1, n) #generate an interval of ones
 
-l.illum<-seq(min(bm2$l.illum), max(bm2$l.illum),length.out = n)
-# standardize l.illum
+
+l.illum<-seq(min(bm2$l.illum), max(bm2$l.illum),length.out = n) # get the observed values
+# scale  l.illum
 l.illum_s<- scale(l.illum)
 
 # extract fixed coefficients
 
-sum_m1.5nb<- summary(m1.5nb)
-feff<-sum_m1.5nb$coefficients$cond # get fixed eff
 
-c0<-feff["(Intercept)","Estimate"] # get intercept
-b2<-feff["l.illum_s", "Estimate"]   # get slope for treatment
 cint<-confint(m1.5nb)
-
-c0b2<-cbind(c0,b2)
+cint[c(1,6),]
 
 predcalls <- exp(t(cint[c(1,6),]) %*% t(cbind(int, l.illum_s)))
 
@@ -479,18 +476,181 @@ l.illumdf <- data.frame(t(predcalls), l.illum_s, l.illum) # make a df with all t
 colnames(l.illumdf)[1:3] <- c( "lowCI", "highCI", "Mean")
 
 ggplot(l.illumdf, aes(x = l.illum, y = Mean)) +
-  theme_classic(base_size = 17) +
+  theme_classic(base_size = 12) +
   ylab("bat calls") +
-  xlab("l.illum") +
-  geom_line(size = 1.5) +
+  xlab("lunar illumination") +
+  geom_line(size = .4) +
   geom_ribbon(alpha = 0.3, aes(ymin = lowCI, ymax = highCI))
 
+# Improved plot
+p1<-ggplot(l.illumdf, aes(x = l.illum, y = Mean)) +
+  geom_line(size = .75, color = "black") + # Adjust line size and color
+  geom_ribbon(aes(ymin = lowCI, ymax = highCI), fill = "grey", alpha = 0.5) + # Customize ribbon fill and transparency
+  theme_classic(base_size = 12) +
+  theme(
+    plot.title = element_text(hjust = 0.5, ), # Center and bold title
+    axis.title = element_text(), # Bold axis titles
+    axis.text = element_text(color = "black"), # Ensure axis text is visible
+    axis.line = element_line(color = "black"), # Darken axis lines for better visibility
+    panel.grid = element_blank(), # Remove grid lines for a cleaner look
+    plot.margin = margin(10, 10, 10, 10) # Add margin around the plot
+  ) +
+  labs(
+    title = "Effect of Lunar Illumination on Bat Calls", # Add a title
+    y = "Bat Calls", # More descriptive y-axis label
+    x = "Lunar Illumination " # More descriptive x-axis label
+  ) +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.05))) + # Adjust y-axis to avoid clipping
+  scale_x_continuous(expand = expansion(mult = c(0.01, 0.01))) # Adjust x-axis for balance
 
+ggsave(filename = "l.illum_feff_v1.png",plot = p1,device = "png", path = 'figures/glmm_v1/' )
+
+
+
+
+
+# temperature -------------------------------------------------------------
+
+n=100
+int # interval of 1s
+# observed values 
+
+tmp<-seq(min(bm2$avg_temperature, na.rm = T ), max(bm2$avg_temperature, na.rm = T), length.out= n)
+tmp_s<- scale(tmp)
+
+#fixed effect
+
+cint<- confint(m1.5nb)
+cint[c(1,7),]
+
+predcalls <- exp(t(cint[c(1,7),]) %*% t(cbind(int, tmp_s)))
+
+tmpdf <- data.frame(t(predcalls), tmp, tmp_s) # make a df with all the above
+colnames(tmpdf)[1:3] <- c( "lowCI", "highCI", "Mean")  #This is to label the data frame appropiately. 
+
+p2<-ggplot(tmpdf, aes(x = tmp, y = Mean)) +
+  geom_line(size = .75, color = "black") + # Adjust line size and color
+  geom_ribbon(aes(ymin = lowCI, ymax = highCI), fill = "grey", alpha = 0.5) + # Customize ribbon fill and transparency
+  theme_classic(base_size = 12) +
+  theme(
+    plot.title = element_text(hjust = 0.5, ), # Center and bold title
+    axis.title = element_text(), # Bold axis titles
+    axis.text = element_text(color = "black"), # Ensure axis text is visible
+    axis.line = element_line(color = "black"), # Darken axis lines for better visibility
+    panel.grid = element_blank(), # Remove grid lines for a cleaner look
+    plot.margin = margin(10, 10, 10, 10) # Add margin around the plot
+  ) +
+  labs(
+    title = "Effect of average night temperature on Bat Calls", # Add a title
+    y = "Bat Calls", # More descriptive y-axis label
+    x = "Temperature °C" # More descriptive x-axis label
+  ) +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.05))) + # Adjust y-axis to avoid clipping
+  scale_x_continuous(expand = expansion(mult = c(0.01, 0.01))) # Adjust x-axis for balance
+p2
+ggsave(filename = "temp_feff_v1.png",plot = p2,device = "png", path = 'figures/glmm_v1/' )
+
+
+# wind --------------------------------------------------------------------
+
+
+n=100
+int # interval of 1s
+
+# observed values 
+
+wnd<-seq(min(bm2$avg_wind_speed, na.rm = T ), max(bm2$avg_wind_speed, na.rm = T), length.out= n)
+wnd_s<- scale(wnd)
+
+#fixed effect
+
+cint<- confint(m1.5nb)
+cint[c(1,8),]
+
+predcalls <- exp(t(cint[c(1,8),]) %*% t(cbind(int, wnd_s)))
+
+wnddf <- data.frame(t(predcalls), wnd, wnd_s) # make a df with all the above
+colnames(wnddf)[1:3] <- c( "lowCI", "highCI", "Mean")  #This is to label the data frame appropiately. 
+
+p3<-ggplot(wnddf, aes(x = tmp, y = Mean)) +
+  geom_line(size = .75, color = "black") + # Adjust line size and color
+  geom_ribbon(aes(ymin = lowCI, ymax = highCI), fill = "grey", alpha = 0.5) + # Customize ribbon fill and transparency
+  theme_classic(base_size = 12) +
+  theme(
+    plot.title = element_text(hjust = 0.5, ), # Center and bold title
+    axis.title = element_text(), # Bold axis titles
+    axis.text = element_text(color = "black"), # Ensure axis text is visible
+    axis.line = element_line(color = "black"), # Darken axis lines for better visibility
+    panel.grid = element_blank(), # Remove grid lines for a cleaner look
+    plot.margin = margin(10, 10, 10, 10) # Add margin around the plot
+  ) +
+  labs(
+    title = "Effect of average night wind on Bat Calls", # Add a title
+    y = "Bat Calls", # More descriptive y-axis label
+    x = "wind m/s" # More descriptive x-axis label
+  ) +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.05))) + # Adjust y-axis to avoid clipping
+  scale_x_continuous(expand = expansion(mult = c(0.01, 0.01))) # Adjust x-axis for balance
+p3
+ggsave(filename = "wnd_feff_v1.png",plot = p3,device = "png", path = 'figures/glmm_v1/' )
+
+
+# elevation ---------------------------------------------------------------
+# obs. values
+n<-100
+int <- rep(1, n) #generate an interval of ones
+
+
+elv<-seq(min(bm2$elev_mean), max(bm2$elev_mean),length.out = n) # get the observed values
+# scale  
+elv_s<- scale(elv)
+
+# extract fixed coefficients
+cint<-confint(m1.5nb)
+cint[c(1,10),]
+
+predcalls <- exp(t(cint[c(1,10),]) %*% t(cbind(int, elv_s)))
+
+#Data
+
+elvdf <- data.frame(t(predcalls), elv, elv_s) # make a df with all the above
+head(elvdf)
+colnames(elvdf)[1:3] <- c( "lowCI", "highCI", "Mean")
+
+ggplot(elvdf, aes(x = elv, y = Mean)) +
+  theme_classic(base_size = 12) +
+  ylab("bat calls") +
+  xlab("elevation") +
+  geom_line(size = .4) +
+  geom_ribbon(alpha = 0.3, aes(ymin = lowCI, ymax = highCI))
+
+# Improved plot
+p4<-ggplot(elvdf, aes(x = elv, y = Mean)) +
+  geom_line(size = .75, color = "black") + # Adjust line size and color
+  geom_ribbon(aes(ymin = lowCI, ymax = highCI), fill = "grey", alpha = 0.5) + # Customize ribbon fill and transparency
+  theme_classic(base_size = 12) +
+  theme(
+    plot.title = element_text(hjust = 0.5, ), # Center and bold title
+    axis.title = element_text(), # Bold axis titles
+    axis.text = element_text(color = "black"), # Ensure axis text is visible
+    axis.line = element_line(color = "black"), # Darken axis lines for better visibility
+    panel.grid = element_blank(), # Remove grid lines for a cleaner look
+    plot.margin = margin(10, 10, 10, 10) # Add margin around the plot
+  ) +
+  labs(
+    title = "Effect of elevation on Bat Calls", # Add a title
+    y = "Bat Calls", # More descriptive y-axis label
+    x = "elevation m " # More descriptive x-axis label
+  ) 
+  # scale_y_continuous(expand = expansion(mult = c(0, 0.05))) + # Adjust y-axis to avoid clipping
+  # scale_x_continuous(expand = expansion(mult = c(0.01, 0.01))) # Adjust x-axis for balance
+
+p4
+ggsave(filename = "elv_feff_v1.png",plot = p4,device = "png", path = 'figures/glmm_v1/' )
 
 
 # year marginal effect ----------------------------------------------------
 
-# it is signinficant and it is not in the  random effects. 
 
 # obs. values
 yr<- unique(bm2$yr)
@@ -526,10 +686,41 @@ ggplot( abunddf, aes( x = yr, y = Mean) ) +
   geom_errorbar( aes( ymin = lowCI, ymax = highCI ) )
 
 
-m1.5nb
+# improved graph 
+ggplot(abunddf, aes(x = as.factor(yr), y = Mean)) +  
+  # Use a professional theme
+  theme_classic(base_size = 17) +
+  
+  # Add labels
+  ylab("Bat Calls") +
+  xlab("Year") +
+  
+  # Add violin plot with custom color and transparency
+  geom_violin(fill = "#BDC3C7", color = "black", alpha = 0.7, width = 0.8) +
+  
+  # Add jittered points to show individual data
+   geom_jitter(size =1 , color = "#2C3E50", width = 0.2, height = 0) +
+  
+  # Add error bars
+   geom_errorbar(aes(ymin = lowCI, ymax = highCI), width = 0.2, color = "black") +
+  
+  # Customize axis text and title
+  theme(
+    axis.title = element_text(face = "bold", size = 14),
+    axis.text = element_text(size = 12),
+    plot.title = element_text(hjust = 0.5, face = "bold", size = 16),
+    plot.subtitle = element_text(hjust = 0.5, size = 12),
+    panel.grid = element_blank(),
+    axis.line = element_line(color = "black"),
+    plot.margin = margin(10, 10, 10, 10)
+  ) +
+  
+  # Optionally, add a title and subtitle
+  ggtitle("Distribution of Bat Calls by Year", subtitle = "Including Individual Data Points and Confidence Intervals")
 
 
-# random effects plot
+# random effects plots ----------------------------------------------------
+
 
 sl=100
 ones = rep(1,100)
@@ -604,23 +795,56 @@ rm(abunddf)
 
 
 # treatment 
+
+trmt_bin_s <- c(-1,1)
 trmt_bin_s
-a<-rss[,1:2]
+
+# correcting random eff
+ran.efs <- ranef( m1.5nb )$cond$sp # get the random effects 
+a<-ran.efs[,1:2] # index to just the intercept and treatment raneff
 a
-b<-t( cbind( ones, trmt_bin_s))
-b
-indpred<- exp( as.matrix(a) %*% as.matrix(b) )
+
+
+cint<-confint(m1.5nb)[1:2,] # get fixed effects from the model
+cint
+
+#y = int + random.int[sp] + beta[1]treatment + random.slope[sp] * treatment
+
+a[, 1] <- a[, 1] + cint[1,3] # adding random int and fixed int 
+a[, 2] <- a[, 2] + cint[2, 3] # adding the random slope and the fixed slope. 
+
+a
+
+pred<- a[,1]+trmt_bin_s[1]*
+indpred<- exp( as.matrix(a) %*%  )
 head(indpred)
+
+
 
 abunddf <- data.frame(t(indpred), trmt_bin_s)
 head(abunddf)
 
+
+ggplot( abunddf, aes( x = trmt_bin_s, y = EPTFUS )) +  
+  theme_classic( base_size = 17) +
+  ylab( "bat calls" ) +
+  xlab( "tmt" ) +
+  geom_point()
+
+
+
+
 ggplot(abunddf, aes(x = trmt_bin_s, y = ANTPAL)) +
   theme_classic(base_size = 17) +
   ylab("bat calls") +
-  xlab("jday") +
-  geom_line(size = 1.5) 
+  xlab("trmt") 
 
+
+  ggplot( abunddf, aes( x = trmt_bin_s, y = ANTPAL, group = trmt_bin_s) ) +  
+  theme_classic( base_size = 17) +
+  ylab( "bat calls" ) +
+  xlab( "treatment" ) +
+    geom_point()
 
 # Create the melted data for plotting all columns
 abunddf_melted <- melt(abunddf, id.vars = "ord.day", measure.vars = names(abunddf))
@@ -644,7 +868,8 @@ geom_boxplot()+
   labs(title = "Bat calls by ", x = "", y = "") +
   # Set theme for better visuals (optional)
   theme_classic()
-rm(abunddf)
+
+
 
 
 
@@ -741,6 +966,31 @@ load("models/my_models.RData")
 
 
 # trash -------------------------------------------------------------------
+
+# rstan_models ------------------------------------------------------------
+
+
+# Define the formula
+formula <- n ~ trmt_bin + jday_s + I(jday_s^2)  + percent_s + l.illum_s +
+  avg_wind_speed_s + avg_temperature_s + (1 | site) + (1 + trmt_bin + jday_s + I(jday_s^2) | sp)
+
+# Fit the negative binomial model using rstanarm
+m1.4_off <- stan_glmer(
+  formula,
+  family = neg_binomial_2(),  # Negative binomial family with log-link
+  data = bm2,
+  chains = 4,                 # Number of Markov chains
+  cores = 4                    # Number of cores to use (adjust as needed)
+)
+
+
+loo_m1.4_off <- loo(m1.4_off)
+print(loo_m1.4_off)
+
+plot_model(m1.4_off)
+
+
+
 
 # scale data old way
 

@@ -167,7 +167,7 @@ bat_combined$rmins<-round(bat_combined$date_time, units="mins") #rounds to the n
 
 bm.miller<-bat_combined %>% #min of activity 
   group_by(site, AUTO.ID., noche, rmins) %>% 
-  summarize(activity_min= n()) %>%  #calculate the num of min activte
+  summarize(activity_min= n()) %>%  #calculate the num of min activity
   ungroup()
 
 
