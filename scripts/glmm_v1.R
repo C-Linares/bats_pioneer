@@ -659,7 +659,7 @@ yr_s<- unique(bm2$yr_s)
 yr_s
 
 cint <- confint(m1.5nb)[c(1, 9), ]
-cint
+cint 
 
 mcalls <- c(exp(cint[1, 3] + yr_s[1] * cint[2, 3]),
             exp(cint[1, 3] + yr_s[2] * cint[2, 3]),
@@ -678,37 +678,21 @@ abunddf <- data.frame(mcalls, lowCI, highCI, yr)
 
 colnames(abunddf )[1:3] <- c( "Mean", "lowCI", "highCI" )
 
-ggplot( abunddf, aes( x = yr, y = Mean) ) +  
-  theme_classic( base_size = 17) +
+p5<-ggplot( abunddf, aes( x = yr, y = Mean) ) +  
+  theme_classic( base_size = 12) +
   ylab( "bat calls" ) +
   xlab( "year" ) +
   geom_point()+
-  geom_errorbar( aes( ymin = lowCI, ymax = highCI ) )
-
-
-# improved graph 
-ggplot(abunddf, aes(x = as.factor(yr), y = Mean)) +  
-  # Use a professional theme
-  theme_classic(base_size = 17) +
-  
-  # Add labels
+  geom_errorbar( aes( ymin = lowCI, ymax = highCI ) )+
+# labels
   ylab("Bat Calls") +
   xlab("Year") +
   
-  # Add violin plot with custom color and transparency
-  geom_violin(fill = "#BDC3C7", color = "black", alpha = 0.7, width = 0.8) +
-  
-  # Add jittered points to show individual data
-   geom_jitter(size =1 , color = "#2C3E50", width = 0.2, height = 0) +
-  
-  # Add error bars
-   geom_errorbar(aes(ymin = lowCI, ymax = highCI), width = 0.2, color = "black") +
-  
   # Customize axis text and title
   theme(
-    axis.title = element_text(face = "bold", size = 14),
+    axis.title = element_text(size = 12),
     axis.text = element_text(size = 12),
-    plot.title = element_text(hjust = 0.5, face = "bold", size = 16),
+    plot.title = element_text(hjust = 0.5, face = "bold", size = 12),
     plot.subtitle = element_text(hjust = 0.5, size = 12),
     panel.grid = element_blank(),
     axis.line = element_line(color = "black"),
@@ -716,8 +700,10 @@ ggplot(abunddf, aes(x = as.factor(yr), y = Mean)) +
   ) +
   
   # Optionally, add a title and subtitle
-  ggtitle("Distribution of Bat Calls by Year", subtitle = "Including Individual Data Points and Confidence Intervals")
+  ggtitle("Distribution of Bat Calls by Year")
 
+p5
+ggsave(filename = "yr_feff_v1.png",plot = p5,device = "png", path = 'figures/glmm_v1/' )
 
 # random effects plots ----------------------------------------------------
 
@@ -746,131 +732,157 @@ cint<-confint(m1.5nb)
 
 rss <- ran.efs
 
+# we correct the random effects adding the fixes effects. 
+
 rss[, 1] <- rss[, 1] + fix.efs[1]  #adding fixed effects to each of the random effects
 rss[, 2] <- rss[, 2] + fix.efs[2]
 rss[, 3] <- rss[, 3] + fix.efs[3]
 rss[, 4] <- rss[, 4] + fix.efs[4]
 
-#create id column
 #view
 rss
 a<-rss[,c(1,3,4)]
+t(a)                      # why we have to transpose the tables?
+
 b<-t( cbind( ones, jday.s, jday.sqr))
+b
 indpred<- exp( as.matrix(a) %*% as.matrix(b) )
 
 abunddf <- data.frame(t(indpred), jday.s, ord.day)
 
-ggplot(abunddf, aes(x = ord.day, y = ANTPAL)) +
+ggplot(abunddf, aes(x = ord.day, y = MYOLUC    )) +
   theme_classic(base_size = 17) +
   ylab("bat calls") +
   xlab("jday") +
   geom_line(size = 1.5) 
 
 
-# Create the melted data for plotting all columns
-abunddf_melted <- melt(abunddf, id.vars = "ord.day",variable.name = "sp", value.name ="predicted calls" )
-unique(abunddf_melted$variable)
+# Create the melted data for plotting# Create the melted data for plotting# Create the melted data for plotting all columns
+abunddf_melted <- melt(abunddf, id.vars = "ord.day",variable.name = "sp", value.name ="predicted calls" , measure.vars = 1:14)
+unique(abunddf_melted$sp)
 
 abunddf_long<- pivot_longer(abunddf, cols= 1:14, names_to = "sp", values_to = "predicted calls")
-
+unique(abunddf_long$sp)
+head(abunddf_long)
 
 # Create the ggplot object
-ggplot(abunddf_melted, aes(x = ord.day, y = `predicted calls`, color = sp)) +
+p6<-ggplot(abunddf_melted, aes(x = ord.day, y = `predicted calls`, color = sp)) +
+  scale_color_viridis_d()+
   # Add geom_point to plot points for each variable
-  geom_point(size = 1) +
+  scale_shape_manual(values = 1:6)+ 
+  geom_point(size = 2) +
+    # Use different shapes
   # Set labels and title
-  labs(title = "Abundance by Day", x = "Day", y = "Abundance") +
+  labs(title = "Abundance by Day", x = "Day", y = "bat calls") +
   # Set theme for better visuals (optional)
   theme_classic()
-
+p6
 ggplot(abunddf_long, aes(x = ord.day, y = `predicted calls`, color = sp)) +
   # Add geom_point to plot points for each variable
   geom_point(size = 1) +
-   facet_wrap(~ sp,scales = "free_y")+
+  facet_wrap( ~ sp, scales = "free_y") +
   # Set labels and title
-  labs(title = "Bat calls by julian day", x = "julian day", y = "Abundance") +
+  labs(title = "Bat calls by julian day", x = "julian day", y = "bat calls") +
   # Set theme for better visuals (optional)
   theme_classic()
 rm(abunddf)
 
 
-# treatment 
 
+p6
+ggsave(filename = "jday_raneff_v1.png",plot = p6,device = "png", path = 'figures/glmm_v1/' )
+
+
+# treatment  random effects plot
+
+trmt<- c("lit", "dark") 
 trmt_bin_s <- c(-1,1)
 trmt_bin_s
 
 # correcting random eff
 ran.efs <- ranef( m1.5nb )$cond$sp # get the random effects 
-a<-ran.efs[,1:2] # index to just the intercept and treatment raneff
-a
-
+randint<- ran.efs[,1]
+randslope<- ran.efs[,2]
 
 cint<-confint(m1.5nb)[1:2,] # get fixed effects from the model
-cint
+fixint<-cint[1,3]
+fixslope<-cint[2,3]
+
 
 #y = int + random.int[sp] + beta[1]treatment + random.slope[sp] * treatment
 
-a[, 1] <- a[, 1] + cint[1,3] # adding random int and fixed int 
-a[, 2] <- a[, 2] + cint[2, 3] # adding the random slope and the fixed slope. 
-
-a
-
-pred<- a[,1]+trmt_bin_s[1]*
-indpred<- exp( as.matrix(a) %*%  )
-head(indpred)
+pred<- c(exp((randint+fixint)+(randslope+fixslope)*trmt_bin_s[1]),
+         exp((randint+fixint)+(randslope+fixslope)*trmt_bin_s[2]))
 
 
+abunddf <- data.frame(pred, trmt_bin, trmt_bin_s)
 
-abunddf <- data.frame(t(indpred), trmt_bin_s)
+sp_names <- rownames(ran.efs)
+sp_doubled <- rep(sp_names, each = 2)
+
+# Check the length to match the number of rows in the dataframe
+if (length(sp_doubled) == nrow(abunddf)) {
+  # Add the new column to the dataframe
+  abunddf$sp <- sp_doubled
+} else {
+  stop("The length of sp_doubled does not match the number of rows in abunddf.")
+}
+
+# View the updated dataframe
 head(abunddf)
 
-
-ggplot( abunddf, aes( x = trmt_bin_s, y = EPTFUS )) +  
-  theme_classic( base_size = 17) +
+p7<-ggplot( abunddf, aes( x = trmt_bin, y = pred, colour = sp, group = sp, shape = sp) ) +  
+  theme_classic( base_size = 12) +
+  scale_color_viridis_d(direction = -1, option = "A")+
+  scale_shape_manual(values = 1:14) +  # Customize shapes for each 'sp', adjust as needed
   ylab( "bat calls" ) +
-  xlab( "tmt" ) +
-  geom_point()
+  xlab( "year" ) +
+  geom_point(size=3)+
+  geom_line()+
+  # labels
+  ylab("Bat calls") +
+  xlab("") 
+p7
+
+
+ggsave(filename = "trmt_raneff_v1.png",plot = p7,device = "png", path = 'figures/glmm_v1/' )
+
+
+
+# save models -------------------------------------------------------------
+
+#save image 
+save.image(file = "working_env/glmm_v1.RData")
+
+save(m1.5nb, file = "models/my_models.RData")
+load("models/my_models.RData")
 
 
 
 
-ggplot(abunddf, aes(x = trmt_bin_s, y = ANTPAL)) +
-  theme_classic(base_size = 17) +
-  ylab("bat calls") +
-  xlab("trmt") 
+# trash -------------------------------------------------------------------
+
+# rstan_models ------------------------------------------------------------
 
 
-  ggplot( abunddf, aes( x = trmt_bin_s, y = ANTPAL, group = trmt_bin_s) ) +  
-  theme_classic( base_size = 17) +
-  ylab( "bat calls" ) +
-  xlab( "treatment" ) +
-    geom_point()
+# Define the formula
+formula <- n ~ trmt_bin + jday_s + I(jday_s^2)  + percent_s + l.illum_s +
+  avg_wind_speed_s + avg_temperature_s + (1 | site) + (1 + trmt_bin + jday_s + I(jday_s^2) | sp)
 
-# Create the melted data for plotting all columns
-abunddf_melted <- melt(abunddf, id.vars = "ord.day", measure.vars = names(abunddf))
-abunddf_long<- pivot_longer(abunddf, cols= 1:14, names_to = "sp", values_to = "predicted calls")
-
-
-# Create the ggplot object
-ggplot(abunddf_melted, aes(x = ord.day, y = `predicted calls`, color = sp)) +
-  # Add geom_point to plot points for each variable
-  geom_point(size = 1) +
-  # Set labels and title
-  labs(title = "Abundance by Day", x = "Day", y = "Abundance") +
-  # Set theme for better visuals (optional)
-  theme_classic()
-
-ggplot(abunddf_long, aes(x = trmt_bin_s, y = `predicted calls`)) +
-  # Add geom_point to plot points for each variable
-geom_boxplot()+
-   # facet_wrap(~ sp)+
-  # Set labels and title
-  labs(title = "Bat calls by ", x = "", y = "") +
-  # Set theme for better visuals (optional)
-  theme_classic()
+# Fit the negative binomial model using rstanarm
+m1.4_off <- stan_glmer(
+  formula,
+  family = neg_binomial_2(),  # Negative binomial family with log-link
+  data = bm2,
+  chains = 4,                 # Number of Markov chains
+  cores = 4                    # Number of cores to use (adjust as needed)
+)
 
 
+loo_m1.4_off <- loo(m1.4_off)
+print(loo_m1.4_off)
 
+plot_model(m1.4_off)
 
 
 # plot model m1.5nb --------------------------------------------------------
@@ -951,43 +963,6 @@ ggplot(abunddf, aes(x = jday_s_values, y = Mean)) +
 
 
 
-
-
-
-# save models -------------------------------------------------------------
-
-#save image 
-save.image(file = "working_env/glmm_v1.RData")
-
-save(m1.5nb, file = "models/my_models.RData")
-load("models/my_models.RData")
-
-
-
-
-# trash -------------------------------------------------------------------
-
-# rstan_models ------------------------------------------------------------
-
-
-# Define the formula
-formula <- n ~ trmt_bin + jday_s + I(jday_s^2)  + percent_s + l.illum_s +
-  avg_wind_speed_s + avg_temperature_s + (1 | site) + (1 + trmt_bin + jday_s + I(jday_s^2) | sp)
-
-# Fit the negative binomial model using rstanarm
-m1.4_off <- stan_glmer(
-  formula,
-  family = neg_binomial_2(),  # Negative binomial family with log-link
-  data = bm2,
-  chains = 4,                 # Number of Markov chains
-  cores = 4                    # Number of cores to use (adjust as needed)
-)
-
-
-loo_m1.4_off <- loo(m1.4_off)
-print(loo_m1.4_off)
-
-plot_model(m1.4_off)
 
 
 

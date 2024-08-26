@@ -310,7 +310,7 @@ The next step should be rerun the model with the data from 2022 and 2023. I am b
 
 8/16/2024
 
-I learned to use the line equation to predict the values for building the marginal predictors plot and the random effect plots. for [[example:\\\\](example:\\){.uri}]([example:\\](example:\){.uri}){.uri}
+I learned to use the line equation to predict the values for building the marginal predictors plot and the random effect plots. for [[example:\\\\](example:){.uri}](%5Bexample:\%5D(example:)%7B.uri%7D){.uri}
 
 fday\<-confint(m1.5nb)
 
@@ -351,7 +351,14 @@ I got stuck... it is not working very well.
 
 I got a hard setback when Jen told me I need to rethink how I am plotting the marginal effects plots. I feel a little discouraged but I think I agree with Jen and need to improve my understanding.
 
-today I plotted most of the fixed effects that are not included in the random slopes. \
+today I plotted most of the fixed effects that are not included in the random slopes.\
 I also did a step by step guide to plot those confidence intervals.
 
 ![wind marginal effect example](figures/glmm_v1/wnd_feff_v1.png)
+
+------------------------------------------------------------------------
+
+8/26/2024
+
+I was able to plot the graph for the treatment effect on the bat sp. I think I got all the rando effect plots and marginal effects plots. \
+![treatment effect on bat calls.](figures/glmm_v1/trmt_raneff_v1.png)
