@@ -1,0 +1,12 @@
+
+scripts:            purpose 
+
+cleanup_script_v2    updated version of cleanup_scrip_v2. mostily has good information for how to cleanup data and calculate variables like the moon. it is outdated though. 
+
+
+bat_prep_analysis,    started this script when I was planning to do pop analysis using n-mixture modes. It has good parts like how to calculate the miller AI index. 
+
+prep_for_glmm       This script is the most up to data it has the prep work for run the kpro data for 2021-2023. It has the Miller Ai index and it is well documented. 
+
+dist_mat            this creates the distance to the nearest two lit sites matrix to add to the data. 
+

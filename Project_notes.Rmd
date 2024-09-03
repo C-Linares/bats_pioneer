@@ -43,13 +43,13 @@ you have to set the row.names=false argument.
 I ran the data work but got an error anyway.
 
 ```{r}
-urn-in + Update 1 (30000)Error in checkForRemoteErrors(val) :
-
-  5 nodes produced errors; first error:
-
-Error parsing model file:
-
-syntax error on line 44 near "}"
+# urn-in + Update 1 (30000)Error in checkForRemoteErrors(val) :
+# 
+#   5 nodes produced errors; first error:
+# 
+# Error parsing model file:
+# 
+# syntax error on line 44 near "}"
 ```
 
 I think there's something wrong with the model when we feed it to JAGS.
@@ -310,7 +310,7 @@ The next step should be rerun the model with the data from 2022 and 2023. I am b
 
 8/16/2024
 
-I learned to use the line equation to predict the values for building the marginal predictors plot and the random effect plots. for [[example:\\\\](example:){.uri}](%5Bexample:\%5D(example:)%7B.uri%7D){.uri}
+I learned to use the line equation to predict the values for building the marginal predictors plot and the random effect plots. for [[example:\\\\](example:){.uri}](%5Bexample:%5D(example:)%7B.uri%7D){.uri}
 
 fday\<-confint(m1.5nb)
 
@@ -360,5 +360,51 @@ I also did a step by step guide to plot those confidence intervals.
 
 8/26/2024
 
-I was able to plot the graph for the treatment effect on the bat sp. I think I got all the rando effect plots and marginal effects plots. \
+I was able to plot the graph for the treatment effect on the bat sp. I think I got all the rando effect plots and marginal effects plots.\
 ![treatment effect on bat calls.](figures/glmm_v1/trmt_raneff_v1.png)
+
+------------------------------------------------------------------------
+
+09/03/2024
+
+I calculated the distance to the nearest two lit sites from each point. Then I ran a model with that distance as explanatory variable. The results were not that much different from the one coding light as present or absent.
+
+``` r
+ summary(m1.7nb)
+ Family: nbinom2  ( log )
+Formula:          n ~ Sum_Distance_s + jday_s + I(jday_s^2) + percent_s + l.illum_s +      avg_wind_speed_s + avg_temperature_s + yr_s + elev_mean_s +      moo + (1 | site) + (1 + trmt_bin + jday_s + I(jday_s^2) |  
+    sp)
+Data: bm2
+
+     AIC      BIC   logLik deviance df.resid 
+125032.8 125211.8 -62493.4 124986.8    17748 
+
+Random effects:
+
+Conditional model:
+ Groups Name        Variance Std.Dev. Corr              
+ site   (Intercept) 0.06293  0.2509                     
+ sp     (Intercept) 2.41084  1.5527                     
+        trmt_bin    0.10191  0.3192    0.79             
+        jday_s      0.01170  0.1082    0.23 -0.05       
+        I(jday_s^2) 0.02035  0.1427   -0.79 -0.77  0.24 
+Number of obs: 17771, groups:  site, 15; sp, 14
+
+Dispersion parameter for nbinom2 family (): 1.25 
+
+Conditional model:
+                   Estimate Std. Error z value Pr(>|z|)    
+(Intercept)        1.868218   0.335804   5.563 2.65e-08 ***
+Sum_Distance_s    -0.036203   0.101152  -0.358  0.72041    
+jday_s             0.060505   0.032390   1.868  0.06176 .  
+I(jday_s^2)       -0.072637   0.034281  -2.119  0.03410 *  
+percent_s          0.029202   0.076454   0.382  0.70250    
+l.illum_s          0.024233   0.007687   3.153  0.00162 ** 
+avg_wind_speed_s   0.059415   0.007880   7.540 4.71e-14 ***
+avg_temperature_s  0.041596   0.009418   4.417 1.00e-05 ***
+yr_s              -0.072594   0.009920  -7.318 2.52e-13 ***
+elev_mean_s        0.158565   0.083192   1.906  0.05665 .  
+moo               -0.008597   0.093947  -0.092  0.92708    
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+```

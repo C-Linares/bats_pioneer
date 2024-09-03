@@ -17,8 +17,9 @@
 ##
 ## ---------------------------
 ## # inputs ------------------------------------------------------------------
-#   data_for_analysis/prep_for_glmm/bm.csv
-#   data_for_analysis/Bat_trait.csv
+#   data_for_analysis/prep_for_glmm/bm.csv product of the prep_for_glmm.R script. summary daily of bat call counts
+
+
 # outputs ----------------------
 
 # 
@@ -42,7 +43,7 @@ library(reshape2)
 
 
 #load environment 
-#last worked 08/16/2024
+#last worked 09/03/2024
 load(file = "working_env/glmm_v1.RData")
 
 # data --------------------------------------------------------------------
@@ -92,6 +93,9 @@ moon.adj<-moon %>% mutate(
 
 # effort_hrs<-read.csv('data_for_analysis/data_glmm/effort_hrs.csv')# we might not need effort because we are not doing an offset model. 
 
+# dist to two nearest lit sites 
+
+dst.mat<-read.csv('data_for_analysis/sum.dst.csv')
 
 # merge -------------------------------------------------------------------
 
@@ -121,6 +125,7 @@ bm2<- left_join(bm2, weather, by="date")
 bm2<- left_join(bm2, moon.adj, by=c("date"))
 # bm2<- left_join(bm2, effort_hrs, by=c("jday","site"))
 
+bm2<-left_join(bm2, dst.mat, by="site")
 
 # Identify rows with NA values
 rows_with_na <- bm2[rowSums(is.na(bm2)) > 0, ] # some wind and temp have NAs because we are missing august 2021 weather data.
@@ -150,12 +155,12 @@ variables_to_scale <- c(
   "ndvi_mean",
   "percent",
   "jday",
-  "PeakFreq",
   "l.illum",
   "avg_wind_speed",
   "avg_temperature",
   "phase",
-  "fraction"
+  "fraction",
+  "Sum_Distance"
 )
 
 # Loop over each variable, scale it, and assign it back to the data frame with a new name
@@ -271,7 +276,6 @@ plot_model(m1.4, type = "pred", terms = c("trmt_bin[exp]"), ci.lvl = NA)
 plot_residuals(m1.4)
 get_model_data(m1.4)
 
-#----#----#---------------------------------------------------------------#
 
 
 
@@ -358,6 +362,28 @@ plot(ggeffects::ggpredict(m1.5nb, "avg_temperature_s [all]"))
 
 
 
+# m1.7
+# we run this one with the model we neede 
+
+m1.7nb <- glmmTMB(
+  n ~ Sum_Distance_s + jday_s + I(jday_s ^ 2) + percent_s  + l.illum_s +
+    avg_wind_speed_s + avg_temperature_s + yr_s + elev_mean_s + moo+
+  (1 | site) + (1 + trmt_bin + jday_s + I(jday_s ^ 2) | sp),
+  data = bm2,
+  nbinom2(link = "log")
+)
+
+summary(m1.7nb)
+
+# Calculate residual deviance and residual degrees of freedom
+residual_deviance <- deviance(m1.7nb)
+residual_df <- df.residual(m1.7nb)
+
+# Calculate c-hat using residual deviance
+c_hat_deviance <- residual_deviance / residual_df
+print(c_hat_deviance)
+
+AIC(m1.5nb,m1.7nb)
 
 # plots -------------------------------------------------------------------
 

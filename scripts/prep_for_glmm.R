@@ -183,9 +183,9 @@ summary(bm.miller.day)
 
 # dir.create("data_for_analysis/prep_for_glm", showWarnings = FALSE) # just run if the dir is abscent
 
-write.csv(bat_combined, file = 'data_for_analysis/prep_for_glmm/bat_combined.csv', row.names = F)
-write.csv(bm, file = 'data_for_analysis/prep_for_glmm/bm.csv', row.names = F)
-write.csv(bm.miller.day, file = "data_for_analysis/prep_for_glmm/bm.miller.day.csv")
+write.csv(bat_combined, file = 'data_for_analysis/prep_for_glmm/bat_combined.csv', row.names = F) # raw combine data 
+write.csv(bm, file = 'data_for_analysis/prep_for_glmm/bm.csv', row.names = F) #daily counts
+write.csv(bm.miller.day, file = "data_for_analysis/prep_for_glmm/bm.miller.day.csv") # miller Ai index data
 
 
 
