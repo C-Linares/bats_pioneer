@@ -10,6 +10,10 @@
 ##
 ## Email: carlosgarcialina@u.boisestate.edu
 ##
+## inputs
+##
+##
+##
 ## ---------------------------
 ##
 ## Notes: started in 2022 and reworked in 2024 
@@ -31,10 +35,9 @@ library(viridis)
 
 # load kpro data. 
 
-bm<-read.csv('data_for_analysis/data_glmm/bat_counts.csv', header = T) # bat counts by jday  
+bm<-read_csv('data_for_analysis/prep_for_glmm/bm.csv')
 
 
-# bat2021<-read.csv('data_analysis/bat2021_v2.csv',check.names = T)
 # bat2021$datetime<-ymd_hms(bat2021$datetime) # makes dates as dates 
 # bat2021$noche<-ymd(bat2021$noche)# makes dates as dates
 
@@ -63,8 +66,28 @@ summary(abundance_data) # there is no NAs
 #Sum the abundances of each species across all sites
 total_abundance <- rowSums(abundance_matrix)
 
-# Print the total abundances
-print(total_abundance)
+species_counts <- data.frame(
+  Species = names(total_abundance),
+  Count = as.numeric(total_abundance)
+)
+species_counts<- species_counts %>% filter(!Species %in% c("Noise", "NoID"))
+
+sum(species_counts$Count)
+
+summary(species_counts)
+# Create and style the table
+kable(species_counts, format = "html", caption = "Species Count Table") %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"))
+
+p1<-ggplot(species_counts, aes(x = reorder(Species, -Count), y = Count)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  labs(title = "Species Call Counts 2021-2023", x = "Species", y = "Count") +
+  annotate("text", x = Inf, y = Inf, label = "Total = 560,645", hjust = 2, vjust = 1, size = 5) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))+
+  theme_blank(base_size = 12, base_family = "")
+p1
+ggsave("speciescounts.tiff", plot = p1, device = "tiff",path = 'figures/bat_diversity')
 
 # Identify the species with the highest total abundance
 most_abundant_species <- names(which.max(total_abundance))
@@ -144,7 +167,7 @@ bat.sp.m<- bm %>%
   count(AUTO.ID.) %>%  #counts the occurrences not the number of calls
   spread(AUTO.ID., n, fill=0)
 
-
+bat.sp.m<-bat.sp.m %>% select(-c(NoID,Noise))
 
 tab<-t( bat.sp.m[,-1])
 totals2021<- rowSums(tab) # bat passes totals for 2021
@@ -157,7 +180,7 @@ shanon<- diversity(bat.sp.m[-1])
 ens<- exp(shanon)
 totbats <-
   rowSums(bat.sp.m != 0)
-
+sites<-unique(bat.sp.m$site)
 alpha.div <-cbind.data.frame(sites = bat.sp.m[1] , sps, totbats, shanon, ens) 
 alpha.div
 
@@ -170,11 +193,15 @@ alpha.div$treatmt<-ifelse(alpha.div$site %in% litsites , "lit", "dark")
 #----- plot alpha ------
   
 p1.1 <- ggplot(data=alpha.div, aes(x=site, y=ens, color=treatmt)) +
-  geom_point() +
+  geom_point(size=4) +
+  ylim(10,14)+
   ylab("effective number of species")+
   theme_classic() +
   scale_color_viridis(discrete = T, option = "A",begin = 0, end = .5)
 p1.1
+
+ggsave("spnum.tiff", plot = p1.1, device = "tiff",path = 'figures/bat_diversity')
+
 
 
 bat.sp.m<-column_to_rownames(bat.sp.m, var = "site") #makes sites row names 

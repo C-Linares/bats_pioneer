@@ -408,3 +408,16 @@ moo               -0.008597   0.093947  -0.092  0.92708
 ---
 Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
 ```
+
+------------------------------------------------------------------------
+
+09/10/2024
+
+updated the diversity script and saved some graphs.\
+I need help interpreting the beta diversity graph.
+
+![](images/clipboard-775704578.png)
+
+there's not a clear pattern of species diference
+
+next: do a bipartite analysis.
