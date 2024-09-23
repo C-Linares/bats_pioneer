@@ -139,6 +139,7 @@ keep<- c("AUTO.ID.", "PULSES", "site","noche","date_time", "yr","treatmt","trmt_
 
 bat_combined <- bat_combined %>% select(all_of(keep))
 
+colnames(bat_combined)[10]<-"sp" # change the auto.id to sp 
 
 
 
@@ -151,7 +152,7 @@ summary(bat_combined)
 # daily counts
 
 bm <- bat_combined %>% # 
-  group_by(noche, AUTO.ID., site,yr, trmt_bin, treatmt) %>% 
+  group_by(noche, sp, site,yr, trmt_bin, treatmt) %>% 
   summarise(n = n(), .groups = 'drop') 
 
 summary(bm)
@@ -178,6 +179,24 @@ bm.miller.day <- bm.miller %>% # number of minutes active  by night.
 summary(bm.miller.day)
 
 
+bm.miller<- bat_combined %>%
+  # Extract the relevant columns and round to minute level
+  mutate(rmins = round(date_time, units = "mins")) %>%
+  # Remove duplicate entries for the same site, date, and minute
+  distinct(site, sp, noche, rmins, .keep_all = TRUE) %>%
+  # Group by site, date, and minute
+  group_by(site,sp, noche, rmins) %>%
+  # Summarize to count the number of unique minutes
+  summarize(activity_min = n_distinct(rmins), .groups = 'drop')
+
+bm.miller.day <- bm.miller %>% # number of minutes active  by night. 
+  group_by(site, noche, sp) %>%
+  summarize(activity_min = sum(activity_min))
+
+head(bm.miller.day)
+summary(bm.miller.day)
+
+
 # outputs -----------------------------------------------------------------
 
 
@@ -195,7 +214,7 @@ This directory contains the bat_combined.csv file which was created using the sc
 
 bat_combined.csv - process data no counts
 bm.csv - counts of bat calls by day from 2021 to 2023 all sites
-bm.miller.day - number of minutes of activity by day  for 2021-2023 data all sites"
+bm.miller.day - number of minutes of activity by day  for 2021-2023 data all sites (last update 9/23/2024)"
 
 # Write the README content to a file
 writeLines(readme_content, "data_for_analysis/prep_for_glmm/README.txt")

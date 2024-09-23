@@ -50,12 +50,12 @@ load(file = "working_env/glmm_v1.RData")
 
 bm<-read.csv('data_for_analysis/prep_for_glmm/bm.csv', header = T) 
 filtered_bm <- bm[!(bm$AUTO.ID. %in% c("Noise","NoID")), ] # if noise is not filtered there is more records for dark sites. 
-colnames(filtered_bm)[2]<-"sp"
+colnames(filtered_bm)[2]<-"sp" # change from AUTO.ID to sp
 
-# bm<-read.csv('data_for_analysis/data_glmm/bat_counts.csv', header = T) # bat counts by jday for 2021
-# bm$datefromyday<-as_date(bm$jday, origin= "2021-01-01")
-# filtered_bm <- bm[bm$AUTO.ID. != "Noise", ] # if noise is not filtered there is more records for dark sites. 
-# colnames(filtered_bm)[3]<-"sp" # change Auto.ID to sp
+#load activity index
+
+bm.ai<- read_csv('data_for_analysis/')
+
 
 btrait<-read.csv('data_for_analysis/Bat_trait.csv', header = T)
 btrait$Species<-toupper(btrait$Species) # makes all caps
@@ -94,6 +94,7 @@ moon.adj<-moon %>% mutate(
 # effort_hrs<-read.csv('data_for_analysis/data_glmm/effort_hrs.csv')# we might not need effort because we are not doing an offset model. 
 
 # dist to two nearest lit sites 
+# calculated in qgis
 
 dst.mat<-read.csv('data_for_analysis/sum.dst.csv')
 
@@ -778,9 +779,9 @@ abunddf <- data.frame(t(indpred), jday.s, ord.day)
 
 ggplot(abunddf, aes(x = ord.day, y = MYOLUC    )) +
   theme_classic(base_size = 17) +
-  ylab("bat calls") +
+  ylab("bat calls Myluc") +
   xlab("jday") +
-  geom_line(size = 1.5) 
+  geom_line(linewidth = 1.5) 
 
 
 # Create the melted data for plotting# Create the melted data for plotting# Create the melted data for plotting all columns
@@ -803,7 +804,7 @@ p6<-ggplot(abunddf_melted, aes(x = ord.day, y = `predicted calls`, color = sp)) 
   # Set theme for better visuals (optional)
   theme_classic()
 p6
-ggplot(abunddf_long, aes(x = ord.day, y = `predicted calls`, color = sp)) +
+p6.1<-ggplot(abunddf_long, aes(x = ord.day, y = `predicted calls`, color = sp)) +
   # Add geom_point to plot points for each variable
   geom_point(size = 1) +
   facet_wrap( ~ sp, scales = "free_y") +
@@ -812,11 +813,12 @@ ggplot(abunddf_long, aes(x = ord.day, y = `predicted calls`, color = sp)) +
   # Set theme for better visuals (optional)
   theme_classic()
 rm(abunddf)
-
+p6.1
 
 
 p6
 ggsave(filename = "jday_raneff_v1.png",plot = p6,device = "png", path = 'figures/glmm_v1/' )
+ggsave(filename = "jday_raneff_v2.png",plot = p6.1,device = "png", path = 'figures/glmm_v1/' )
 
 
 # treatment  random effects plot

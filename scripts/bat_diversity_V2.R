@@ -423,6 +423,14 @@ ggsave(filename = "p3.png", path = "data_analysis/figures/")
 
 
 
+# save --------------------------------------------------------------------
+
+save.image(file = "working_env/bat_divesity_v2.RData")
+
+
+
+
+
 # junk --------------------------------------------------------------------
 # species matrix with species as columns 
 

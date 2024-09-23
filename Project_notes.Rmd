@@ -421,3 +421,11 @@ I need help interpreting the beta diversity graph.
 there's not a clear pattern of species diference
 
 next: do a bipartite analysis.
+
+------------------------------------------------------------------------
+
+9/23/2024
+
+I updated the bm.miller.day. csv file. This file calculates properly the activity index according to miller. I was forgetting to not double count calls that occurred in the same minute. Maybe I could try 5 minutes ai index to see if that makes a change in the patterns observed.
+
+next is to run the same models with the ai index as I did for the whole data.
