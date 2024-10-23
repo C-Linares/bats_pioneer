@@ -781,7 +781,8 @@ ggplot(abunddf, aes(x = ord.day, y = MYOLUC    )) +
   theme_classic(base_size = 17) +
   ylab("bat calls Myluc") +
   xlab("jday") +
-  geom_line(linewidth = 1.5) 
+  geom_line(linewidth = 1.5)+ 
+  
 
 
 # Create the melted data for plotting# Create the melted data for plotting# Create the melted data for plotting all columns
@@ -803,11 +804,37 @@ p6<-ggplot(abunddf_melted, aes(x = ord.day, y = `predicted calls`, color = sp)) 
   labs(title = "Abundance by Day", x = "Day", y = "bat calls") +
   # Set theme for better visuals (optional)
   theme_classic()
+  
 p6
+
+# black and white figure 
+
+
+p6 <- ggplot(abunddf_melted, aes(x = ord.day, y = `predicted calls`, color = sp, shape = sp)) +
+  scale_color_viridis_d() +  # Color by species
+  scale_shape_manual(values = 1:14) +  # Use different shapes
+  geom_point(size = 2, color = "white") +  # Set point color to white
+  labs(title = "", x = "JDay", y = "Bat Calls") +
+  theme_minimal(base_size = 20) + 
+  theme(
+    plot.background = element_rect(fill = "black"),  # Set plot background to black
+    panel.background = element_rect(fill = "black"),  # Set panel background to black
+    axis.text = element_text(color = "white"),  # Set axis text color to white
+    axis.title = element_text(color = "white"),  # Set axis title color to white
+    plot.title = element_text(color = "white"),  # Set plot title color to white
+    axis.ticks = element_line(color = "white"),  # Set axis ticks color to white
+    panel.grid.major = element_line(color = "black"),  # Optional: set grid lines color
+    panel.grid.minor = element_line(color = "black"),  # Optional: set minor grid lines color
+    legend.text = element_text(color = "white"),  # Set legend text color to white
+    legend.title = element_blank()   # Set legend title color to white
+  )
+
+p6
+
 p6.1<-ggplot(abunddf_long, aes(x = ord.day, y = `predicted calls`, color = sp)) +
   # Add geom_point to plot points for each variable
   geom_point(size = 1) +
-  facet_wrap( ~ sp, scales = "free_y") +
+  facet_wrap( ~ sp, scales = "free") +
   # Set labels and title
   labs(title = "Bat calls by julian day", x = "julian day", y = "bat calls") +
   # Set theme for better visuals (optional)
@@ -816,8 +843,8 @@ rm(abunddf)
 p6.1
 
 
-p6
-ggsave(filename = "jday_raneff_v1.png",plot = p6,device = "png", path = 'figures/glmm_v1/' )
+
+ggsave(filename = "jday_raneff_v2.tiff",plot = p6,device = "tiff", path = 'figures/glmm_v1/', width = 11, height = 8, units = "in" )
 ggsave(filename = "jday_raneff_v2.png",plot = p6.1,device = "png", path = 'figures/glmm_v1/' )
 
 
@@ -872,9 +899,32 @@ p7<-ggplot( abunddf, aes( x = trmt_bin, y = pred, colour = sp, group = sp, shape
   xlab("") 
 p7
 
+p7.1<- ggplot(abunddf, aes(x = trmt_bin, y = pred, colour = sp, group = sp, shape = sp)) +  
+  theme_classic(base_size = 16) +  # Increase base size for larger text
+  scale_color_viridis_d(direction = -1, option = "A", guide = FALSE) +  # Remove legend if desired
+  scale_shape_manual(values = 1:14) +  # Customize shapes for each 'sp'
+  ylab("Bat calls") +
+  xlab("") +
+  geom_point(size = 3, color = "white") +  # Set point color to white
+  geom_line(color = "white") +  # Set line color to white
+  theme(
+    plot.background = element_rect(fill = "black"),  # Set plot background to black
+    panel.background = element_rect(fill = "black"),  # Set panel background to black
+    legend.background = element_rect(fill = "black"),  # Set legend background to black
+    axis.text = element_text(color = "white"),  # Set axis text color to white
+    axis.title = element_text(color = "white"),  # Set axis title color to white
+    plot.title = element_text(color = "white"),  # Set plot title color to white
+    axis.ticks = element_line(color = "white"),  # Set axis ticks color to white
+    legend.text = element_text(color = "white"),  # Set legend text color to white
+    legend.title = element_text(color = "white"),  # Set legend title color to white
+    panel.grid.major = element_line(color = "black"),  # Optional: set grid lines color (adjust as needed)
+    panel.grid.minor = element_line(color = "black")   # Optional: set minor grid lines color (adjust as needed)
+  )
+
+p7.1
 
 ggsave(filename = "trmt_raneff_v1.png",plot = p7,device = "png", path = 'figures/glmm_v1/' )
-
+ggsave(filename = "trmt_raneff_v2.png",plot = p7.1,device = "tiff", path = 'figures/glmm_v1/', width = 11, height = 8, units = "in" )
 
 
 # save models -------------------------------------------------------------

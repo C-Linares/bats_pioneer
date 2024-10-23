@@ -87,7 +87,28 @@ p1<-ggplot(species_counts, aes(x = reorder(Species, -Count), y = Count)) +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))+
   theme_blank(base_size = 12, base_family = "")
 p1
-ggsave("speciescounts.tiff", plot = p1, device = "tiff",path = 'figures/bat_diversity')
+
+
+p1 <- ggplot(species_counts, aes(x = reorder(Species, -Count), y = Count)) +
+  geom_bar(stat = "identity", fill = "white") +  # Change bar fill color to black
+  labs(title = "Species Call Counts 2021-2023", x = "Species", y = "Count") +
+  annotate("text", x = Inf, y = Inf, label = "Total = 560,645", hjust = 2, vjust = 1, size = 5, color = "white") +  # Set text color to white
+  theme_minimal(base_size = 16) + 
+  theme(
+    plot.background = element_rect(fill = "black"),  # Set plot background to black
+    panel.background = element_rect(fill = "black"),  # Set panel background to black
+    axis.text = element_text(color = "white"),  # Set axis text color to white
+    axis.title = element_text(color = "white"),  # Set axis title color to white
+    plot.title = element_text(color = "white"),  # Set plot title color to white
+    axis.ticks = element_line(color = "white"),  # Set axis ticks color to white
+    panel.grid.major = element_line(color = "black"),  # Optional: set grid lines color (adjust as needed)
+    panel.grid.minor = element_line(color = "black"),# Optional: set minor grid lines color (adjust as needed)
+    axis.text.x = element_text(angle = 45, hjust = 1),  # Rotate x-axis text by 45 degrees
+  )
+
+p1
+
+ggsave("speciescounts_v2.tiff", plot = p1, device = "tiff",path = 'figures/bat_diversity', width =10 , height =5,units = "in" )
 
 # Identify the species with the highest total abundance
 most_abundant_species <- names(which.max(total_abundance))
@@ -427,7 +448,7 @@ ggsave(filename = "p3.png", path = "data_analysis/figures/")
 
 save.image(file = "working_env/bat_divesity_v2.RData")
 
-
+load(file = 'working_env/bat_divesity_v2.RData')
 
 
 
