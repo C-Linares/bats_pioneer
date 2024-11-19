@@ -10,17 +10,20 @@
 ##
 ## Email: carlosgarcialina@u.boisestate.edu
 ##
-## inputs
+## inputs:
 ##
+## bm<-read_csv('data_for_analysis/prep_for_glmm/bm.csv')
 ##
-##
-## ---------------------------
+# --------------------------- -------------------------------
 ##
 ## Notes: started in 2022 and reworked in 2024 
 ##   
 ##
-## ---------------------------
 ## 
+
+
+
+# libraries  --------------------------------------------------------------
 
 # load libraries 
 library(vegan)
@@ -29,20 +32,36 @@ library(iNEXT)
 library(tidyverse)
 library(lubridate)
 library(viridis)
-
+library(kableExtra)
+library(RColorBrewer)
+library(sjPlot)
 
 # load data ---------------------------------------------------------------
+
+# load working env
+
+load(file = 'working_env/bat_divesity_v2.RData')
 
 # load kpro data. 
 
 bm<-read_csv('data_for_analysis/prep_for_glmm/bm.csv')
 
 
-# bat2021$datetime<-ymd_hms(bat2021$datetime) # makes dates as dates 
-# bat2021$noche<-ymd(bat2021$noche)# makes dates as dates
+# calculate wk
 
-# unique(bat2021$site)# tell us what sites we have
+bm <- bm %>%
+  mutate(week = lubridate::week(noche))
+bm<- bm %>% 
+  mutate(jday = lubridate::yday(noche))
 
+# load species names
+batnames<-read.csv('data_for_analysis/Species_bats.csv')
+colnames(batnames)[4]<-"sp"
+
+# Create short sp name
+batnames <- batnames %>%
+  mutate(Genus_Species = str_c(str_sub(Scientific.name, 1, 1), ".", 
+                               str_extract(Scientific.name, "\\S+$")))
 
 
 # Matrix building ------------------
@@ -52,6 +71,17 @@ abundance_data <- bm %>%
   group_by(site, AUTO.ID.) %>%
   summarize(count = sum(n), .groups = 'drop') %>%
   spread(key = site, value = count, fill = 0)
+
+
+abundance_data <- abundance_data %>%
+  rowwise() %>%
+  mutate(Total_Count = sum(c_across(starts_with("iron")), na.rm = TRUE)) %>%
+  ungroup() %>%
+  filter(AUTO.ID. != "Noise", AUTO.ID. != "NoID") %>%  # Exclude specific species
+  mutate(Relative_Abundance = Total_Count / sum(Total_Count))  # Calculate relative abundance
+
+# View the updated data frame
+print(abundance_data %>% select(AUTO.ID., Total_Count, Relative_Abundance))
 
 
 # Convert to matrix and set species names as row names
@@ -65,56 +95,114 @@ summary(abundance_data) # there is no NAs
 
 #Sum the abundances of each species across all sites
 total_abundance <- rowSums(abundance_matrix)
+# total_abundance<- total_abundance %>% filter(!Species %in% c("Noise","NoID"))not working
 
 species_counts <- data.frame(
-  Species = names(total_abundance),
-  Count = as.numeric(total_abundance)
+  sp = names(total_abundance),
+  Count = as.numeric(total_abundance),
+  r.ab= (total_abundance/sum(species_counts$Count))
 )
-species_counts<- species_counts %>% filter(!Species %in% c("Noise", "NoID"))
+species_counts<- species_counts %>% filter(!sp %in% c("Noise", "NoID"))
 
-sum(species_counts$Count)
+sum(species_counts$Count) # total calls ID by Kaleidoscope. 
+
+# add latin names 
+
+species_counts<-left_join(species_counts, batnames, by = "sp")
+
 
 summary(species_counts)
 # Create and style the table
 kable(species_counts, format = "html", caption = "Species Count Table") %>%
   kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"))
 
-p1<-ggplot(species_counts, aes(x = reorder(Species, -Count), y = Count)) +
+p1<-ggplot(species_counts, aes(x = reorder(Species, -Count), y = r.ab)) +
   geom_bar(stat = "identity", fill = "steelblue") +
   labs(title = "Species Call Counts 2021-2023", x = "Species", y = "Count") +
   annotate("text", x = Inf, y = Inf, label = "Total = 560,645", hjust = 2, vjust = 1, size = 5) +
   theme_minimal() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))+
   theme_blank(base_size = 12, base_family = "")
-p1
 
-
-p1 <- ggplot(species_counts, aes(x = reorder(Species, -Count), y = Count)) +
-  geom_bar(stat = "identity", fill = "white") +  # Change bar fill color to black
-  labs(title = "Species Call Counts 2021-2023", x = "Species", y = "Count") +
-  annotate("text", x = Inf, y = Inf, label = "Total = 560,645", hjust = 2, vjust = 1, size = 5, color = "white") +  # Set text color to white
-  theme_minimal(base_size = 16) + 
+p1 <- ggplot(species_counts, aes(x = reorder(Genus_Species, -Count), y = Count)) +
+  geom_bar(stat = "identity", fill = "white") +  # Single fill color for bars
+  labs(title = "", x = "", y = "") +
+  annotate("text", x = Inf, y = Inf, label = "", hjust = 2, vjust = 1, size = 5, color = "white") +  # Set text color to white
+  theme_minimal(base_size = 16) +
   theme(
-    plot.background = element_rect(fill = "black"),  # Set plot background to black
-    panel.background = element_rect(fill = "black"),  # Set panel background to black
-    axis.text = element_text(color = "white"),  # Set axis text color to white
-    axis.title = element_text(color = "white"),  # Set axis title color to white
-    plot.title = element_text(color = "white"),  # Set plot title color to white
-    axis.ticks = element_line(color = "white"),  # Set axis ticks color to white
-    panel.grid.major = element_line(color = "black"),  # Optional: set grid lines color (adjust as needed)
-    panel.grid.minor = element_line(color = "black"),# Optional: set minor grid lines color (adjust as needed)
-    axis.text.x = element_text(angle = 45, hjust = 1),  # Rotate x-axis text by 45 degrees
+    text = element_text(color = "white"),  # Set all text to white
+    axis.text.x = element_text(angle = 45, hjust = 1, face = "italic"),
+    panel.grid.major = element_blank(),  # Optional: remove grid lines for a cleaner look
+    panel.grid.minor = element_blank(),
+    plot.background = element_rect(fill = "black")  # Optional: set background to black for contrast
   )
 
 p1
 
-ggsave("speciescounts_v2.tiff", plot = p1, device = "tiff",path = 'figures/bat_diversity', width =10 , height =5,units = "in" )
+ ggsave("speciescounts.tiff", plot = p1, device = "tiff",path = 'figures/bat_diversity', units = "in",width = 11, height = 6)
 
 # Identify the species with the highest total abundance
 most_abundant_species <- names(which.max(total_abundance))
 
 # Print the most abundant species
 print(paste("The most abundant species is:", most_abundant_species))
+
+
+# diversity/week ----------------------------------------------------------
+
+
+# Group by week, site, and year, then calculate diversity per week. 
+diversity_week<- bm %>%
+  group_by(week, site, yr, treatmt) %>%
+  summarise(
+    species_richness = n_distinct(AUTO.ID.),           # Count distinct species
+    shannon_diversity = diversity(as.numeric(table(AUTO.ID., n))),  # Calculate Shannon diversity
+    effective_species = exp(shannon_diversity),         # Effective number of species
+    .groups = 'drop'                                     # Ungroup the result
+  )
+
+
+
+
+p1.0 <- ggplot(diversity_week, aes(y = shannon_diversity, x = site, fill = factor(treatmt))) +
+  geom_boxplot(color = "white") +
+  scale_fill_grey() +
+  geom_jitter(color = "white", size = 0.4, alpha = 0.5, position = position_jitter(width = 0.1)) +
+  labs(title = "", x = "", y = "", fill = "Treatment") +  # Set legend title
+  theme_minimal(base_size = 13) +  # Start with a minimal theme
+  theme(
+    text = element_text(color = "white"),  # Set all text to white
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    panel.grid.major = element_blank(),  # Remove major grid lines
+    panel.grid.minor = element_blank(),  # Remove minor grid lines
+    plot.background = element_rect(fill = "black"),  # Set plot background to black
+    legend.background = element_rect(fill = "black"),  # Set legend background to black
+    legend.text = element_text(color = "white"),  # Set legend text to white
+    legend.title = element_text(color = "white")  # Set legend title to white
+  )
+
+print(p1.0)
+p1.0 <- ggplot(diversity_week, aes(y = species_richness, x = site, fill = factor(treatmt))) +
+  geom_boxplot(color = "white") +
+  scale_fill_grey() +
+  geom_jitter(color = "white", size = 0.4, alpha = 0.5, position = position_jitter(width = 0.1)) +
+  labs(title = "", x = "", y = "", fill = "Treatment") +  # Set legend title
+  theme_minimal(base_size = 16) +  # Start with a minimal theme
+  theme(
+    text = element_text(color = "white"),  # Set all text to white
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    panel.grid.major = element_blank(),  # Remove major grid lines
+    panel.grid.minor = element_blank(),  # Remove minor grid lines
+    plot.background = element_rect(fill = "black"),  # Set plot background to black
+    legend.background = element_rect(fill = "black"),  # Set legend background to black
+    legend.text = element_text(color = "white"),  # Set legend text to white
+    legend.title = element_text(color = "white")  # Set legend title to white
+  )
+
+
+
+ggsave("sprich.tiff", plot = p1.0, device = "tiff",path = 'figures/bat_diversity', width = 12,height=6, units = "in")
+
 
 # Perform iNEXT analysis
 iNEXT_result <- iNEXT(abundance_matrix, q=c(0,1,2),datatype = "abundance")
@@ -448,11 +536,18 @@ ggsave(filename = "p3.png", path = "data_analysis/figures/")
 
 save.image(file = "working_env/bat_divesity_v2.RData")
 
-load(file = 'working_env/bat_divesity_v2.RData')
+
 
 
 
 # junk --------------------------------------------------------------------
+
+
+# bat2021$datetime<-ymd_hms(bat2021$datetime) # makes dates as dates 
+# bat2021$noche<-ymd(bat2021$noche)# makes dates as dates
+
+# unique(bat2021$site)# tell us what sites we have
+
 # species matrix with species as columns 
 
 bat.site.m<- bat2021 %>% 
@@ -479,6 +574,11 @@ bat.sp.m<- bat2021 %>%
   group_by(site) %>% 
   count(SppAccp) %>% 
   spread(SppAccp, n, fill=0
+         
+         
+         
+         
+         
 #---------------Activity Index --------------------#
 # with these two matrix we try to calculate the miller activity index.
 

@@ -139,7 +139,8 @@ keep<- c("AUTO.ID.", "PULSES", "site","noche","date_time", "yr","treatmt","trmt_
 
 bat_combined <- bat_combined %>% select(all_of(keep))
 
-colnames(bat_combined)[10]<-"sp" # change the auto.id to sp 
+bat_combined <- bat_combined %>% rename(sp = AUTO.ID.)# change the auto.id to sp 
+# colnames(bat_combined)[10]<-"sp" 
 
 
 
@@ -156,6 +157,7 @@ bm <- bat_combined %>% #
   summarise(n = n(), .groups = 'drop') 
 
 summary(bm)
+head(bm)
 
 # miller matrix -----------------------------------------------------------
 
@@ -195,6 +197,52 @@ bm.miller.day <- bm.miller %>% # number of minutes active  by night.
 
 head(bm.miller.day)
 summary(bm.miller.day)
+
+
+
+# correcting for abundance ------------------------------------------------
+
+# Define the pairs
+site_pairs <- list(
+  c("long01", "long02"),
+  c("long03", "long04"),
+  c("iron01", "iron02"),
+  c("iron03", "iron04"),
+  c("iron05", "iron06")
+)
+
+# Add a column to map pairs
+bm <- bm %>%
+  mutate(
+    pair_group = case_when(
+      site %in% c("long01", "long02") ~ "long01:long02",
+      site %in% c("long03", "long04") ~ "long03:long04",
+      site %in% c("long05") ~ "long05",
+      site %in% c("iron01", "iron02") ~ "iron01:iron02",
+      site %in% c("iron03", "iron04") ~ "iron03:iron04",
+      site %in% c("iron05", "iron06") ~ "iron05:iron06",
+      TRUE ~ NA_character_
+    )
+  )
+
+# Normalize activity
+normalized_bm <- bm %>%
+  group_by(noche, pair_group, sp) %>%  # Add species (sp) to the grouping
+  summarize(
+    control_mean = mean(n[treatmt == "dark"], na.rm = TRUE),  # Average control activity per species
+    experimental_activity = sum(n[treatmt == "lit"], na.rm = TRUE),  # Total experimental activity per species
+    .groups = "drop"
+  ) %>%
+  mutate(
+    normalized_activity = experimental_activity / control_mean  # Calculate normalized activity
+  )
+
+normalized_bm <- normalized_bm[!(normalized_bm$sp %in% c("Noise","NoID")), ]
+normalized_bm$jday<-yday(normalized_bm$noche)
+
+# View the result
+normalized_bm
+
 
 
 # outputs -----------------------------------------------------------------
@@ -320,7 +368,30 @@ ggplot(bat_combined, aes(x = treatmt, y = scale(PULSES), fill = treatmt)) +
   theme_minimal()
 
 
+# plots_normalized_activity  ----------------------------------------------
 
+p7<-ggplot(normalized_bm, aes(x=jday, y=normalized_activity, color=pair_group))+
+  geom_point()
+p7
+
+p7 <- ggplot(normalized_bm, aes(x = jday, y = normalized_activity, color = pair_group)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE, aes(color = pair_group)) +  # Adds a linear trend line
+  facet_wrap(~ sp, scales = "free") +
+  labs(
+    title = "Normalized Bat Activity by Species with Trend Lines",
+    x = "Julian Day (jday)",
+    y = "Normalized Activity",
+    color = "Site Pair Group"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    legend.position = "bottom"
+  ) +
+  scale_color_viridis_d()
+
+# Print the plot
 # Session info ------------------------------------------------------------
 
 

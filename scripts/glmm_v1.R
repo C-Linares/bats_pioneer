@@ -49,7 +49,7 @@ load(file = "working_env/glmm_v1.RData")
 # data --------------------------------------------------------------------
 
 bm<-read.csv('data_for_analysis/prep_for_glmm/bm.csv', header = T) 
-filtered_bm <- bm[!(bm$AUTO.ID. %in% c("Noise","NoID")), ] # if noise is not filtered there is more records for dark sites. 
+filtered_bm <- bm[!(bm$AUTO.ID. %in% c("Noise","NoID")), ] # Noise needs to be filter out before analysis other whise there are more records in dark areas. 
 colnames(filtered_bm)[2]<-"sp" # change from AUTO.ID to sp
 
 #load activity index
@@ -62,6 +62,13 @@ btrait$Species<-toupper(btrait$Species) # makes all caps
 batnames<-read.csv('data_for_analysis/Species_bats.csv')
 colnames(batnames)[3]<-"sp"
 colnames(btrait)[2]<-"sp"
+
+# Create short sp name
+batnames <- batnames %>%
+  mutate(Genus_Species = str_c(str_sub(Scientific.name, 1, 1), ".", 
+                               str_extract(Scientific.name, "\\S+$")))
+
+
 
 elev<-read.csv('data_for_analysis/elev/elevation.csv', header = T)
 elev<-elev %>% rename("site" = "name")
@@ -349,7 +356,24 @@ print(c_hat_deviance)
 
 saveRDS(m1.5nb,"models/m1.5nb")
 
-plot_model(m1.5nb)
+p0<-plot_model(m1.5nb,colors = "gs")
+p0<-p0 + theme(
+  panel.grid.major = element_blank(),  # Remove major gridlines
+  panel.grid.minor = element_blank(),  # Remove minor gridlines
+  text = element_text(size = 16, color = "white"),  # Set text size and color
+  plot.background = element_rect(fill = "black"),  # Set background to black
+  panel.background = element_rect(fill = "black"),  # Set panel background to black
+  axis.text = element_text(color = "white"),  # Set axis text color to white
+  axis.title = element_text(color = "white"),  # Set axis title color to white
+  legend.background = element_rect(fill = "black"),  # Set legend background to black
+  legend.text = element_text(color = "white"),  # Set legend text to white
+  legend.title = element_text(color = "white")  # Set legend title to white
+)
+
+ggsave(filename = "m1.5nb_eff.tiff",plot = p0,device = "tiff", path = 'figures/glmm_v1/' , width = 12,height=6, units = "in" )
+ggsave(filename = "m1.5nb_eff.svg",plot = p0,device = "svg", path = 'figures/glmm_v1/',  width = 12,height=6, units = "in" )
+
+
 load('models/m1.5nb')
 
 tab_model(m1.5nb)
@@ -530,6 +554,7 @@ p1<-ggplot(l.illumdf, aes(x = l.illum, y = Mean)) +
   scale_y_continuous(expand = expansion(mult = c(0, 0.05))) + # Adjust y-axis to avoid clipping
   scale_x_continuous(expand = expansion(mult = c(0.01, 0.01))) # Adjust x-axis for balance
 
+p1
 ggsave(filename = "l.illum_feff_v1.png",plot = p1,device = "png", path = 'figures/glmm_v1/' )
 
 
@@ -781,13 +806,13 @@ ggplot(abunddf, aes(x = ord.day, y = MYOLUC    )) +
   theme_classic(base_size = 17) +
   ylab("bat calls Myluc") +
   xlab("jday") +
-  geom_line(linewidth = 1.5)+ 
-  
+  geom_line(linewidth = 1.5) 
 
 
 # Create the melted data for plotting# Create the melted data for plotting# Create the melted data for plotting all columns
 abunddf_melted <- melt(abunddf, id.vars = "ord.day",variable.name = "sp", value.name ="predicted calls" , measure.vars = 1:14)
 unique(abunddf_melted$sp)
+t<-left_join(abunddf_melted, batnames, )
 
 abunddf_long<- pivot_longer(abunddf, cols= 1:14, names_to = "sp", values_to = "predicted calls")
 unique(abunddf_long$sp)
@@ -797,44 +822,44 @@ head(abunddf_long)
 p6<-ggplot(abunddf_melted, aes(x = ord.day, y = `predicted calls`, color = sp)) +
   scale_color_viridis_d()+
   # Add geom_point to plot points for each variable
-  scale_shape_manual(values = 1:6)+ 
+  scale_shape_manual(values = 1:14)+ 
   geom_point(size = 2) +
     # Use different shapes
   # Set labels and title
   labs(title = "Abundance by Day", x = "Day", y = "bat calls") +
   # Set theme for better visuals (optional)
   theme_classic()
-  
 p6
 
-# black and white figure 
-
-
 p6 <- ggplot(abunddf_melted, aes(x = ord.day, y = `predicted calls`, color = sp, shape = sp)) +
-  scale_color_viridis_d() +  # Color by species
-  scale_shape_manual(values = 1:14) +  # Use different shapes
-  geom_point(size = 2, color = "white") +  # Set point color to white
-  labs(title = "", x = "JDay", y = "Bat Calls") +
-  theme_minimal(base_size = 20) + 
+  scale_color_manual(values = rep("white", length(unique(abunddf_melted$sp)))) +  # Set all points to white
+  scale_shape_manual(values = 1:14) +  # Custom shapes for each bat species
+  geom_point(size = 2) +
+  # Set labels and title
+  labs(title = "", x = "Day", y = "Bat Calls") +
+  # Set theme for better visuals
+  theme_classic(base_size = 14) +
   theme(
     plot.background = element_rect(fill = "black"),  # Set plot background to black
     panel.background = element_rect(fill = "black"),  # Set panel background to black
-    axis.text = element_text(color = "white"),  # Set axis text color to white
-    axis.title = element_text(color = "white"),  # Set axis title color to white
-    plot.title = element_text(color = "white"),  # Set plot title color to white
-    axis.ticks = element_line(color = "white"),  # Set axis ticks color to white
-    panel.grid.major = element_line(color = "black"),  # Optional: set grid lines color
-    panel.grid.minor = element_line(color = "black"),  # Optional: set minor grid lines color
-    legend.text = element_text(color = "white"),  # Set legend text color to white
-    legend.title = element_blank()   # Set legend title color to white
+    text = element_text(color = "white"),  # Set all text to white
+    axis.text = element_text(color = "white"),  # Set axis text to white
+    axis.title = element_text(color = "white"),  # Set axis titles to white
+    panel.grid.major = element_blank(),  # Remove major grid lines
+    panel.grid.minor = element_blank(),  # Remove minor grid lines
+    legend.background = element_rect(fill = "black"),  # Set legend background to black
+    legend.key = element_rect(fill = "black"),  # Set legend keys to black
+    legend.text = element_text(color = "white"),  # Set legend text to white
+    legend.title = element_text(color = "white")  # Set legend title to white
   )
 
-p6
+
+print(p6)
 
 p6.1<-ggplot(abunddf_long, aes(x = ord.day, y = `predicted calls`, color = sp)) +
   # Add geom_point to plot points for each variable
   geom_point(size = 1) +
-  facet_wrap( ~ sp, scales = "free") +
+  facet_wrap( ~ sp, scales = "free_y") +
   # Set labels and title
   labs(title = "Bat calls by julian day", x = "julian day", y = "bat calls") +
   # Set theme for better visuals (optional)
@@ -844,7 +869,9 @@ p6.1
 
 
 
-ggsave(filename = "jday_raneff_v2.tiff",plot = p6,device = "tiff", path = 'figures/glmm_v1/', width = 11, height = 8, units = "in" )
+
+p6
+ggsave(filename = "jday_raneff_v2.png",plot = p6,device = "png", path = 'figures/glmm_v1/' )
 ggsave(filename = "jday_raneff_v2.png",plot = p6.1,device = "png", path = 'figures/glmm_v1/' )
 
 
@@ -888,7 +915,7 @@ head(abunddf)
 
 p7<-ggplot( abunddf, aes( x = trmt_bin, y = pred, colour = sp, group = sp, shape = sp) ) +  
   theme_classic( base_size = 12) +
-  scale_color_viridis_d(direction = -1, option = "A")+
+  # scale_color_viridis_d(direction = -1, option = "A")+
   scale_shape_manual(values = 1:14) +  # Customize shapes for each 'sp', adjust as needed
   ylab( "bat calls" ) +
   xlab( "year" ) +
@@ -899,32 +926,30 @@ p7<-ggplot( abunddf, aes( x = trmt_bin, y = pred, colour = sp, group = sp, shape
   xlab("") 
 p7
 
-p7.1<- ggplot(abunddf, aes(x = trmt_bin, y = pred, colour = sp, group = sp, shape = sp)) +  
-  theme_classic(base_size = 16) +  # Increase base size for larger text
-  scale_color_viridis_d(direction = -1, option = "A", guide = FALSE) +  # Remove legend if desired
+#black and greys graph
+p7.1 <- ggplot(abunddf, aes(x = trmt_bin, y = pred, colour = sp, group = sp, shape = sp)) +  
+  theme_classic(base_size = 12) +
+  scale_color_grey(start = 0, end = 1) +  # Use grayscale colors
   scale_shape_manual(values = 1:14) +  # Customize shapes for each 'sp'
   ylab("Bat calls") +
-  xlab("") +
-  geom_point(size = 3, color = "white") +  # Set point color to white
-  geom_line(color = "white") +  # Set line color to white
+  xlab("Year") +
+  geom_point(size = 3) +
+  geom_line() +
   theme(
     plot.background = element_rect(fill = "black"),  # Set plot background to black
     panel.background = element_rect(fill = "black"),  # Set panel background to black
+    axis.text = element_text(color = "white"),  # Set axis text to white
+    axis.title = element_text(color = "white"),  # Set axis titles to white
     legend.background = element_rect(fill = "black"),  # Set legend background to black
-    axis.text = element_text(color = "white"),  # Set axis text color to white
-    axis.title = element_text(color = "white"),  # Set axis title color to white
-    plot.title = element_text(color = "white"),  # Set plot title color to white
-    axis.ticks = element_line(color = "white"),  # Set axis ticks color to white
-    legend.text = element_text(color = "white"),  # Set legend text color to white
-    legend.title = element_text(color = "white"),  # Set legend title color to white
-    panel.grid.major = element_line(color = "black"),  # Optional: set grid lines color (adjust as needed)
-    panel.grid.minor = element_line(color = "black")   # Optional: set minor grid lines color (adjust as needed)
+    legend.text = element_text(color = "white"),  # Set legend text to white
+    legend.title = element_text(color = "white")  # Set legend title to white
   )
 
 p7.1
 
 ggsave(filename = "trmt_raneff_v1.png",plot = p7,device = "png", path = 'figures/glmm_v1/' )
-ggsave(filename = "trmt_raneff_v2.png",plot = p7.1,device = "tiff", path = 'figures/glmm_v1/', width = 11, height = 8, units = "in" )
+ggsave(filename = "trmt_raneff_v2.png",plot = p7.1,device = "png", path = 'figures/glmm_v1/' )
+
 
 
 # save models -------------------------------------------------------------

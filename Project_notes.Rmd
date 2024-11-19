@@ -429,3 +429,19 @@ next: do a bipartite analysis.
 I updated the bm.miller.day. csv file. This file calculates properly the activity index according to miller. I was forgetting to not double count calls that occurred in the same minute. Maybe I could try 5 minutes ai index to see if that makes a change in the patterns observed.
 
 next is to run the same models with the ai index as I did for the whole data.
+
+------------------------------------------------------------------------
+
+11/19/2024
+
+I sitill need to run all the data with the bm.miller.day.csv.
+
+-   need to recalculate values with the moonlit package for moon illumination
+
+-   need to correct for abundance.
+
+    I will do this by getting all the detentions by at lit and dark and getting the difference between both. then modeling such difference.
+
+-   find some temporal change look one note notes [Jesse meeting ](onenote:https://d.docs.live.net/389838b7e3cff5ec/Documentos/phd/Phd_meetings%20advisors.one#Jesse%20meeting&section-id={D72C4F66-1EBB-43B2-9B02-FF45D4030D0F}&page-id={646664F3-8A08-4FBC-8106-B794329320F6}&end)  ([Web view](https://onedrive.live.com/view.aspx?resid=389838B7E3CFF5EC%2130314&id=documents&wd=target%28Phd_meetings%20advisors.one%7CD72C4F66-1EBB-43B2-9B02-FF45D4030D0F%2FJesse%20meeting%7C646664F3-8A08-4FBC-8106-B794329320F6%2F%29))
+
+-   
