@@ -1,3 +1,20 @@
+# Script name: moon_pred
+# 
+# Purpose of script: calculate the moon illumination
+# 
+# Author: Carlos Linares
+# 
+# Date Created: 07/29/2024
+# 
+# Email: carlosgarcialina@u.boisestate.edu
+# 
+# ---------------------------
+#   
+#   Notes: early in the analysis we calculated moon illumination using suncal and lunar. 11/21/2024 as recomended by Kayba we will use the moonlit. packae 
+
+
+# inputs ------------------------------------------------------------------
+# data_for_analysis/sites_coordinates.csv -> file with the coordinates for the field sites.
 
 
 #script to calculate the average and median moon phase for use a predictor in a population model
@@ -92,6 +109,90 @@ colnames(moon_pred)[1]<-"date"
 
 
 write.csv(moon_pred,file = 'data_for_analysis/moon_pred.csv', row.names = F) # ran once in case of needing to rewrite the data
+
+
+
+# moonlit -----------------------------------------------------------------
+
+# # install package
+# install.packages("devtools")
+# library(devtools)
+
+# 
+# install_github("msmielak/moonlit")
+
+#load the moonlit library
+library(moonlit)
+
+# calculateMoonlightIntensity(lat, lon, date, e) Function requires dates and lat long data. 
+
+# site coordinates
+sts<-read.csv("data_for_analysis/sites_coordinates.csv")
+sts<-sts[1,]
+
+# bat data set time and dates 2021-2023
+
+bat_combined<-read_csv(file = 'data_for_analysis/prep_for_glmm/bat_combined.csv')
+
+site.date<- bat_combined %>% select(site, date_time)
+
+t<-left_join(site.date, sts, by="site")
+t_sampled <- t[sample(nrow(t), size = 10, replace = TRUE), ]
+
+# generate dates from 2021 to 2023 just the summer months. 
+
+start_date <- as.Date("2020-05-01")
+end_date <- as.Date("2023-12-30")
+
+# Generate the sequence of dates
+all_dates <- seq.Date(from = start_date, to = end_date, by = "day")
+# Filter the dates to include only May to September
+dates<- all_dates[format(all_dates, "%m") %in% c("05", "06", "07", "08", "09")]
+dates<-as.data.frame(dates)
+colnames(dates)[1]<-"date"
+
+# merge the dates with the site and the coordinates. 
+
+t1<-merge(dates, sts, by=NULL)
+
+date<-t_sampled$date_time[1]
+
+moon.int <- calculateMoonlightIntensity(
+  t_sampled$lat,
+  t_sampled$lon,
+  as.POSIXct(t_sampled$date_time) ,
+  e = 0.16
+)
+
+moon.stat <- calculateMoonlightStatistics(
+  lat = t1$lat,
+  lon = t1$lon,
+  t1$date,
+  e = 0.16,
+  t = "15 mins",
+  timezone = "UTC"
+)
+
+
+# example from the code 
+lat <- 43.5504720
+lon <- -113.7367802
+date <- as.POSIXct("2023-10-15 22:00:00", tz = "America/Denver")
+result <- calculateMoonlightIntensity(lat, lon, date, e = 0.16)
+
+# Calculate nightly statistics for the entire night starting on 15/10/2023
+
+stats <- calculateMoonlightStatistics(lat, lon, date, e = 0.26, t = "15 mins", timezone = "Europe/Warsaw")
+
+
+
+class(date)
+
+
+
+
+
+
 
 
 
