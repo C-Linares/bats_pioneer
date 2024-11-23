@@ -451,3 +451,17 @@ did:
 I worked on the correction for the bat calls. Not sure I got it right. it seems off and there's no way to model the difference because there's no way to assign it to a site...
 
 \
+
+------------------------------------------------------------------------
+
+11/21/2024
+
+Trying to calculate the moon predictor using the [moonlit](https://github.com/msmielak/moonlit) package. Not working very well to calculate because the data time I have are stored as UTC and when I pass it to MDT the night turns into day and the moon calculations don't work.
+
+-   if I just give the function dates it calculates everything for the day and there's no moon.
+
+------------------------------------------------------------------------
+
+11/22/2024
+
+I worked on the code to see if it would be bettert to create a sequence of dates and times to calculate the moon illumination. It kind of worked but the file is too large. I was looking at the cheatsheet form lubridate and I might need to try force_tz or with_tz() and try again with the date and times of the actual data collected.

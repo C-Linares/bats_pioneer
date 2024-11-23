@@ -15,6 +15,7 @@
 
 # inputs ------------------------------------------------------------------
 # data_for_analysis/sites_coordinates.csv -> file with the coordinates for the field sites.
+# data_for_analysis/prep_for_glmm/bat_combined.csv -> data base with the date and times
 
 
 #script to calculate the average and median moon phase for use a predictor in a population model
@@ -29,8 +30,6 @@ library(tidyverse)
 #we need the coordinates for the sites
 
 sts<-read.csv("data_for_analysis/sites_coordinates.csv")
-sts<-sts[1,]
-
 
 # load bat data 2021 for dates. 
 
@@ -56,9 +55,9 @@ dates<-as.data.frame(dates)
 colnames(dates)[1]<-"date"
 
 
-# merge tdates# merge the dates with the site and the coordinates. 
+# merge tdates# merge the dates with the site and the coordinates. 9180 obs because is 15 times the dates object. 
 
-t1<-merge(dates, sts, by=NULL)
+t1<-merge(dates, sts, by=NULL) 
 
 # moon illumination, times, and pos ----------------------
 
@@ -128,7 +127,6 @@ library(moonlit)
 
 # site coordinates
 sts<-read.csv("data_for_analysis/sites_coordinates.csv")
-sts<-sts[1,]
 
 # bat data set time and dates 2021-2023
 
@@ -139,28 +137,39 @@ site.date<- bat_combined %>% select(site, date_time)
 t<-left_join(site.date, sts, by="site")
 t_sampled <- t[sample(nrow(t), size = 10, replace = TRUE), ]
 
-# generate dates from 2021 to 2023 just the summer months. 
-
-start_date <- as.Date("2020-05-01")
-end_date <- as.Date("2023-12-30")
 
 # Generate the sequence of dates
 all_dates <- seq.Date(from = start_date, to = end_date, by = "day")
+
 # Filter the dates to include only May to September
-dates<- all_dates[format(all_dates, "%m") %in% c("05", "06", "07", "08", "09")]
-dates<-as.data.frame(dates)
-colnames(dates)[1]<-"date"
+dates <- all_dates[format(all_dates, "%m") %in% c("05", "06", "07", "08", "09")]
+dates <- as.data.frame(dates)
+colnames(dates)[1] <- "date"
+
+# Generate times for each date from 6 PM to 6 AM the next day
+time_sequences <- lapply(dates$date, function(date) {
+  start_time <- as.POSIXct(paste(date, "18:00:00"), tz = "America/Denver")
+  end_time <- as.POSIXct(paste(date + 1, "06:00:00"), tz = "America/Denver")
+  seq(from = start_time, to = end_time, by = "min")
+})
+
+# Combine the list into a single data frame
+times <- do.call(rbind, lapply(seq_along(time_sequences), function(i) {
+  data.frame(date = dates$date[i], time = time_sequences[[i]])
+}))
+
+head(times)
 
 # merge the dates with the site and the coordinates. 
 
-t1<-merge(dates, sts, by=NULL)
+t1<-merge(times, sts, by=NULL)
 
-date<-t_sampled$date_time[1]
+
 
 moon.int <- calculateMoonlightIntensity(
-  t_sampled$lat,
-  t_sampled$lon,
-  as.POSIXct(t_sampled$date_time) ,
+  t1$lat,
+  t1$lon,
+  as.POSIXct(t1$time) ,
   e = 0.16
 )
 
