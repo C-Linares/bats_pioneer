@@ -465,3 +465,13 @@ Trying to calculate the moon predictor using the [moonlit](https://github.com/ms
 11/22/2024
 
 I worked on the code to see if it would be bettert to create a sequence of dates and times to calculate the moon illumination. It kind of worked but the file is too large. I was looking at the cheatsheet form lubridate and I might need to try force_tz or with_tz() and try again with the date and times of the actual data collected.
+
+------------------------------------------------------------------------
+
+I am still trying to calculate the moon illumination, however I have found a couple things to fix.
+
+-   First I realized that I had to use the force_tz() function to make the date-time column into "America\\denver" time zone without changing the actual time. If this is not done, the times are all wrong for when you calculate the moon illumination.
+
+-   second: I realized that when merging dates and times that are ymd-00:00:00 that corresponds to midnight the information about midnight disapeared. the time was parsed out of the column. see code prep_for_glm.R
+
+Doing: I am figuring out how to prevent midnight times to disapear when merged with a date and parces as time.

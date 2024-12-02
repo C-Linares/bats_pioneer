@@ -130,46 +130,33 @@ sts<-read.csv("data_for_analysis/sites_coordinates.csv")
 
 # bat data set time and dates 2021-2023
 
-bat_combined<-read_csv(file = 'data_for_analysis/prep_for_glmm/bat_combined.csv')
+bat_combined<-read_csv(file = 'data_for_analysis/prep_for_glmm/bat_combined.csv') # 70 rows are missing the time for the date time column. see below. 
+
+missing_time_rows <- bat_combined[grep("^\\d{4}-\\d{2}-\\d{2}$", bat_combined$date_time), ]
 
 site.date<- bat_combined %>% select(site, date_time)
 
-t<-left_join(site.date, sts, by="site")
-t_sampled <- t[sample(nrow(t), size = 10, replace = TRUE), ]
+sidalo<-left_join(site.date, sts, by="site")
+
+sidalo$date_time_prsed<- ymd_hms(sidalo$date_time, tz="UTC") #keep it UTC.
+
+failed_rows <- which(is.na(sidalo$date_time_prsed))
+failed_dates <- sidalo[failed_rows, ]
+
+sidalo$date_time<- force_tz(sidalo$date_time, tzone = "America/Denver")
+
+summary
 
 
-# Generate the sequence of dates
-all_dates <- seq.Date(from = start_date, to = end_date, by = "day")
-
-# Filter the dates to include only May to September
-dates <- all_dates[format(all_dates, "%m") %in% c("05", "06", "07", "08", "09")]
-dates <- as.data.frame(dates)
-colnames(dates)[1] <- "date"
-
-# Generate times for each date from 6 PM to 6 AM the next day
-time_sequences <- lapply(dates$date, function(date) {
-  start_time <- as.POSIXct(paste(date, "18:00:00"), tz = "America/Denver")
-  end_time <- as.POSIXct(paste(date + 1, "06:00:00"), tz = "America/Denver")
-  seq(from = start_time, to = end_time, by = "min")
-})
-
-# Combine the list into a single data frame
-times <- do.call(rbind, lapply(seq_along(time_sequences), function(i) {
-  data.frame(date = dates$date[i], time = time_sequences[[i]])
-}))
-
-head(times)
-
-# merge the dates with the site and the coordinates. 
-
-t1<-merge(times, sts, by=NULL)
 
 
+# calculate moon intensity
+# we use the combine data set to extract the bat calls time and dates for the 2021-2023 time frame. 
 
 moon.int <- calculateMoonlightIntensity(
-  t1$lat,
-  t1$lon,
-  as.POSIXct(t1$time) ,
+  sidalo$lat,
+  sidalo$lon,
+  sidalo$date_time ,
   e = 0.16
 )
 
@@ -231,3 +218,54 @@ ggplot(moon_pos, aes(x = yday(moon_pos$date), y = altitude, color = above_horizo
   labs(x = "Time", y = "Moon Altitude", color = "Moon Above Horizon?") +
   theme_bw() +
   geom_hline(yintercept = 0, linetype = "dashed", color = "gray")  # Optional: Show threshold lin
+
+
+
+# examples ----------------------------------------------------------------
+# 
+# Here is code we don't need or use anymore but that helped solve a problem in the past
+# 
+# Sample of sites 
+
+# I coded this section to learn how ti fix the issue withe the time zone changing the time when passing it to the moonlit package functions. Once I learned I moved it to the end of the code. It should not be needed to run again. It should be used as an example.
+t_sampled <- t[sample(nrow(t), size = 10, replace = TRUE), ]
+
+date_time_utc <- ymd_hms(t_sampled$date_time, tz = "UTC") # convert to UTC 
+
+# Change the time zone to "America/Denver", but keep the exact same clock time
+# To keep the same time, we use `force_tz`.
+date_time_denver <- force_tz(date_time_utc, tzone = "America/Denver") # this forces the time zone to MDT
+
+# Show the result
+date_time_denver
+
+
+# trash
+
+# 
+# # Generate the sequence of dates
+# all_dates <- seq.Date(from = start_date, to = end_date, by = "day")
+# 
+# # Filter the dates to include only May to September
+# dates <- all_dates[format(all_dates, "%m") %in% c("05", "06", "07", "08", "09")]
+# dates <- as.data.frame(dates)
+# colnames(dates)[1] <- "date"
+# 
+# # Generate times for each date from 6 PM to 6 AM the next day
+# time_sequences <- lapply(dates$date, function(date) {
+#   start_time <- as.POSIXct(paste(date, "18:00:00"), tz = "America/Denver")
+#   end_time <- as.POSIXct(paste(date + 1, "06:00:00"), tz = "America/Denver")
+#   seq(from = start_time, to = end_time, by = "min")
+# })
+# 
+# # Combine the list into a single data frame
+# times <- do.call(rbind, lapply(seq_along(time_sequences), function(i) {
+#   data.frame(date = dates$date[i], time = time_sequences[[i]])
+# }))
+# 
+# head(times)
+# 
+# # merge the dates with the site and the coordinates. 
+# 
+# t1<-merge(times, sts, by=NULL)
+

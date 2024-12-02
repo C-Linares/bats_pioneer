@@ -142,7 +142,10 @@ bat_combined <- bat_combined %>% select(all_of(keep))
 bat_combined <- bat_combined %>% rename(sp = AUTO.ID.)# change the auto.id to sp 
 # colnames(bat_combined)[10]<-"sp" 
 
+midnight_rows <- bat_combined[format(as.POSIXct(bat_combined$date_time), "%H:%M:%S") == "00:00:00", ]
 
+# View the rows that match
+midnight_rows
 
 summary(bat_combined)
 
