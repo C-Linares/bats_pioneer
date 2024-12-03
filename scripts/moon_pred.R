@@ -32,6 +32,12 @@ library(ggplot2)
 library(lunar)
 library(tidyverse)
 library(moonlit)
+library(beepr)
+
+
+#load environment 
+
+load('working_env/moon_pred.RData')
 
 
 #we need the coordinates for the sites
@@ -138,6 +144,15 @@ sts<-read.csv("data_for_analysis/sites_coordinates.csv")
 
 bat_combined<-read_csv(file = 'data_for_analysis/prep_for_glmm/bat_combined.csv') # 70 rows are missing the time for the date time column. see below. 
 
+#--- 1pm times -----
+  # here we are exploring if there are any wrong dates in the original data set because there are wrong dates in the moon intensity. For some reason there are recordings made at 1 pm at one site but these are all noise and will be filter out at the end. 
+  
+rows_13pm <- bat_combined %>%
+  filter(format(as.POSIXct(date_time, tz = "UTC"), "%H") == "13")
+
+#--
+
+
 # missing_time_rows <- bat_combined[grep("^\\d{4}-\\d{2}-\\d{2}$", bat_combined$date_time), ]
 
 site.date<- bat_combined %>% select(site, date_time)
@@ -168,6 +183,7 @@ moon.int <- calculateMoonlightIntensity(
 
 summary(moon.int) # yes there is no NAs now we need to merge it with sidalo. 
 
+
 mindate<-min(sidalo$date_time)
 
 moon.stat <- calculateMoonlightStatistics(
@@ -176,25 +192,34 @@ moon.stat <- calculateMoonlightStatistics(
   mindate,
   e = 0.16,
   t = "15 mins",
-  timezone = ""
+  timezone = "America/Denver"
 )
 
+stats <- apply(moon.int, 1, function(row) {
+  calculateMoonlightStatistics(
+    lat = as.numeric(row["lat"]),
+    lon = as.numeric(row["lon"]),
+    date = as.POSIXct(row["date"], tz = "America/Denver"),
+    e = 0.26,
+    t = "15 mins",
+    timezone = "America/Denver"
+  )
+})
+beep()
 
-# example from the code 
-lat <- 43.5418
-lon <- -113.7331
-date <- as.POSIXct("2021-06-22 20:39:04", tz = "America/Denver")
-
-# Calculate nightly statistics for the entire night starting on 15/10/2023
-
-stats <- calculateMoonlightStatistics(moon.int$lat, moon.int$lon, moon.int$date, e = 0.26, t = "15 mins", timezone = "America/Denver")
+stats <- calculateMoonlightStatistics(moon.int$lat, moon.int$lon, moon.int$date, e = 0.26, t = "1", timezone = "America/Denver")
 
 
 
 
+# outputs -----------------------------------------------------------------
+
+write.csv(moon.int, file = 'data_for_analysis/moon_pred_out/moon.ill.csv', row.names = F) # data 
 
 
+# save --------------------------------------------------------------------
 
+save.image(file = "working_env/moon_pred.RData")
 
 
 
