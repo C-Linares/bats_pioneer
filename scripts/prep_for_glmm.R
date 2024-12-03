@@ -85,10 +85,22 @@ bat_combined$noche <-
 
 
 # date time col. 
-datetime<-paste(bat_combined$DATE, bat_combined$TIME)#merge date and time # this time is wrong and needs to be extracted from the file itself. ############################!!!!!!!!!!!!!!!!
-datetime.parse<-lubridate::ymd_hms(datetime) # parse as date time
+bat_combined$DATE<-as.character(bat_combined$DATE)
+bat_combined$TIME<-as.character(bat_combined$TIME)
+
+datetime<-paste(bat_combined$DATE, bat_combined$TIME)#merge date and time # this time is wrong and needs to be extracted
+
+midnight_strings <- datetime[grepl("^\\d{4}-\\d{2}-\\d{2} 00:00:00$", datetime)] # make sure the midnight strings are there. 
+
+
 bat_combined$date_time<-datetime.parse # add to data. 
 sum(is.na(bat_combined$date_time)) # check for NAs. 
+
+midnight_rows <- bat_combined[format(as.POSIXct(bat_combined$date_time), "%H:%M:%S") == "00:00:00", ]
+
+# View the rows that match
+midnight_rows
+
 
 #year
 
@@ -140,12 +152,8 @@ keep<- c("AUTO.ID.", "PULSES", "site","noche","date_time", "yr","treatmt","trmt_
 bat_combined <- bat_combined %>% select(all_of(keep))
 
 bat_combined <- bat_combined %>% rename(sp = AUTO.ID.)# change the auto.id to sp 
-# colnames(bat_combined)[10]<-"sp" 
 
-midnight_rows <- bat_combined[format(as.POSIXct(bat_combined$date_time), "%H:%M:%S") == "00:00:00", ]
 
-# View the rows that match
-midnight_rows
 
 summary(bat_combined)
 
@@ -263,7 +271,7 @@ write.csv(bm.miller.day, file = "data_for_analysis/prep_for_glmm/bm.miller.day.c
 readme_content <- "Carlos Linares 8/01/2024 
 This directory contains the bat_combined.csv file which was created using the script prep_for_glmm.R combines bat species call abundance data. This script merges 2021-23 data that was previously scanned with Kaleidoscope pro
 
-bat_combined.csv - process data no counts
+bat_combined.csv - process data no counts (Update: 12/2/2024 some modifications to date time column.) 
 bm.csv - counts of bat calls by day from 2021 to 2023 all sites
 bm.miller.day - number of minutes of activity by day  for 2021-2023 data all sites (last update 9/23/2024)"
 

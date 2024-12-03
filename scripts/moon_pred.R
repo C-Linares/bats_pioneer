@@ -21,11 +21,18 @@
 #script to calculate the average and median moon phase for use a predictor in a population model
 #we will be using the suncalc package
 
+
+# libraries ---------------------------------------------------------------
+
+
+
 library(suncalc)
 library(sf)
 library(ggplot2)
 library(lunar)
 library(tidyverse)
+library(moonlit)
+
 
 #we need the coordinates for the sites
 
@@ -121,7 +128,6 @@ write.csv(moon_pred,file = 'data_for_analysis/moon_pred.csv', row.names = F) # r
 # install_github("msmielak/moonlit")
 
 #load the moonlit library
-library(moonlit)
 
 # calculateMoonlightIntensity(lat, lon, date, e) Function requires dates and lat long data. 
 
@@ -132,16 +138,16 @@ sts<-read.csv("data_for_analysis/sites_coordinates.csv")
 
 bat_combined<-read_csv(file = 'data_for_analysis/prep_for_glmm/bat_combined.csv') # 70 rows are missing the time for the date time column. see below. 
 
-missing_time_rows <- bat_combined[grep("^\\d{4}-\\d{2}-\\d{2}$", bat_combined$date_time), ]
+# missing_time_rows <- bat_combined[grep("^\\d{4}-\\d{2}-\\d{2}$", bat_combined$date_time), ]
 
 site.date<- bat_combined %>% select(site, date_time)
 
 sidalo<-left_join(site.date, sts, by="site")
 
-sidalo$date_time_prsed<- ymd_hms(sidalo$date_time, tz="UTC") #keep it UTC.
+# sidalo$date_time_prsed<- ymd_hms(sidalo$date_time, tz="UTC") #keep it UTC.
 
-failed_rows <- which(is.na(sidalo$date_time_prsed))
-failed_dates <- sidalo[failed_rows, ]
+# failed_rows <- which(is.na(sidalo$date_time_prsed))
+# failed_dates <- sidalo[failed_rows, ]
 
 sidalo$date_time<- force_tz(sidalo$date_time, tzone = "America/Denver")
 
@@ -160,29 +166,29 @@ moon.int <- calculateMoonlightIntensity(
   e = 0.16
 )
 
+summary(moon.int) # yes there is no NAs now we need to merge it with sidalo. 
+
+mindate<-min(sidalo$date_time)
+
 moon.stat <- calculateMoonlightStatistics(
-  lat = t1$lat,
-  lon = t1$lon,
-  t1$date,
+  sidalo$lat,
+  sidalo$lon,
+  mindate,
   e = 0.16,
   t = "15 mins",
-  timezone = "UTC"
+  timezone = ""
 )
 
 
 # example from the code 
-lat <- 43.5504720
-lon <- -113.7367802
-date <- as.POSIXct("2023-10-15 22:00:00", tz = "America/Denver")
-result <- calculateMoonlightIntensity(lat, lon, date, e = 0.16)
+lat <- 43.5418
+lon <- -113.7331
+date <- as.POSIXct("2021-06-22 20:39:04", tz = "America/Denver")
 
 # Calculate nightly statistics for the entire night starting on 15/10/2023
 
-stats <- calculateMoonlightStatistics(lat, lon, date, e = 0.26, t = "15 mins", timezone = "Europe/Warsaw")
+stats <- calculateMoonlightStatistics(moon.int$lat, moon.int$lon, moon.int$date, e = 0.26, t = "15 mins", timezone = "America/Denver")
 
-
-
-class(date)
 
 
 

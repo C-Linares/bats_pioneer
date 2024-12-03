@@ -474,4 +474,5 @@ I am still trying to calculate the moon illumination, however I have found a cou
 
 -   second: I realized that when merging dates and times that are ymd-00:00:00 that corresponds to midnight the information about midnight disapeared. the time was parsed out of the column. see code prep_for_glm.R
 
-Doing: I am figuring out how to prevent midnight times to disapear when merged with a date and parces as time.
+Doing: I am figuring out how to prevent midnight times to disappear when merged with a date and parse it as time. \
+I did some work and tried my best to make it work. The moon.intensity function eventually worked. I can't make the moon stats function to work.
