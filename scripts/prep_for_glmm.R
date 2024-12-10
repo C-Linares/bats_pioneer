@@ -37,6 +37,11 @@ library(beepr)
 # kpro_data --------------------------------------------------------------
 
 # load
+# 
+load("working_env/prep_for_glm.RData")
+
+
+
 
 kpro_2021_bat<- read.csv(file = 'data_for_analysis/2021_kpro_raw/bats2021_kpro_v1.csv',header = T)
 kpro_2022_bat<-read.csv(file = 'data_for_analysis/2022_kpro_raw/bat2022_kpr.csv',header = T)
@@ -403,6 +408,12 @@ p7 <- ggplot(normalized_bm, aes(x = jday, y = normalized_activity, color = pair_
   scale_color_viridis_d()
 
 # Print the plot
+
+
+# save --------------------------------------------------------------------
+
+save.image("working_env/prep_for_glm.RData")
+
 # Session info ------------------------------------------------------------
 
 

@@ -21,17 +21,17 @@ Then, the predictors matrix for the population analysis section is calculated.
 
 10/15/2023
 
-I tried copying the lat and log but there seems to be a problem as points are not plotting correctly. There might be problems with the coordinates. Update: I tried again and the elevatr package loaded and worked. However, I didn't display any elevation.\
-I tried the package raster and plotted the DEM for Idaho and was able to obtain elevation for each site.
+I tried copying the lat and log, but there seems to be a problem, as points are not plotting correctly. There might be problems with the coordinates. Update: I tried again, and the elevatr package loaded and worked. However, I didn't display any elevation.\
+I tried the package raster, plotted the DEM for Idaho, and obtained elevation for each site.
 
 \
-For the population analysis I want to include moon phase, moon illumination, elevation, riparian veg.
+For the population analysis, I want to include the moon's phase, illumination, elevation, and riparian vegetation.
 
-The riparian vegetation I will calculate with the NDVI. Unfortunately, is not working as it is. I am using  a code that is in the cleanup script. ChatGPT helped me generate it, but still not working well.
+I will calculate the riparian vegetation with the NDVI. Unfortunately, it is not working as it should. I am using·  code in the cleanup script. ChatGPT helped me generate it, but it is still not working well.
 
 11/17/2023
 
-Per recommendation of Jen I created the matrix lano_js that should be use to run the model in the script pop_model. We will be using just a single species data set for testing right now. To the file lano_js we remove last week and the site column. We also made 0 data because we didn't wanted.
+Per the recommendation of Jen, I created the matrix lano_js that should be used to run the model in the script pop_model. We will be using just a single species data set for testing. To the file lano_js, we removed last week and the site column. We also made 0 data because we didn't want.
 
 I just noticed that when I write a file with the write.csv function there's a there's a new index column created that has a number for each row. How to prevent this?
 
@@ -474,5 +474,17 @@ I am still trying to calculate the moon illumination, however I have found a cou
 
 -   second: I realized that when merging dates and times that are ymd-00:00:00 that corresponds to midnight the information about midnight disapeared. the time was parsed out of the column. see code prep_for_glm.R
 
-Doing: I am figuring out how to prevent midnight times to disappear when merged with a date and parse it as time. \
+Doing: I am figuring out how to prevent midnight times to disappear when merged with a date and parse it as time.\
 I did some work and tried my best to make it work. The moon.intensity function eventually worked. I can't make the moon stats function to work.
+
+------------------------------------------------------------------------
+
+12/5/2024
+
+I did my best to make the moonstat function work. However, I needed more help, so I asked Kyle Shannon. He will help me run the data.
+
+------------------------------------------------------------------------
+
+12/09/2023
+
+the moon intensity calculated with moonlit worked after some modification from Kyle Shannon. The problem is the moon stat function. It didn't work because the process takes too long to run. I am going to run a small sample of with moonlit and suncalc to see if the timings are the same and then just take in consideration the suncalc one.

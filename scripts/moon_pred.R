@@ -150,10 +150,8 @@ bat_combined<-read_csv(file = 'data_for_analysis/prep_for_glmm/bat_combined.csv'
 rows_13pm <- bat_combined %>%
   filter(format(as.POSIXct(date_time, tz = "UTC"), "%H") == "13")
 
-#--
+#------
 
-
-# missing_time_rows <- bat_combined[grep("^\\d{4}-\\d{2}-\\d{2}$", bat_combined$date_time), ]
 
 site.date<- bat_combined %>% select(site, date_time)
 
@@ -166,7 +164,7 @@ sidalo<-left_join(site.date, sts, by="site")
 
 sidalo$date_time<- force_tz(sidalo$date_time, tzone = "America/Denver")
 
-summary
+summary(sidalo)
 
 
 
@@ -184,16 +182,33 @@ moon.int <- calculateMoonlightIntensity(
 summary(moon.int) # yes there is no NAs now we need to merge it with sidalo. 
 
 
-mindate<-min(sidalo$date_time)
+
+s.sidalo <- sidalo[sample(nrow(t), size = 5000, replace = TRUE), ]
+s.sidalo<- head(sidalo)
+saveRDS(sidalo, file = "data_for_analysis/moon_pred/sidalo.csv")
 
 moon.stat <- calculateMoonlightStatistics(
-  sidalo$lat,
-  sidalo$lon,
-  mindate,
+  s.sidalo$lat,
+  s.sidalo$lon,
+  s.sidalo$date_time,
   e = 0.16,
-  t = "15 mins",
+  t = "1 hour",
   timezone = "America/Denver"
 )
+beep()
+
+
+Rprof("profile.out")
+moon.stat <- calculateMoonlightStatistics(
+  s.sidalo$lat,
+  s.sidalo$lon,
+  as.POSIXct(s.sidalo$date_time, tz = "America/Denver"),
+  e = 0.16,
+  t = "1 hour",
+  timezone = "America/Denver"
+)
+Rprof(NULL)
+summaryRprof("profile.out")
 
 stats <- apply(moon.int, 1, function(row) {
   calculateMoonlightStatistics(
@@ -207,9 +222,47 @@ stats <- apply(moon.int, 1, function(row) {
 })
 beep()
 
-stats <- calculateMoonlightStatistics(moon.int$lat, moon.int$lon, moon.int$date, e = 0.26, t = "1", timezone = "America/Denver")
+stats <- calculateMoonlightStatistics(sidalo$lat, sidalo$lon, min(sidalo$date_time), e = 0.16, t = "1 hour", timezone = "UTC")
 
 
+# parallel ----------------------------------------------------------------
+library(parallel)
+
+# # Preprocess date_time column
+# sidalo$date_time <- as.POSIXct(sidalo$date_time, tz = "UTC")
+
+# Define function to process chunks
+process_chunk <- function(lat, lon, date_time) {
+  calculateMoonlightStatistics(lat, lon, date_time, e = 0.16, t = "1 hour", timezone = "UTC")
+}
+
+# Split into chunks
+num_cores <- detectCores() - 2
+rows_per_chunk <- ceiling(nrow(sidalo) / num_cores)
+chunks <- split(1:nrow(sidalo), ceiling(seq_along(1:nrow(sidalo)) / rows_per_chunk))
+
+# Create a cluster
+cl <- makeCluster(num_cores)
+
+# Export necessary variables and functions to the cluster
+clusterExport(cl, c("sidalo", "process_chunk", "calculateMoonlightStatistics"))
+
+# Apply function in parallel
+results <- parLapply(cl, chunks, function(idx) {
+  process_chunk(
+    sidalo$lat[idx],
+    sidalo$lon[idx],
+    sidalo$date_time[idx]
+  )
+})
+
+# Stop the cluster
+stopCluster(cl)
+
+# Combine results
+moon.stat <- do.call(rbind, results)
+
+#----
 
 
 # outputs -----------------------------------------------------------------
@@ -224,6 +277,23 @@ save.image(file = "working_env/moon_pred.RData")
 
 
 #-----------------plots-----------------
+
+#coordinates 
+library(sf)
+library(ggplot2)
+
+# Create a data frame with the coordinates
+coords <- data.frame(lat = 43.5418, lon = -113.7331)
+points_sf <- st_as_sf(coords, coords = c("lon", "lat"), crs = 4326)
+
+# Plot the point on a map
+ggplot() +
+  geom_sf(data = points_sf, color = "red", size = 3) +
+  borders("state") +
+  coord_sf(xlim = c(-114, -112), ylim = c(42, 44), expand = FALSE) +
+  theme_minimal()
+
+
 ggplot(moon.adj, aes(x=altitude, y=phase))+
   geom_point()+
   geom_vline(xintercept = 0)
