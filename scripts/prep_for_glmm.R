@@ -32,6 +32,7 @@
 
 library(tidyverse)
 library(beepr)
+library(lubridate)
 
 
 # kpro_data --------------------------------------------------------------
@@ -87,21 +88,33 @@ bat_combined$noche <-
           true =  (date(bat_combined$DATE) - ddays(1)),
           false = date(bat_combined$DATE))
 
+sum(is.na(bat_combined$noche)) # check for NAs. 
 
 
 # date time col. 
 bat_combined$DATE<-as.character(bat_combined$DATE)
 bat_combined$TIME<-as.character(bat_combined$TIME)
 
-datetime<-paste(bat_combined$DATE, bat_combined$TIME)#merge date and time # this time is wrong and needs to be extracted
+datetime<-paste(bat_combined$DATE, bat_combined$TIME)#merge date and time 
 
-midnight_strings <- datetime[grepl("^\\d{4}-\\d{2}-\\d{2} 00:00:00$", datetime)] # make sure the midnight strings are there. 
+bat_combined$datetime<- datetime
 
+bat_combined <- bat_combined %>%
+  mutate(
+    datetime = ymd_hms(datetime, tz = "America/Denver"), # Parse as POSIXct
+    # Add 10 seconds to midnight times
+    datetime = if_else(
+      format(datetime, "%H:%M:%S") == "00:00:00", 
+      datetime + seconds(10), 
+      datetime
+    )
+  )
 
-bat_combined$date_time<-datetime.parse # add to data. 
-sum(is.na(bat_combined$date_time)) # check for NAs. 
+# View result
 
-midnight_rows <- bat_combined[format(as.POSIXct(bat_combined$date_time), "%H:%M:%S") == "00:00:00", ]
+midnight_times <- bat_combined$datetime %>%
+  as_tibble() %>%
+  filter(hour(value) == 0 & minute(value) == 0 & second(value) == 10)
 
 # View the rows that match
 midnight_rows
@@ -144,7 +157,7 @@ effort_days <- bat_combined %>%
 
 effort_hrs <- bat_combined %>%
   group_by(site, noche, jday, yr) %>%
-  summarise(stard = min(date_time), endd = max(date_time)) %>%
+  summarise(stard = min(datetime), endd = max(datetime)) %>%
   mutate(eff.hrs = time_length(endd - stard, unit = "hours"))
 
 # merge effort with bat combined 
@@ -152,7 +165,7 @@ effort_hrs <- bat_combined %>%
 bat_combined<- left_join(bat_combined, effort_hrs, by=c("site", "jday", "yr", "noche"))
 
 
-keep<- c("AUTO.ID.", "PULSES", "site","noche","date_time", "yr","treatmt","trmt_bin","jday","eff.hrs") # cols to keep
+keep<- c("AUTO.ID.", "PULSES", "site","noche","datetime", "yr","treatmt","trmt_bin","jday","eff.hrs") # cols to keep
 
 bat_combined <- bat_combined %>% select(all_of(keep))
 
@@ -218,6 +231,8 @@ summary(bm.miller.day)
 
 # correcting for abundance ------------------------------------------------
 
+# This code maps sites into defined pairs, groups data by night, site pair, and species, calculates normalized bat activity by dividing experimental activity (lit treatment) by the mean control activity (dark treatment), and filters out noise and unidentified species. It also adds a Julian day column to the resulting dataset.
+
 # Define the pairs
 site_pairs <- list(
   c("long01", "long02"),
@@ -253,12 +268,12 @@ normalized_bm <- bm %>%
     normalized_activity = experimental_activity / control_mean  # Calculate normalized activity
   )
 
-normalized_bm <- normalized_bm[!(normalized_bm$sp %in% c("Noise","NoID")), ]
+normalized_bm <- normalized_bm[!(normalized_bm$sp %in% c("Noise","NoID")), ]# filter out Noise and NoID rows. 
 normalized_bm$jday<-yday(normalized_bm$noche)
 
 # View the result
 normalized_bm
-
+summary(normalized_bm)
 
 
 # outputs -----------------------------------------------------------------
@@ -269,17 +284,17 @@ normalized_bm
 write.csv(bat_combined, file = 'data_for_analysis/prep_for_glmm/bat_combined.csv', row.names = F) # raw combine data 
 write.csv(bm, file = 'data_for_analysis/prep_for_glmm/bm.csv', row.names = F) #daily counts
 write.csv(bm.miller.day, file = "data_for_analysis/prep_for_glmm/bm.miller.day.csv") # miller Ai index data
-
+write.csv(normalized_bm, file = "data_for_analysis/prep_for_glmm/normalized_bm.csv")
 
 
 # Create a README file with information about the script
-readme_content <- "Carlos Linares 8/01/2024 
+readme_content <- "Carlos Linares 8/01/2024, 12/12/2024 
 This directory contains the bat_combined.csv file which was created using the script prep_for_glmm.R combines bat species call abundance data. This script merges 2021-23 data that was previously scanned with Kaleidoscope pro
 
 bat_combined.csv - process data no counts (Update: 12/2/2024 some modifications to date time column.) 
 bm.csv - counts of bat calls by day from 2021 to 2023 all sites
-bm.miller.day - number of minutes of activity by day  for 2021-2023 data all sites (last update 9/23/2024)"
-
+bm.miller.day - number of minutes of activity by day  for 2021-2023 data all sites (last update 9/23/2024)
+normalized_bm.csv - normalized bat activity by dividing experimental activity (lit treatment) by the mean control activity (dark treatment) by species and noche(date) "
 # Write the README content to a file
 writeLines(readme_content, "data_for_analysis/prep_for_glmm/README.txt")
 
@@ -448,3 +463,17 @@ save.image("working_env/prep_for_glm.RData")
 # [31] sjmisc_2.8.10      vctrs_0.6.5        glue_1.7.0         fansi_1.0.6        colorspace_2.1-0   tools_4.4.1       
 # [37] pkgconfig_2.0.3   
 # --------------------------- trash ----------------
+
+
+
+midnight_strings <- datetime[grepl("^\\d{4}-\\d{2}-\\d{2} 00:00:00$", datetime)] # make sure the midnight strings are there. 
+
+t<-ymd_hms(head(midnight_strings), tz = "America/Denver")
+
+formatted_times <- format(t, "%Y-%m-%d %H:%M:%S %Z")
+print(formatted_times)\\\
+
+
+
+bat_combined$date_time<-ymd_hms(datetime) # add to data. 
+sum(is.na(bat_combined$date_time)) # check for NAs. 

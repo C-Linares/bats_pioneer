@@ -488,3 +488,23 @@ I did my best to make the moonstat function work. However, I needed more help, s
 12/09/2023
 
 the moon intensity calculated with moonlit worked after some modification from Kyle Shannon. The problem is the moon stat function. It didn't work because the process takes too long to run. I am going to run a small sample of with moonlit and suncalc to see if the timings are the same and then just take in consideration the suncalc one.
+
+------------------------------------------------------------------------
+
+12/12/2024
+
+script: prep_for_glmm
+
+To ensure accuracy in analyzing date-time data, all entries corresponding to midnight (**`00:00:00`**) in the **`datetime`** column are identified and incremented by 10 seconds. This was achieved by:
+
+1.  Parsing the **`datetime`** column as **`POSIXct`** with the "America/Denver" time zone using **`ymd_hms`**.
+
+2.  Filtering midnight entries using **`format(datetime, "%H:%M:%S") == "00:00:00"`**.
+
+3.  Adding 10 seconds selectively to these rows using **`if_else`** and **`+ seconds(10)`**.
+
+This adjustment prevents potential misinterpretation of exact midnight timestamps in downstream analyses.
+
+-   I created the normalized_bm.csv data set to control for abundance. According to Jesse, this helps us see if there is a difference in the number of bats at lit and dark sites over time.
+
+-   
