@@ -21,7 +21,7 @@ Then, the predictors matrix for the population analysis section is calculated.
 
 10/15/2023
 
-I tried copying the lat and log, but there seems to be a problem, as points are not plotting correctly. There might be problems with the coordinates. Update: I tried again, and the elevatr package loaded and worked. However, I didn't display any elevation.\
+I tried copying the lat and log, but there seems to be a problem, as points are not plotting correctly. There might be problems with the coordinates. Update: I tried again, and the elevator package loaded and worked. However, I didn't display any elevation.\
 I tried the package raster, plotted the DEM for Idaho, and obtained elevation for each site.
 
 \
