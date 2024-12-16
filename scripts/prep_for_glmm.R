@@ -248,7 +248,7 @@ bm <- bm %>%
     pair_group = case_when(
       site %in% c("long01", "long02") ~ "long01:long02",
       site %in% c("long03", "long04") ~ "long03:long04",
-      site %in% c("long05") ~ "long05",
+      # site %in% c("long05") ~ "long05",
       site %in% c("iron01", "iron02") ~ "iron01:iron02",
       site %in% c("iron03", "iron04") ~ "iron03:iron04",
       site %in% c("iron05", "iron06") ~ "iron05:iron06",
@@ -256,25 +256,40 @@ bm <- bm %>%
     )
   )
 
-# Normalize activity
 normalized_bm <- bm %>%
   group_by(noche, pair_group, sp) %>%  # Add species (sp) to the grouping
   summarize(
-    control_mean = mean(n[treatmt == "dark"], na.rm = TRUE),  # Average control activity per species
+    control_mean = ifelse(all(is.na(n[treatmt == "dark"])), 
+                          .01,  # Replace NaN with .01 when no data exists for control
+                          mean(n[treatmt == "dark"], na.rm = TRUE)),  # Average control activity per species,  # Average control activity per species
     experimental_activity = sum(n[treatmt == "lit"], na.rm = TRUE),  # Total experimental activity per species
     .groups = "drop"
   ) %>%
   mutate(
-    normalized_activity = experimental_activity / control_mean  # Calculate normalized activity
+    normalized_activity = experimental_activity / (control_mean+ experimental_activity)  # Calculate normalized activity
   )
 
-normalized_bm <- normalized_bm[!(normalized_bm$sp %in% c("Noise","NoID")), ]# filter out Noise and NoID rows. 
-normalized_bm$jday<-yday(normalized_bm$noche)
+
+
+
 
 # View the result
 normalized_bm
-summary(normalized_bm)
 
+summary(normalized_bm)
+head(normalized_bm,100)
+
+normalized_bm$jday<-yday(normalized_bm$noche)
+normalized_bm$year<-year(normalized_bm$noche)
+
+# View the result
+normalized_bm
+normalized_bm<- normalized_bm %>% drop_na()
+normalized_bm <- normalized_bm[!(normalized_bm$sp %in% c("Noise","NoID")), ]# filter out Noise and NoID rows. 
+
+
+summary(normalized_bm)
+head(normalized_bm,100)
 
 # outputs -----------------------------------------------------------------
 
@@ -401,26 +416,33 @@ ggplot(bat_combined, aes(x = treatmt, y = scale(PULSES), fill = treatmt)) +
 
 # plots_normalized_activity  ----------------------------------------------
 
-p7<-ggplot(normalized_bm, aes(x=jday, y=normalized_activity, color=pair_group))+
-  geom_point()
-p7
-
-p7 <- ggplot(normalized_bm, aes(x = jday, y = normalized_activity, color = pair_group)) +
-  geom_point() +
-  geom_smooth(method = "lm", se = FALSE, aes(color = pair_group)) +  # Adds a linear trend line
-  facet_wrap(~ sp, scales = "free") +
+ggplot(normalized_bm, aes(x = normalized_activity)) +
+  geom_histogram(binwidth = 0.2, fill = "blue", color = "black") +
+  facet_wrap(~ year) +  # Facet by year
   labs(
-    title = "Normalized Bat Activity by Species with Trend Lines",
-    x = "Julian Day (jday)",
-    y = "Normalized Activity",
-    color = "Site Pair Group"
+    title = "Histogram of Normalized Activity by Year",
+    x = "Normalized Activity",
+    y = "Frequency"
   ) +
-  theme_minimal() +
-  theme(
-    axis.text.x = element_text(angle = 45, hjust = 1),
-    legend.position = "bottom"
+  theme_minimal()
+
+ggplot(normalized_bm, aes(x = normalized_activity, colour = factor(year))) + 
+  geom_density() +
+  labs(
+    title = "Density Plot of Normalized Activity by Year",
+    x = "Normalized Activity",
+    y = "Density"
   ) +
-  scale_color_viridis_d()
+  theme_minimal()
+
+ggplot(normalized_bm, aes(x = factor(year), y = normalized_activity)) +
+  geom_boxplot(fill = "lightblue", color = "black") +
+  labs(
+    title = "Boxplot of Normalized Activity by Year",
+    x = "Year",
+    y = "Normalized Activity"
+  ) +
+  theme_minimal()
 
 # Print the plot
 
@@ -477,3 +499,29 @@ print(formatted_times)\\\
 
 bat_combined$date_time<-ymd_hms(datetime) # add to data. 
 sum(is.na(bat_combined$date_time)) # check for NAs. 
+
+
+# maybe too complex normalization
+
+# Normalize activity
+normalized_bm <- bm %>%
+  group_by(noche, pair_group, sp) %>%  # Add species (sp) to the grouping
+  summarize(
+    control_mean = ifelse(all(is.na(n[treatmt == "dark"])), 
+                          .01,  # Replace NaN with .01 when no data exists for control
+                          mean(n[treatmt == "dark"], na.rm = TRUE)),  # Average control activity per species
+    experimental_activity = sum(n[treatmt == "lit"], na.rm = TRUE),  # Total experimental activity per species
+    .groups = "drop"
+  ) %>%
+  mutate(
+    normalized_activity = ifelse(control_mean == 0, 
+                                 .01,  # Assign a small value when control_mean is zero
+                                 experimental_activity / control_mean)  # Otherwise, calculate normally
+  )%>%
+  group_by(sp) %>%
+  mutate(
+    # Min-Max normalization to scale between 0 and 1
+    normalized_activity = (normalized_activity - min(normalized_activity)) / 
+      (max(normalized_activity) - min(normalized_activity))
+  ) %>%
+  ungroup()

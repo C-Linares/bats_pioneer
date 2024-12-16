@@ -507,4 +507,30 @@ This adjustment prevents potential misinterpretation of exact midnight timestamp
 
 -   I created the normalized_bm.csv data set to control for abundance. According to Jesse, this helps us see if there is a difference in the number of bats at lit and dark sites over time.
 
--   
+------------------------------------------------------------------------
+
+Carlos 12/13/2024
+
+I started working on analyzing the normalized data to see if it changes by time in the glmm_norm.R script.\
+
+-   I encountered a problem while calculating the correlation between numeric variables. I realized the normalized data should have a special case when a species has no activity in the control site but it is present in the experimental site. If left as it is the result is NA as we are dividing the experiment/ control sites.
+
+------------------------------------------------------------------------
+
+![](images/clipboard-3251885484.png)
+
+-   From the figure above, it seems that the data is zero-inflated and we need to account for that when analyzing it. (graph fro pep_for_glmm.R script)
+
+-   I corrected the data for the cases when the control where 0 and now we can check it
+
+Bad news I ran a few models with the data I have, the models are not a good fit because of residuals plots showing a pattern.
+
+-   I tried one solution: I made the normalized abundance bound between zero and one. I end up doing a change in the normalization calculation\
+
+    `normalized_activity = experimental_activity / (control_mean+ experimental_activity)  # Calculate normalized activity`
+
+    `)`
+
+This way we don't have trouble with the zeros and stays between zero and 1.
+
+-   I will try to find a model that works with this one.

@@ -14,7 +14,6 @@
 ## Notes: 
 ##   
 ##
-## ---------------------------
 ## # inputs ------------------------------------------------------------------
 #   data_for_analysis/prep_for_glmm/normalized_bm.csv  #product of the prep_for_glmm.R script. summary daily of bat call counts
 
@@ -75,17 +74,100 @@ head(bm)
 
 
 
-#correlation matrix just numeric variables  (not including date)
-#how do I first remove the NA falues from bm? 
+#correlation matrix just numeric variables
+
+numeric_cols<- sapply(bm, is.numeric) # separate all the num col
+cor1<-bm[,numeric_cols] #keeps just the numeric
+c1<- cor(cor1,use="pairwise.complete.obs")
+corrplot(c1, order= 'AOE')
+
+# List of variable names to be scaled
+variables_to_scale <- c(
+  "jday",
+  "l.illum",
+  "avg_wind_speed",
+  "avg_temperature"
+)
+
+# Loop over each variable, scale it, and assign it back to the data frame with a new name
+for (var in variables_to_scale) {
+  bm[[paste0(var, "_s")]] <- scale(bm[[var]], center = TRUE, scale = TRUE)
+}
+
+# make year between -1:1
+bm <- bm %>%
+  mutate(yr_s = case_when(
+    year == 2021 ~ -1,
+    year == 2022 ~ 0,
+    TRUE ~ 1
+  ))
 
 
+# explore data ------------------------------------------------------------
+
+ggplot(normalized_bm, aes(x = normalized_activity)) +
+  geom_histogram(binwidth = 0.2, fill = "blue", color = "black") +
+  facet_wrap(~ year) +  # Facet by year
+  labs(
+    title = "Histogram of Normalized Activity by Year",
+    x = "Normalized Activity",
+    y = "Frequency"
+  ) +
+  theme_minimal()
+
+# models ------------------------------------------------------------------
 
 
-cor_matrix <- cor(bm[, sapply(bm, is.numeric)])
-corrplot(cor_matrix, method = "color", type = "upper", order = "hclust", tl.cex = 0.7, tl.col = "black", tl.srt = 45)
-  
+# Fit a Mixed-Effects Model (GLM)
 
-m1.1 <- glmmTMB(normalized_activity ~ + jday + I(jday^ 2) + l.illum +  avg_wind_speed + avg_temperature,
-  data = bm,
-  gaussian(link = "identity"))
+m1.1 <- lmer(
+  normalized_activity ~ jday_s + I(jday_s ^ 2) + l.illum_s +
+    avg_wind_speed_s + avg_temperature_s + yr_s + (1 |pair_group),
+  data = bm
+)
+
+# Summary of the model
 summary(m1.1)
+
+
+plot_model(m1.1)
+
+plot(residuals(m1.1))
+ranef(m1.1)
+
+
+m1.2 <- lmer(
+  normalized_activity ~ jday_s + I(jday_s ^ 2) + l.illum_s + yr_s + (1 |pair_group)+(1 | sp),
+  data = bm
+)
+
+summary(m1.2)
+plot(residuals(m1.2))
+
+AIC(m1.1,m1.2)
+
+
+
+
+# glmm  -------------------------------------------------------------------
+
+
+# Fit a zero-inflated beta GLMM
+m2.1_proportional_zi <- glmmTMB(
+  normalized_activity ~ jday_s + I(jday_s ^ 2) + l.illum_s +
+    avg_wind_speed_s + avg_temperature_s + yr_s + (1 | pair_group),
+  family = beta_family(link = "logit"),  # Beta distribution with logit link
+  zi = ~1,  # Zero-inflation model
+  data = bm
+)
+
+# Check the model summary
+summary(m2.1_proportional_zi)
+
+
+plot(residuals(m2.1_proportional_zi))
+hist(residuals(m2.1_proportional_zi), breaks = 30, main = "Histogram of Residuals", xlab = "Residuals")
+qqnorm(residuals(m2.1_proportional_zi))
+qqline(residuals(m2.1_proportional_zi))
+
+plot_models(m2.1_proportional_zi)
