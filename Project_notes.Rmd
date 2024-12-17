@@ -534,3 +534,15 @@ Bad news I ran a few models with the data I have, the models are not a good fit 
 This way we don't have trouble with the zeros and stays between zero and 1.
 
 -   I will try to find a model that works with this one.
+
+------------------------------------------------------------------------
+
+I was able to run run a couple models by calculating a new variable: bin_act.\
+\
+**Binary Indicator**: Create `bin_act`:
+
+-   `1` if experimental activity ≥ control mean.
+
+-   `0` otherwise.
+
+This allow me to run a couple of models a glm and a glmm. both seemed ok althoug I don't know how to evaluate the fit yet.

@@ -267,9 +267,14 @@ normalized_bm <- bm %>%
   ) %>%
   mutate(
     normalized_activity = experimental_activity / (control_mean+ experimental_activity)  # Calculate normalized activity
+  ) %>% 
+  mutate(
+    bin_act = ifelse(experimental_activity>=control_mean, 1, 0)
   )
 
 
+
+# pseudo binomial. 
 
 
 
