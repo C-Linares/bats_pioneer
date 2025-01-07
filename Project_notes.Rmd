@@ -546,3 +546,29 @@ I was able to run run a couple models by calculating a new variable: bin_act.\
 -   `0` otherwise.
 
 This allow me to run a couple of models a glm and a glmm. both seemed ok althoug I don't know how to evaluate the fit yet.
+
+------------------------------------------------------------------------
+
+12/18/2024
+
+I ran a model with the bin_act variable, and it seems that we don't see any difference between activity and years, but the model only explains 11 percent of the variance.
+
+year + jday +jday2 seemed to be significant, but the model appears to be bad...
+
+Ideas:
+
+-   focus on finding the moon and weather variables that are more relevant.
+
+-   work on the data for bats to finish the analysis.
+
+-   se if there is a difference in activity curves between lit and dark sites.
+
+-   focus on the buzz counts
+
+-   focus on bird data
+
+------------------------------------------------------------------------
+
+1/07/2025
+
+trying to get plot the jday and year random effects plots.

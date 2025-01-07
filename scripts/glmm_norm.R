@@ -2,9 +2,9 @@
 ##
 ## Script name:  glmm_norm
 ##
-## Purpose of script: run models on the normalized data
+## Purpose of script: run models on the normalized data. Data that has been normalized by dividing the calls in lit sites by the calls in dark sites. 
 ##
-## Author: Carlos Linares, \
+## Author: Carlos Linares, 
 ## Date Created: 12/13/2024
 ##
 ## Email: carlosgarcialina@u.boisestate.edu
@@ -12,10 +12,13 @@
 ## ---------------------------
 ##
 ## Notes: 
+## 
+## 
 ##   
 ##
 ## # inputs ------------------------------------------------------------------
-#   data_for_analysis/prep_for_glmm/normalized_bm.csv  #product of the prep_for_glmm.R script. summary daily of bat call counts
+
+# -data_for_analysis/prep_for_glmm/normalized_bm.csv  #product of the prep_for_glmm.R script. summary daily of bat call counts
 
 
 # outputs ----------------------
@@ -29,6 +32,11 @@ if (!require("pacman")) install.packages("pacman")
 # Use pacman to load libraries
 pacman::p_load(tidyverse, magrittr, lme4, sjPlot, ggeffects, 
                car, glmmTMB, corrplot, effects, reshape2)
+
+# save past images
+
+load('working_env/glmm_norm.RData')
+
 
 # data --------------------------------------------------------------------
 
@@ -108,7 +116,7 @@ ggplot(bm, aes(x = normalized_activity)) +
   ) +
   theme_minimal()
 
-ggplot(bm, aes(x = normalized_activity)) +
+ggplot(bm, aes(x = normalized_activity, colour = sp)) +
   # geom_histogram(aes(y = ..density..), binwidth = 0.2, fill = "lightblue", color = "black", alpha = 0.5) +
   geom_density(color = "blue", size = 1) +
   facet_wrap(~ year) +
@@ -118,6 +126,19 @@ ggplot(bm, aes(x = normalized_activity)) +
     y = "Density"
   ) +
   theme_minimal()
+
+ggplot(bm, aes(x = normalized_activity, color = sp)) +
+  # geom_histogram(aes(y = ..density..), binwidth = 0.2, fill = "lightblue", color = "black", alpha = 0.5) +
+  geom_density(size = 1) +
+  facet_wrap(~ year) +
+  labs(
+    title = "Histogram and Density Curve of Normalized Activity by Year and Species",
+    x = "Normalized Activity",
+    y = "Density",
+    color = "Species"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "bottom")
 
 ggplot(bm, aes(x = bin_act)) +
   # geom_histogram(aes(y = ..density..), binwidth = 0.2, fill = "lightblue", color = "black", alpha = 0.5) +
@@ -129,63 +150,28 @@ ggplot(bm, aes(x = bin_act)) +
     y = "Density"
   ) +
   theme_minimal()
+
+# Summarize the data to count the number of 1's and 0's for each year
+summary_data <- bm %>%
+  group_by(year, bin_act, sp) %>%
+  summarize(count = n(), .groups = 'drop')
+
+# View the summarized data
+print(summary_data)
+
+# Create the box plot
+ggplot(summary_data, aes(x = factor(year), y = count)) +
+  geom_boxplot(position = position_dodge(width = 0.75)) +
+  labs(title = "Count of bin_act by Year",
+       x = "Year",
+       y = "Count",
+       fill = "bin_act") +
+  scale_fill_manual(values = c("0" = "blue", "1" = "red")) +
+  theme_minimal()
+
+
+
 # models ------------------------------------------------------------------
-
-
-# Fit a Mixed-Effects Model (GLM)
-
-m1.1 <- lmer(
-  normalized_activity ~ jday_s + I(jday_s ^ 2) + l.illum_s +
-    avg_wind_speed_s + avg_temperature_s + yr_s + (1 |pair_group),
-  data = bm
-)
-
-# Summary of the model
-summary(m1.1)
-
-
-plot_model(m1.1)
-
-plot(residuals(m1.1))
-ranef(m1.1)
-
-
-m1.2 <- lmer(
-  normalized_activity ~ jday_s + I(jday_s ^ 2) + l.illum_s + yr_s + (1 |pair_group)+(1 | sp),
-  data = bm
-)
-
-summary(m1.2)
-plot(residuals(m1.2))
-
-AIC(m1.1,m1.2)
-
-
-
-
-# glmm  -------------------------------------------------------------------
-
-
-# Fit a zero-inflated beta GLMM
-m2.1_proportional_zi <- glmmTMB(
-  normalized_activity ~ jday_s + I(jday_s ^ 2) + l.illum_s +
-    avg_wind_speed_s + avg_temperature_s + yr_s + (1 | pair_group),
-  family = beta_family(link = "logit"),  # Beta distribution with logit link
-  zi = ~1,  # Zero-inflation model
-  data = bm
-)
-
-# Check the model summary
-summary(m2.1_proportional_zi)
-
-
-plot(residuals(m2.1_proportional_zi))
-hist(residuals(m2.1_proportional_zi), breaks = 30, main = "Histogram of Residuals", xlab = "Residuals")
-qqnorm(residuals(m2.1_proportional_zi))
-qqline(residuals(m2.1_proportional_zi))
-
-plot_models(m2.1_proportional_zi)
-
 
 
 
@@ -209,8 +195,9 @@ c_hat_glm <- residual_deviance_glm / residual_df_glm
 print(c_hat_glm)
 AIC(m3.1)
 
-pseudo_r2 <- 1 - (m3.1$deviance / m3.1$null.deviance)
-pseudo_r2
+pseudoR2 <- (m3.1$null.deviance - m3.1$deviance) / m3.1$null.deviance  # I got this formula from http://r.qcbs.ca/workshop06/book-en/binomial-glm.html
+
+pseudo_r2 # model explains nothing...
 
 # Plot residuals
 par(mfrow = c(2, 2))
@@ -234,12 +221,16 @@ plot_model(m3.1)
 
 #glmm
 
+# glmm binomial -----------------------------------------------------------
+
+# Fit the GLMM model
 m3.1_glmm <- glmer(
   bin_act ~ jday_s + I(jday_s^2) + yr_s + avg_wind_speed_s + avg_temperature_s + l.illum_s +
     (1 | pair_group) + (1+yr_s+jday_s+I(jday_s^2) | sp),  # Specify random effects
   data = bm,
   family = binomial
 )
+
 
 # Summary of the GLMM model
 summary(m3.1_glmm)
@@ -253,29 +244,19 @@ print(c_hat_glm)
 
 AIC(m3.1,m3.1_glmm)
 
+install.packages("MuMIn")
+install.packages("performance")
+library(lme4)
+library(MuMIn)
+library(performance)
+
+# Calculate R-squared values
+r_squared <- r.squaredGLMM(m3.1_glmm) # seems like the model does not explain much of the variance in the data. 
+print(r_squared)
+
 plot_model(m3.1_glmm)
 
 
-
-library(effects)
-
-# Plot marginal effects
-all_effects <- allEffects(m3.1_glmm)
-plot(all_effects)
-
-
-library(sjPlot)
-
-# Plot marginal effects
-sjp.glmer(m3.1_glmm, type = "eff")
-
-
-install.packages("lattice")
-library(lattice)
-
-# Plot random effects
-dotplot(ranef(m3.1_glmm, condVar = TRUE), scales = list(relation = "free"))
-ranef(m3.1_glmm)
 
 
 trmt<- c("lit", "dark") 
@@ -291,59 +272,43 @@ cint<-confint(m3.1_glmm)#[1:2,] # get fixed effects from the model
 fixint<-cint[1,3]
 fixslope<-cint[2,3]
 
+# jday random effects plot. 
 
-#y = int + random.int[sp] + beta[1]treatment + random.slope[sp] * treatment
+n=100
+sl=100
+ones = rep(1,100)
 
-pred<- c(exp((randint+fixint)+(randslope+fixslope)*trmt_bin_s[1]),
-         exp((randint+fixint)+(randslope+fixslope)*trmt_bin_s[2]))
+# obs. values
+ord.day <- seq(min(bm[, "jday"]), max(bm[, "jday"]), length.out = n)
+# extraer el jday sqr 
+ord.day.sqr<-ord.day^2
+#std pred
+jday.s <- scale(ord.day)
+jday.sqr<- scale(ord.day.sqr)
 
 
-abunddf <- data.frame(pred, trmt_bin, trmt_bin_s)
+#extract fixed coef jday
+#pull out random effects at the sp level #
+ran.efs <- ranef( m3.1_glmm )$sp
+ranefs<- ran.efs[, c("jday_s", "I(jday_s^2)")]
 
-sp_names <- rownames(ran.efs)
-sp_doubled <- rep(sp_names, each = 2)
+#pull out fixed effects
+fix.efs <- fixef( m3.1_glmm )[2:3]
+#view
+fix.efs
 
-# Check the length to match the number of rows in the dataframe
-if (length(sp_doubled) == nrow(abunddf)) {
-  # Add the new column to the dataframe
-  abunddf$sp <- sp_doubled
-} else {
-  stop("The length of sp_doubled does not match the number of rows in abunddf.")
-}
 
-# View the updated dataframe
-head(abunddf)
 
-p7<-ggplot( abunddf, aes( x = trmt_bin, y = pred, colour = sp, group = sp, shape = sp) ) +  
-  theme_classic( base_size = 12) +
-  # scale_color_viridis_d(direction = -1, option = "A")+
-  scale_shape_manual(values = 1:14) +  # Customize shapes for each 'sp', adjust as needed
-  ylab( "bat calls" ) +
-  xlab( "year" ) +
-  geom_point(size=3)+
-  geom_line()+
-  # labels
-  ylab("Bat calls") +
-  xlab("") 
-p7
+rss <- ranefs
+rss[, 1] <- rss[, 1] + fix.efs[1]
+rss[, 2] <- rss[, 2] + fix.efs[1]# keep doing this for each of the random effects. 
 
-#black and greys graph
-p7.1 <- ggplot(abunddf, aes(x = trmt_bin, y = pred, colour = sp, group = sp, shape = sp)) +  
-  theme_classic(base_size = 12) +
-  scale_color_grey(start = 0, end = 1) +  # Use grayscale colors
-  scale_shape_manual(values = 1:14) +  # Customize shapes for each 'sp'
-  ylab("Bat calls") +
-  xlab("Year") +
-  geom_point(size = 3) +
-  geom_line() +
-  theme(
-    plot.background = element_rect(fill = "black"),  # Set plot background to black
-    panel.background = element_rect(fill = "black"),  # Set panel background to black
-    axis.text = element_text(color = "white"),  # Set axis text to white
-    axis.title = element_text(color = "white"),  # Set axis titles to white
-    legend.background = element_rect(fill = "black"),  # Set legend background to black
-    legend.text = element_text(color = "white"),  # Set legend text to white
-    legend.title = element_text(color = "white")  # Set legend title to white
-  )
 
-p7.1
+
+
+
+# save the environment ---------------------------------------------------
+
+
+#save
+save.image('working_env/glmm_norm.RData')
