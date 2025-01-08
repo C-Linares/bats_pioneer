@@ -572,3 +572,11 @@ Ideas:
 1/07/2025
 
 trying to get plot the jday and year random effects plots.
+
+------------------------------------------------------------------------
+
+1/08/2025
+
+I tried creating a random effect plot for the time variables day and season, but these were not working. The matrix multiplication fails when I am predicting values from the model parameters. I don't know how to move from that.
+
+Lines2 78-318 in the glmm_norm_v1.R script

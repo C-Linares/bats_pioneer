@@ -255,7 +255,7 @@ r_squared <- r.squaredGLMM(m3.1_glmm) # seems like the model does not explain mu
 print(r_squared)
 
 plot_model(m3.1_glmm)
-
+plot_model(m3.1_glmm, type = "re")
 
 
 
@@ -263,11 +263,12 @@ trmt<- c("lit", "dark")
 trmt_bin_s <- c(-1,1)
 trmt_bin_s
 
-# correcting random eff
+# random effects 
 ran.efs <- ranef( m3.1_glmm )$sp # get the random effects 
 randint<- ran.efs[,1]
 randslope<- ran.efs[,2]
 
+# confidence intervals fix eff
 cint<-confint(m3.1_glmm)#[1:2,] # get fixed effects from the model
 fixint<-cint[1,3]
 fixslope<-cint[2,3]
@@ -290,10 +291,10 @@ jday.sqr<- scale(ord.day.sqr)
 #extract fixed coef jday
 #pull out random effects at the sp level #
 ran.efs <- ranef( m3.1_glmm )$sp
-ranefs<- ran.efs[, c("jday_s", "I(jday_s^2)")]
+ranefs<- ran.efs[, c(1,3,4)]
 
 #pull out fixed effects
-fix.efs <- fixef( m3.1_glmm )[2:3]
+fix.efs <- fixef( m3.1_glmm )
 #view
 fix.efs
 
@@ -301,9 +302,20 @@ fix.efs
 
 rss <- ranefs
 rss[, 1] <- rss[, 1] + fix.efs[1]
-rss[, 2] <- rss[, 2] + fix.efs[1]# keep doing this for each of the random effects. 
+rss[, 2] <- rss[, 2] + fix.efs[2]# keep doing this for each of the random effects. 
+rss[, 3] <- rss[, 3] + fix.efs[3]
 
+rss # we added te fix to the random effe
 
+a<-t(rss)
+a
+
+b<-t( cbind( ones, jday.s, jday.sqr))
+b
+
+indpred<- exp( as.matrix(a) %*% as.matrix(b) )
+
+abunddf <- data.frame(t(indpred), jday.s, ord.day)
 
 
 
