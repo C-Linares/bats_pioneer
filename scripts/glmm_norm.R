@@ -75,6 +75,9 @@ head(bm)
 
 
 
+
+# correlation -------------------------------------------------------------
+
 #correlation matrix just numeric variables
 
 numeric_cols<- sapply(bm, is.numeric) # separate all the num col
@@ -115,6 +118,7 @@ ggplot(bm, aes(x = normalized_activity)) +
     y = "Frequency"
   ) +
   theme_minimal()
+
 
 ggplot(bm, aes(x = normalized_activity, colour = sp)) +
   # geom_histogram(aes(y = ..density..), binwidth = 0.2, fill = "lightblue", color = "black", alpha = 0.5) +
@@ -218,7 +222,6 @@ ggplot(coef_df, aes(x = term, y = estimate)) +
 plot_model(m3.1)
 
 
-
 #glmm
 
 # glmm binomial -----------------------------------------------------------
@@ -234,6 +237,7 @@ m3.1_glmm <- glmer(
 
 # Summary of the GLMM model
 summary(m3.1_glmm)
+
 
 
 # Calculate c-hat for glmm
@@ -256,6 +260,17 @@ print(r_squared)
 
 plot_model(m3.1_glmm)
 plot_model(m3.1_glmm, type = "re")
+
+
+# model j_diff
+
+m3.1 <- lmer(
+  j_diff ~ jday_s + I(jday_s^2) + yr_s + l.illum_s +
+    (1 | pair_group) + (1 + yr_s | sp),  # Specify random effects
+  data = bm
+)
+
+summary(m3.1)
 
 
 
@@ -316,6 +331,12 @@ b
 indpred<- exp( as.matrix(a) %*% as.matrix(b) )
 
 abunddf <- data.frame(t(indpred), jday.s, ord.day)
+
+
+
+
+
+
 
 
 

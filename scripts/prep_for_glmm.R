@@ -262,6 +262,7 @@ normalized_bm <- bm %>%
     control_mean = ifelse(all(is.na(n[treatmt == "dark"])), 
                           .01,  # Replace NaN with .01 when no data exists for control
                           mean(n[treatmt == "dark"], na.rm = TRUE)),  # Average control activity per species,  # Average control activity per species
+    control_activity = sum(n[treatmt == "dark"], na.rm = TRUE),  # Total control activity per species
     experimental_activity = sum(n[treatmt == "lit"], na.rm = TRUE),  # Total experimental activity per species
     .groups = "drop"
   ) %>%
@@ -270,10 +271,12 @@ normalized_bm <- bm %>%
   ) %>% 
   mutate(
     bin_act = ifelse(experimental_activity>=control_mean, 1, 0)
-  )
-
-
-
+  ) %>% 
+  mutate(
+  j_diff= experimental_activity - control_activity) # difference between experimental and control activity.
+  
+  
+  
 # pseudo binomial. 
 
 
@@ -281,7 +284,7 @@ normalized_bm <- bm %>%
 # View the result
 normalized_bm
 
-summary(normalized_bm)
+summary(normalized_bm) # check for NAs
 head(normalized_bm,100)
 
 normalized_bm$jday<-yday(normalized_bm$noche)
@@ -289,9 +292,12 @@ normalized_bm$year<-year(normalized_bm$noche)
 
 # View the result
 normalized_bm
+# there are some rows that have NAs. that come from control sites not paired with any experimental site.we remove them. 
+rows_with_na <- normalized_bm %>% filter(if_any(everything(), is.na)) 
 normalized_bm<- normalized_bm %>% drop_na()
 normalized_bm <- normalized_bm[!(normalized_bm$sp %in% c("Noise","NoID")), ]# filter out Noise and NoID rows. 
-
+#remove all rows for long05
+normalized_bm <- normalized_bm %>% filter(!pair_group %in% "long05")
 
 summary(normalized_bm)
 head(normalized_bm,100)

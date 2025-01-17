@@ -580,3 +580,9 @@ trying to get plot the jday and year random effects plots.
 I tried creating a random effect plot for the time variables day and season, but these were not working. The matrix multiplication fails when I am predicting values from the model parameters. I don't know how to move from that.
 
 Lines2 78-318 in the glmm_norm_v1.R script
+
+------------------------------------------------------------------------
+
+1/17/2025
+
+I have the variable j_diff. That is the difference Jesse recommends to calculate. Now I tried to model it but my model is singular... I need to fix it.
