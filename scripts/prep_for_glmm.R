@@ -276,9 +276,6 @@ normalized_bm <- bm %>%
   j_diff= experimental_activity - control_activity) # difference between experimental and control activity.
   
   
-  
-# pseudo binomial. 
-
 
 
 # View the result

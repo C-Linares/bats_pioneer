@@ -18,12 +18,12 @@
 ##
 ## # inputs ------------------------------------------------------------------
 
-# -data_for_analysis/prep_for_glmm/normalized_bm.csv  #product of the prep_for_glmm.R script. summary daily of bat call counts
+# -data_for_analysis/prep_for_glmm/normalized_bm.csv  #product of the prep_for_glmm.R script. activity normalized by control site 
 
 
 # outputs ----------------------
 
-# figures and model data
+# figures and model data from normalized activity
 
 
 # libraries  --------------------------------------------------------------
@@ -98,6 +98,19 @@ for (var in variables_to_scale) {
   bm[[paste0(var, "_s")]] <- scale(bm[[var]], center = TRUE, scale = TRUE)
 }
 
+
+for (var in variables_to_scale) {
+    # Check if the column exists and is numeric
+    if (var %in% names(bm) && is.numeric(bm2[[var]])) {
+      mean_val <- mean(bm[[var]], na.rm = TRUE)
+      sd_val <- sd(bm[[var]], na.rm = TRUE)
+      bm[[paste0(var, "_s")]] <- (bm[[var]] - mean_val) / (2 * sd_val)
+    } else {
+      warning(paste("Column", var, "is not numeric or does not exist in the data frame."))
+    }
+  }
+  
+
 # make year between -1:1
 bm <- bm %>%
   mutate(yr_s = case_when(
@@ -107,7 +120,28 @@ bm <- bm %>%
   ))
 
 
+# Check for missing values
+sum(is.na(bm$j_diff))       # Number of missing values in j_diff
+sum(is.na(bm$jday_s))       # Number of missing values in jday_s
+sum(is.na(bm$yr_s))         # Number of missing values in yr_s
+sum(is.na(bm$l.illum_s))    # Number of missing values in l.illum_s
+sum(is.na(bm$pair_group))   # Number of missing values in pair_group
+
+
+
 # explore data ------------------------------------------------------------
+
+# Visualize the distribution of j_diff
+hist(bm$j_diff, main="Distribution of j_diff", xlab="j_diff")
+
+hist(bm$jday_s, main="Distribution of jday_s", xlab="jday_s")
+
+hist(bm$l.illum_s, main="Distribution of l.illum_s", xlab="l.illum_s")
+
+hist(bm$normalized_activity, main="Distribution of normalized_activity", xlab="normalized_activity")
+
+hist(bm$bin_act, main="Distribution of bin_act", xlab="bin_act")
+
 
 ggplot(bm, aes(x = normalized_activity)) +
   geom_histogram(binwidth = 0.2, fill = "blue", color = "black", alpha=.5) +
@@ -155,23 +189,6 @@ ggplot(bm, aes(x = bin_act)) +
   ) +
   theme_minimal()
 
-# Summarize the data to count the number of 1's and 0's for each year
-summary_data <- bm %>%
-  group_by(year, bin_act, sp) %>%
-  summarize(count = n(), .groups = 'drop')
-
-# View the summarized data
-print(summary_data)
-
-# Create the box plot
-ggplot(summary_data, aes(x = factor(year), y = count)) +
-  geom_boxplot(position = position_dodge(width = 0.75)) +
-  labs(title = "Count of bin_act by Year",
-       x = "Year",
-       y = "Count",
-       fill = "bin_act") +
-  scale_fill_manual(values = c("0" = "blue", "1" = "red")) +
-  theme_minimal()
 
 
 
@@ -246,7 +263,7 @@ residual_df_glm <- df.residual(m3.1_glmm)
 c_hat_glm <- residual_deviance_glm / residual_df_glm
 print(c_hat_glm)
 
-AIC(m3.1,m3.1_glmm)
+
 
 install.packages("MuMIn")
 install.packages("performance")
@@ -262,15 +279,94 @@ plot_model(m3.1_glmm)
 plot_model(m3.1_glmm, type = "re")
 
 
-# model j_diff
 
-m3.1 <- lmer(
-  j_diff ~ jday_s + I(jday_s^2) + yr_s + l.illum_s +
-    (1 | pair_group) + (1 + yr_s | sp),  # Specify random effects
+# model jdiff -------------------------------------------------------------
+
+m2<- glm(
+  j_diff ~ jday_s + I(jday_s^2) + yr_s + l.illum_s,  # Specify random effects
   data = bm
 )
 
+summary(m2)
+
+m3.1 <- lmer(
+  j_diff ~ jday_s + I(jday_s^2) + yr_s + l.illum_s  + 
+    (1 | pair_group) + (1|sp),  # Specify random effects
+  data = bm
+)
+
+update(m3.1, ~ . + (1 +yr_s| sp)) # update model to include year in the random slope
+
 summary(m3.1)
+
+fixef(m3.1)
+ranef(m3.1)
+
+plot(m3.1)
+
+
+AIC(m3.1,m2,m3.1_glmm) # compare models
+
+plot_model(m3.1)
+
+
+
+
+
+# model normalize activity ------------------------------------------------
+
+
+# Adjust values at the boundaries
+bm$normalized_activity[bm$normalized_activity == 0] <- 1e-6 
+bm$normalized_activity[bm$normalized_activity == 1] <- 1 - 1e-6 
+
+# Fit the Beta GLMM
+m4_beta <- glmmTMB(
+  normalized_activity ~ jday_s + I(jday_s^2) + yr_s + l.illum_s + 
+    (1 | pair_group) + (1 | sp),
+  data = bm,
+  family = beta_family(link = "logit")
+)
+
+m4_beta
+
+summary(m4_beta)
+
+m4.1 <- glmmTMB(
+  normalized_activity ~ jday_s + I(jday_s^2) + yr_s + l.illum_s + 
+    (1 | pair_group) + (1 + yr_s | sp),
+  data = bm,
+  family = betabinomial(link = "logit")
+)
+m4.1
+summary(m4.1)
+
+
+# the previous model indicate that the fit is singular. 
+
+# Calculate c-hat for m4_beta
+residual_deviance_glm <- deviance(m4_beta) # there's no deviance for a beta family model. 
+# residual_df_glm <- df.residual(m3.1_glmm)
+# c_hat_glm <- residual_deviance_glm / residual_df_glm
+# print(c_hat_glm)
+
+plot(fitted(m4_beta), residuals(m4_beta)) # from this plot is seems like the model does not fit well.
+
+plot(density(residuals(m4_beta))) # check the distribution of the residuals. bimodal
+
+#beta binomial model 
+m4.2<- glmmTMB(
+  normalized_activity ~ jday_s + I(jday_s^2) + yr_s + l.illum_s + 
+    (1 | pair_group) + (1 | sp),
+  data = bm,
+  family = beta_binomial(link = "logit")
+)
+
+# above model failed...
+summary(m4.2)
+
+# marginal effect plots ---------------------------------------------------
+
 
 
 
