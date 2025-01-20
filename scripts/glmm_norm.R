@@ -31,7 +31,7 @@ if (!require("pacman")) install.packages("pacman")
 
 # Use pacman to load libraries
 pacman::p_load(tidyverse, magrittr, lme4, sjPlot, ggeffects, 
-               car, glmmTMB, corrplot, effects, reshape2)
+               car, glmmTMB, corrplot, effects, reshape2, DHARMa)
 
 # save past images
 
@@ -279,7 +279,15 @@ plot_model(m3.1_glmm)
 plot_model(m3.1_glmm, type = "re")
 
 
+plot(m3.1_glmm)
 
+# Simulate residuals using DHARMa for GLMM
+sim_residuals <- simulateResiduals(m3.1_glmm)
+plotSimulatedResiduals(sim_residuals)
+
+t1 <- testUniformity(sim_residuals) # model is not uniform...
+t2<-testZeroInflation(sim_residuals)
+t3<-testDispersion(sim_residuals)
 # model jdiff -------------------------------------------------------------
 
 m2<- glm(
