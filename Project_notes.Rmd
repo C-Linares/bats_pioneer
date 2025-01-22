@@ -599,5 +599,5 @@ to do:
 
 Make sure you standardize by two standard deviations given I have different predictors.
 
--   I ran the model m1.9nb but I am not sure it is working. \
+-   I ran the model m1.9nb but I am not sure it is working.\
     I need to asses the DHARMa residuals plot and see what does the ks test tell you.

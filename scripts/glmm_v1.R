@@ -166,23 +166,23 @@ variables_to_scale <- c(
   "Sum_Distance"
 )
 
-# Loop over each variable, scale it, and assign it back to the data frame with a new name
+# # Loop over each variable, scale it, and assign it back to the data frame with a new name
 for (var in variables_to_scale) {
   bm2[[paste0(var, "_s")]] <- scale(bm2[[var]], center = TRUE, scale = TRUE)
 }
 
 # 
 # # Loop over each variable, scale it by dividing by two standard deviations, and assign it back to the data frame with a new name
-# for (var in variables_to_scale) {
-#   # Check if the column exists and is numeric
-#   if (var %in% names(bm2) && is.numeric(bm2[[var]])) {
-#     mean_val <- mean(bm2[[var]], na.rm = TRUE)
-#     sd_val <- sd(bm2[[var]], na.rm = TRUE)
-#     bm2[[paste0(var, "_s")]] <- (bm2[[var]] - mean_val) / (2 * sd_val)
-#   } else {
-#     warning(paste("Column", var, "is not numeric or does not exist in the data frame."))
-#   }
-# }
+for (var in variables_to_scale) {
+  # Check if the column exists and is numeric
+  if (var %in% names(bm2) && is.numeric(bm2[[var]])) {
+    mean_val <- mean(bm2[[var]], na.rm = TRUE)
+    sd_val <- sd(bm2[[var]], na.rm = TRUE)
+    bm2[[paste0(var, "_s")]] <- (bm2[[var]] - mean_val) / (2 * sd_val)
+  } else {
+    warning(paste("Column", var, "is not numeric or does not exist in the data frame."))
+  }
+}
 
 # make treatment -1 to 1
 
@@ -323,68 +323,15 @@ mcoef<-coef(m1.4_nb)
 
  
 m1.5nb <- glmmTMB(
-  n ~ trmt_bin + jday_s + I(jday_s ^ 2) + percent_s  + l.illum_s +
+  n ~ trmt_bin + jday_s + I(jday_s ^ 2) + percent_s  + l.illum_s + # best model to date. 
     avg_wind_speed_s + avg_temperature_s + yr_s + elev_mean_s +
     (1 |site) + (1 + trmt_bin + jday_s + I(jday_s ^ 2) | sp),
   data = bm2,   nbinom2(link = "log")
 )
 
 save(m1.5nb, 'models/')
-
-m1.6nb <- glmmTMB(
-  n ~ trmt_bin + jday_s + I(jday_s ^ 2) + percent_s  + l.illum_s + # this one didn't even converge. 
-    avg_wind_speed_s + avg_temperature_s + yr_s + elev_mean_s +
-    (1 |site) + (1 + trmt_bin + jday_s + I(jday_s ^ 2) | sp),
-  data = bm2,   nbinom1(link = "log")
-)
-
-
-
-# after meeting with Dr.Cruz suggested to try to do a interaction effect to see if the time and treatment have an effect. 
-
-m1.7nb <- glmmTMB(
-  n ~ trmt_bin + jday_s + I(jday_s^2) + percent_s  + l.illum_s +
-    avg_wind_speed_s + avg_temperature_s + yr_s +
-    (1 | site) + (1 + trmt_bin + jday_s + I(jday_s^2) | sp),
-  data = bm2,
-  nbinom2(link = "log")
-) 
-
-summary(m1.7nb)
-plot_model(m1.7nb)
-
-
-m1.8nb<-update(m1.7nb, ~ . + jday_s * trmt_bin + I(jday_s^2) * trmt_bin)
-summary(m1.8nb)
-plot_model(m1.8nb)
-
-m1.9nb <- update(m1.8nb, ~ . + yr_s * trmt_bin)
-summary(m1.9nb)
-plot_model(m1.9nb)
-
-# Simulate residuals using DHARMa for GLMM
-sim_residuals <- simulateResiduals(m1.9nb, plot = FALSE,quantreg=T)
-plot(sim_residuals)
-
-t1 <- testUniformity(sim_residuals) # model is not uniform...
-t2 <- testZeroInflation(sim_residuals)
-t3 <- testDispersion(sim_residuals)
-
-
-AIC( m1.5nb,m1.7nb, m1.8nb, m1.9nb) 
 summary(m1.5nb)
 confint(m1.5nb)
-
-
-# Calculate residual deviance and residual degrees of freedom
-residual_deviance <- deviance(m1.5nb)
-residual_df <- df.residual(m1.5nb)
-
-# Calculate c-hat using residual deviance
-c_hat_deviance <- residual_deviance / residual_df
-print(c_hat_deviance)
-
-saveRDS(m1.5nb,"models/m1.5nb")
 
 p0<-plot_model(m1.5nb,colors = "gs")
 p0<-p0 + theme(
@@ -408,12 +355,69 @@ load('models/m1.5nb')
 
 tab_model(m1.5nb)
 
-emmeans::emmeans(m1.5nb, "percent_s",type="response")
 
-plot(ggeffects::ggpredict(m1.5nb, "percent_s [all]"))
-plot(ggeffects::ggpredict(m1.5nb, "l.illum_s [all]"))
-plot(ggeffects::ggpredict(m1.5nb, "avg_wind_speed_s [all]"))
-plot(ggeffects::ggpredict(m1.5nb, "avg_temperature_s [all]"))
+m1.6nb <- glmmTMB(
+  n ~ trmt_bin + jday_s + I(jday_s ^ 2) + percent_s  + l.illum_s + # this one didn't even converge. 
+    avg_wind_speed_s + avg_temperature_s + yr_s + elev_mean_s +
+    (1 |site) + (1 + trmt_bin + jday_s + I(jday_s ^ 2) | sp),
+  data = bm2,   nbinom1(link = "log")
+)
+
+
+
+# after meeting with Dr.Cruz suggested to try to do a interaction effect to see if the time and treatment have an effect. 
+
+m1.7nb <- glmmTMB(
+  n ~ trmt_bin + jday_s + I(jday_s^2) + percent_s  + l.illum_s + # just removed elevation. 
+    avg_wind_speed_s + avg_temperature_s + yr_s +
+    (1 | site) + (1 + trmt_bin + jday_s + I(jday_s^2) | sp),
+  data = bm2,
+  nbinom2(link = "log")
+) 
+
+summary(m1.7nb)
+plot_model(m1.7nb)
+
+
+m1.8nb<-update(m1.7nb, ~ . + jday_s * trmt_bin + I(jday_s^2) * trmt_bin) # adding jday and jday^2 as intereacting
+summary(m1.8nb)
+plot_model(m1.8nb)
+
+m1.9nb <- update(m1.8nb, ~ . + yr_s * trmt_bin) # adding year as an interaction 
+summary(m1.9nb)
+plot_model(m1.9nb)
+
+# Simulate residuals using DHARMa for GLMM
+sim_residuals <- simulateResiduals(m1.9nb, plot = FALSE,quantreg=T)
+plot(sim_residuals)
+
+t1 <- testUniformity(sim_residuals) # model deviates from the expected distribution. What can we do about it? 
+t2 <- testZeroInflation(sim_residuals)
+t3 <- testDispersion(sim_residuals)
+t4 <- testOutliers(sim_residuals) # model has some outliers...
+
+
+
+m1.10<- update(m1.9nb, ~ . , nbinom1(link = "log")) # testing the other negative binomial family option 
+summary(m1.10)
+
+#it seems like there's no change between models. 
+AIC( m1.5nb,m1.7nb, m1.8nb, m1.9nb, m1.10) 
+
+
+
+# Calculate residual deviance and residual degrees of freedom
+residual_deviance <- deviance(m1.5nb)
+residual_df <- df.residual(m1.5nb)
+
+# Calculate c-hat using residual deviance
+c_hat_deviance <- residual_deviance / residual_df
+print(c_hat_deviance)
+
+saveRDS(m1.5nb,"models/m1.5nb")
+
+
+
 
 
 
@@ -994,6 +998,17 @@ load("models/my_models.RData")
 
 
 # trash -------------------------------------------------------------------
+
+
+# model m1.5nb plots
+
+emmeans::emmeans(m1.5nb, "percent_s",type="response")
+
+plot(ggeffects::ggpredict(m1.5nb, "percent_s [all]"))
+plot(ggeffects::ggpredict(m1.5nb, "l.illum_s [all]"))
+plot(ggeffects::ggpredict(m1.5nb, "avg_wind_speed_s [all]"))
+plot(ggeffects::ggpredict(m1.5nb, "avg_temperature_s [all]"))
+
 
 # rstan_models ------------------------------------------------------------
 
