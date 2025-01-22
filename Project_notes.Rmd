@@ -586,3 +586,18 @@ Lines2 78-318 in the glmm_norm_v1.R script
 1/17/2025
 
 I have the variable j_diff. That is the difference Jesse recommends to calculate. Now I tried to model it but my model is singular... I need to fix it.
+
+------------------------------------------------------------------------
+
+1/21/2025
+
+I had a meeting with Jen for discussing the normalization. I realized I had some issues with the models. More importantly she recomended that I run an interaction effect.\
+\
+I created the rowlarge col for the files that need to be vetted in with kaleidoscope. for bats that have too many calls at certain sites.
+
+to do:
+
+Make sure you standardize by two standard deviations given I have different predictors.
+
+-   I ran the model m1.9nb but I am not sure it is working. \
+    I need to asses the DHARMa residuals plot and see what does the ks test tell you.

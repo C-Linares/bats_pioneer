@@ -132,7 +132,7 @@ sum(is.na(bm$pair_group))   # Number of missing values in pair_group
 # explore data ------------------------------------------------------------
 
 # Visualize the distribution of j_diff
-hist(bm$j_diff, main="Distribution of j_diff", xlab="j_diff")
+hist(bm$j_diff, main="Distribution of j_diff", xlab="j_diff", breaks = 10) # filter out noice and noid calls. 
 
 hist(bm$jday_s, main="Distribution of jday_s", xlab="jday_s")
 
@@ -298,12 +298,11 @@ m2<- glm(
 summary(m2)
 
 m3.1 <- lmer(
-  j_diff ~ jday_s + I(jday_s^2) + yr_s + l.illum_s  + 
-    (1 | pair_group) + (1|sp),  # Specify random effects
+  j_diff ~ jday_s + I(jday_s^2) + yr_s + l.illum_s + (1|sp),  # Specify random effects but the intercept is wrong because is just one value by pair. 
   data = bm
 )
 
-update(m3.1, ~ . + (1 +yr_s| sp)) # update model to include year in the random slope
+update(m3.1, ~ . + (0 +yr_s| sp)) # update model to include year in the random slope
 
 summary(m3.1)
 

@@ -299,6 +299,22 @@ normalized_bm <- normalized_bm %>% filter(!pair_group %in% "long05")
 summary(normalized_bm)
 head(normalized_bm,100)
 
+hist(normalized_bm$j_diff)
+range(normalized_bm$j_diff) 
+
+# show rows with 20 largest j_diff 
+rowlarge<- normalized_bm %>%
+  arrange(desc(j_diff)) %>%
+  slice_head(n = 20)
+
+print(rowlarge)
+# save rowlarge as .csv
+rowlarge <- rowlarge %>% select(-c(control_mean, control_activity, experimental_activity)) # remove unwanted columns
+
+write.csv(rowlarge, file = 'data_for_analysis/prep_for_glmm/rowlarge.csv', row.names = F) # raw combine data 
+
+
+
 # outputs -----------------------------------------------------------------
 
 

@@ -30,17 +30,12 @@
 
 # libraries  --------------------------------------------------------------
 
-library(tidyverse)
-library(magrittr)
-library(lme4)
-library(sjPlot)
-library(ggeffects)
-library(car)
-library(glmmTMB)
-library(corrplot)
-library(effects)
-library(reshape2)
 
+if (!require("pacman")) install.packages("pacman")
+
+# Use pacman to load libraries
+pacman::p_load(tidyverse, magrittr, lme4, sjPlot, ggeffects, 
+               car, glmmTMB, corrplot, effects, reshape2, DHARMa)
 
 #load environment 
 #last worked 09/03/2024
@@ -334,14 +329,49 @@ m1.5nb <- glmmTMB(
   data = bm2,   nbinom2(link = "log")
 )
 
+save(m1.5nb, 'models/')
+
 m1.6nb <- glmmTMB(
   n ~ trmt_bin + jday_s + I(jday_s ^ 2) + percent_s  + l.illum_s + # this one didn't even converge. 
     avg_wind_speed_s + avg_temperature_s + yr_s + elev_mean_s +
     (1 |site) + (1 + trmt_bin + jday_s + I(jday_s ^ 2) | sp),
   data = bm2,   nbinom1(link = "log")
 )
-save(m1.5nb, 'models/')
-AIC( m1.5nb,m1.5anb,m1.6nb) 
+
+
+
+# after meeting with Dr.Cruz suggested to try to do a interaction effect to see if the time and treatment have an effect. 
+
+m1.7nb <- glmmTMB(
+  n ~ trmt_bin + jday_s + I(jday_s^2) + percent_s  + l.illum_s +
+    avg_wind_speed_s + avg_temperature_s + yr_s +
+    (1 | site) + (1 + trmt_bin + jday_s + I(jday_s^2) | sp),
+  data = bm2,
+  nbinom2(link = "log")
+) 
+
+summary(m1.7nb)
+plot_model(m1.7nb)
+
+
+m1.8nb<-update(m1.7nb, ~ . + jday_s * trmt_bin + I(jday_s^2) * trmt_bin)
+summary(m1.8nb)
+plot_model(m1.8nb)
+
+m1.9nb <- update(m1.8nb, ~ . + yr_s * trmt_bin)
+summary(m1.9nb)
+plot_model(m1.9nb)
+
+# Simulate residuals using DHARMa for GLMM
+sim_residuals <- simulateResiduals(m1.9nb, plot = FALSE,quantreg=T)
+plot(sim_residuals)
+
+t1 <- testUniformity(sim_residuals) # model is not uniform...
+t2 <- testZeroInflation(sim_residuals)
+t3 <- testDispersion(sim_residuals)
+
+
+AIC( m1.5nb,m1.7nb, m1.8nb, m1.9nb) 
 summary(m1.5nb)
 confint(m1.5nb)
 
