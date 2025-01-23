@@ -167,9 +167,9 @@ variables_to_scale <- c(
 )
 
 # # Loop over each variable, scale it, and assign it back to the data frame with a new name
-for (var in variables_to_scale) {
-  bm2[[paste0(var, "_s")]] <- scale(bm2[[var]], center = TRUE, scale = TRUE)
-}
+# for (var in variables_to_scale) {
+#   bm2[[paste0(var, "_s")]] <- scale(bm2[[var]], center = TRUE, scale = TRUE)
+# }
 
 # 
 # # Loop over each variable, scale it by dividing by two standard deviations, and assign it back to the data frame with a new name
@@ -240,6 +240,19 @@ ggplot(bm2, aes(x=jday, y=n, col=treatmt))+
        x = "Julian Day",
        y = "n calls",
        color = "Treatment")
+
+# Adjusted code to create a violin plot
+ggplot(bm2, aes(x = factor(jday), y = n, fill = treatmt)) +
+  geom_violin(trim = FALSE) +  # Violin plot to show data distribution
+  geom_jitter(position = position_jitter(width = 0.2), alpha = 0.5) +  # Adding jitter for better visibility of individual points
+  facet_wrap(~ sp, scales = "free_y") +  # Facet by species with free y scales
+  theme_minimal() +  # Use a minimal theme for better aesthetics
+  scale_fill_manual(values = c("#0033A0", "#D64309")) +  # Custom color for treatments
+  labs(title = "Bat Acoustic Activity 2021-2023",
+       x = "Julian Day",
+       y = "Number of Calls",
+       fill = "Treatment") +  # Label adjustments
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))  # Rotate x-axis labels for better readability
 
 # models -------------------------------------------------------------------
 
