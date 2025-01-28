@@ -601,3 +601,16 @@ Make sure you standardize by two standard deviations given I have different pred
 
 -   I ran the model m1.9nb but I am not sure it is working.\
     I need to asses the DHARMa residuals plot and see what does the ks test tell you.
+
+------------------------------------------------------------------------
+
+1/24/2025
+
+I have been playing with the models introducing three interaction terms two by jday and another with year. The models seemed to run and now I see model m1.9nb seem better than m1.5nb. We still have a problem with possible outliers that need to be checked.
+
+the goodthing about this model is that it allow us to see if there is an effect of time on the bat calling.
+
+now how do we plot model m1.9nb that is another pedo.
+
+\
+\

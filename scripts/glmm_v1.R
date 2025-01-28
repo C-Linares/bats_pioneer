@@ -35,7 +35,7 @@ if (!require("pacman")) install.packages("pacman")
 
 # Use pacman to load libraries
 pacman::p_load(tidyverse, magrittr, lme4, sjPlot, ggeffects, 
-               car, glmmTMB, corrplot, effects, reshape2, DHARMa)
+               car, glmmTMB, corrplot, effects, reshape2, DHARMa, marginaleffects)
 
 #load environment 
 #last worked 09/03/2024
@@ -49,7 +49,7 @@ colnames(filtered_bm)[2]<-"sp" # change from AUTO.ID to sp
 
 #load activity index
 
-bm.ai<- read_csv('data_for_analysis/')
+bm.ai<- read_csv('data_for_analysis/') # activity index for the bat species.
 
 
 btrait<-read.csv('data_for_analysis/Bat_trait.csv', header = T)
@@ -346,6 +346,17 @@ save(m1.5nb, 'models/')
 summary(m1.5nb)
 confint(m1.5nb)
 
+# Calculate residual deviance and residual degrees of freedom
+residual_deviance <- deviance(m1.5nb)
+residual_df <- df.residual(m1.5nb)
+
+# Calculate c-hat using residual deviance
+c_hat_deviance <- residual_deviance / residual_df
+print(c_hat_deviance)
+
+saveRDS(m1.5nb,"models/m1.5nb")
+
+
 p0<-plot_model(m1.5nb,colors = "gs")
 p0<-p0 + theme(
   panel.grid.major = element_blank(),  # Remove major gridlines
@@ -369,16 +380,16 @@ load('models/m1.5nb')
 tab_model(m1.5nb)
 
 
-m1.6nb <- glmmTMB(
-  n ~ trmt_bin + jday_s + I(jday_s ^ 2) + percent_s  + l.illum_s + # this one didn't even converge. 
-    avg_wind_speed_s + avg_temperature_s + yr_s + elev_mean_s +
-    (1 |site) + (1 + trmt_bin + jday_s + I(jday_s ^ 2) | sp),
-  data = bm2,   nbinom1(link = "log")
-)
+# m1.6nb <- glmmTMB(
+#   n ~ trmt_bin + jday_s + I(jday_s ^ 2) + percent_s  + l.illum_s + # this one didn't even converge. 
+#     avg_wind_speed_s + avg_temperature_s + yr_s + elev_mean_s +
+#     (1 |site) + (1 + trmt_bin + jday_s + I(jday_s ^ 2) | sp),
+#   data = bm2,   nbinom1(link = "log") # change in the family from nbinom2 to nbinom1
+# )
+# summary(m1.6nb)
 
 
-
-# after meeting with Dr.Cruz suggested to try to do a interaction effect to see if the time and treatment have an effect. 
+# after meeting with Dr.Cruz suggested to try to do a interaction effect to see if the time and treatment have an effect
 
 m1.7nb <- glmmTMB(
   n ~ trmt_bin + jday_s + I(jday_s^2) + percent_s  + l.illum_s + # just removed elevation. 
@@ -388,11 +399,17 @@ m1.7nb <- glmmTMB(
   nbinom2(link = "log")
 ) 
 
+# Compare the nested models using the anova function
+anova(m1.7nb, m1.5nb, test = "Chisq") #adding or removing elevation does not change much the model. 
 summary(m1.7nb)
 plot_model(m1.7nb)
 
 
-m1.8nb<-update(m1.7nb, ~ . + jday_s * trmt_bin + I(jday_s^2) * trmt_bin) # adding jday and jday^2 as intereacting
+m1.8nb<-update(m1.7nb, ~  + jday_s * trmt_bin + I(jday_s^2) * trmt_bin) # adding jday and jday^2 as intereacting
+m1.8nb<- glmmTMB(n ~ trmt_bin + jday_s + I(jday_s^2) + percent_s + l.illum_s +  
+                   avg_wind_speed_s + avg_temperature_s + yr_s + (1 | site) + (1 + trmt_bin + jday_s + I(jday_s^2) | sp),
+            data = bm2,
+            nbinom2(link = "log"))
 summary(m1.8nb)
 plot_model(m1.8nb)
 
@@ -400,62 +417,64 @@ m1.9nb <- update(m1.8nb, ~ . + yr_s * trmt_bin) # adding year as an interaction
 summary(m1.9nb)
 plot_model(m1.9nb)
 
+m1.9.1nb<- glmmTMB(n ~ trmt_bin + jday_s + I(jday_s^2) + percent_s + l.illum_s +  
+                   avg_wind_speed_s + avg_temperature_s + yr_s + elev_mean_s+ moo+ Sum_Distance_s+
+                   jday_s * trmt_bin + I(jday_s^2) * trmt_bin + yr_s * trmt_bin + 
+                   (1 | site) + (1 + trmt_bin + jday_s + I(jday_s^2) | sp),
+  data = bm2,
+  nbinom1(link = "log")
+)
+
 # Simulate residuals using DHARMa for GLMM
 sim_residuals <- simulateResiduals(m1.9nb, plot = FALSE,quantreg=T)
 plot(sim_residuals)
 
-t1 <- testUniformity(sim_residuals) # model deviates from the expected distribution. What can we do about it? 
+t1 <- testUniformity(sim_residuals) # model deviates from the expected distribution. What can we do about it? Jen said may not matter much. 
 t2 <- testZeroInflation(sim_residuals)
 t3 <- testDispersion(sim_residuals)
 t4 <- testOutliers(sim_residuals) # model has some outliers...
 
+# Calculate residual deviance and residual degrees of freedom
+residual_deviance <- deviance(m1.9nb)
+residual_df <- df.residual(m1.9nb)
+
+# Calculate c-hat using residual deviance
+c_hat_deviance <- residual_deviance / residual_df
+print(c_hat_deviance)
+
+# Calculate R-squared values
+r_squared <- r.squaredGLMM(m1.9nb) 
+print(r_squared)
 
 
 m1.10<- update(m1.9nb, ~ . , nbinom1(link = "log")) # testing the other negative binomial family option 
 summary(m1.10)
 
+
+# The comparison indicates that the model m1.9nb is preferable:
+# - It has the lowest AIC and deviance values, indicating a better fit.
+# - The differences in fit between m1.9nb and the more complex model m1.10 are not significant.
+# Therefore, m1.9nb is the best model among those compared.
 #it seems like there's no change between models. 
 AIC( m1.5nb,m1.7nb, m1.8nb, m1.9nb, m1.10) 
+anova(m1.5nb, m1.7nb, m1.8nb, m1.9nb, m1.10)
 
 
-
-# Calculate residual deviance and residual degrees of freedom
-residual_deviance <- deviance(m1.5nb)
-residual_df <- df.residual(m1.5nb)
-
-# Calculate c-hat using residual deviance
-c_hat_deviance <- residual_deviance / residual_df
-print(c_hat_deviance)
-
-saveRDS(m1.5nb,"models/m1.5nb")
-
-
-
-
-
-
-# m1.7
-# we run this one with the model we neede 
-
-m1.7nb <- glmmTMB(
-  n ~ Sum_Distance_s + jday_s + I(jday_s ^ 2) + percent_s  + l.illum_s +
-    avg_wind_speed_s + avg_temperature_s + yr_s + elev_mean_s + moo+
-  (1 | site) + (1 + trmt_bin + jday_s + I(jday_s ^ 2) | sp),
+# now we run a model with the interaction of yead and jday interaction with treatment inside the random slopes.
+# however the model does not converge.
+m1.11<- glmmTMB(
+  n ~ trmt_bin + jday_s + I(jday_s^2)  + l.illum_s + 
+    avg_wind_speed_s + avg_temperature_s + yr_s +
+    (1 | site) + (1 + trmt_bin * jday_s + I(jday_s^2) * trmt_bin + jday_s + I(jday_s^2)+ yr_s*trmt_bin  | sp),
   data = bm2,
   nbinom2(link = "log")
 )
 
-summary(m1.7nb)
-
-# Calculate residual deviance and residual degrees of freedom
-residual_deviance <- deviance(m1.7nb)
-residual_df <- df.residual(m1.7nb)
-
-# Calculate c-hat using residual deviance
-c_hat_deviance <- residual_deviance / residual_df
-print(c_hat_deviance)
-
-AIC(m1.5nb,m1.7nb)
+ranef(m1.11)
+summary(m1.11)
+plot_model(m1.11)
+anova(m1.9nb, m1.11, test = "Chisq") # adding jday and year as an interaction in slopes
+AIC(m1.9nb, m1.11)
 
 # plots -------------------------------------------------------------------
 
@@ -1011,6 +1030,29 @@ load("models/my_models.RData")
 
 
 # trash -------------------------------------------------------------------
+
+# m1.7
+# we run this one with the model we neede 
+
+m1.7nb <- glmmTMB(
+  n ~ Sum_Distance_s + jday_s + I(jday_s ^ 2)  + l.illum_s +
+    avg_wind_speed_s + avg_temperature_s + yr_s +
+    (1 | site) + (1 + trmt_bin + jday_s + I(jday_s ^ 2)+ | sp),
+  data = bm2,
+  nbinom2(link = "log")
+)
+
+summary(m1.7nb)
+
+# Calculate residual deviance and residual degrees of freedom
+residual_deviance <- deviance(m1.7nb)
+residual_df <- df.residual(m1.7nb)
+
+# Calculate c-hat using residual deviance
+c_hat_deviance <- residual_deviance / residual_df
+print(c_hat_deviance)
+
+AIC(m1.5nb,m1.7nb)
 
 
 # model m1.5nb plots
