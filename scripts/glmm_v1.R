@@ -405,25 +405,17 @@ summary(m1.7nb)
 plot_model(m1.7nb)
 
 
-m1.8nb<-update(m1.7nb, ~  + jday_s * trmt_bin + I(jday_s^2) * trmt_bin) # adding jday and jday^2 as intereacting
-m1.8nb<- glmmTMB(n ~ trmt_bin + jday_s + I(jday_s^2) + percent_s + l.illum_s +  
-                   avg_wind_speed_s + avg_temperature_s + yr_s + (1 | site) + (1 + trmt_bin + jday_s + I(jday_s^2) | sp),
-            data = bm2,
-            nbinom2(link = "log"))
+m1.8nb<-update(m1.7nb, ~  .+ jday_s * trmt_bin + I(jday_s^2) * trmt_bin) # adding jday and jday^2 as intereacting
+
 summary(m1.8nb)
 plot_model(m1.8nb)
 
 m1.9nb <- update(m1.8nb, ~ . + yr_s * trmt_bin) # adding year as an interaction 
 summary(m1.9nb)
-plot_model(m1.9nb)
+# plot model with title
+plot_model(m1.9nb, title = "Negative Binomial GLMM with Year, jday and Treatment Interaction")
 
-m1.9.1nb<- glmmTMB(n ~ trmt_bin + jday_s + I(jday_s^2) + percent_s + l.illum_s +  
-                   avg_wind_speed_s + avg_temperature_s + yr_s + elev_mean_s+ moo+ Sum_Distance_s+
-                   jday_s * trmt_bin + I(jday_s^2) * trmt_bin + yr_s * trmt_bin + 
-                   (1 | site) + (1 + trmt_bin + jday_s + I(jday_s^2) | sp),
-  data = bm2,
-  nbinom1(link = "log")
-)
+
 
 # Simulate residuals using DHARMa for GLMM
 sim_residuals <- simulateResiduals(m1.9nb, plot = FALSE,quantreg=T)
@@ -476,6 +468,26 @@ plot_model(m1.11)
 anova(m1.9nb, m1.11, test = "Chisq") # adding jday and year as an interaction in slopes
 AIC(m1.9nb, m1.11)
 
+
+# marginal with marginal effects package. 
+
+plot_predictions(m1.9nb,                # The model we fit
+                 type = "response",     # We'd like the predictions on the scale of the response
+                 conf_level = 0.95,     # With a 95% confidence interval
+                 condition = c("trmt_bin", "yr_s"), # Plot predictions for "l.illum_s" while holding all others at their mean
+                 vcov = TRUE) +         # Compute and display the variance-covariance matrix
+  xlab("") +            # Labels for axes
+  ylab("bat calls") +
+  theme_bw()                             # White background
+
+plot_predictions(m1.9nb,                # The model we fit
+                 type = "response",     # We'd like the predictions on the scale of the response
+                 conf_level = 0.95,     # With a 95% confidence interval
+                 condition = c("trmt_bin", "jday_s"), # Plot predictions for "l.illum_s" while holding all others at their mean
+                 vcov = TRUE) +         # Compute and display the variance-covariance matrix
+  xlab("") +            # Labels for axes
+  ylab("bat calls") +
+  theme_bw()        
 # plots -------------------------------------------------------------------
 
 
