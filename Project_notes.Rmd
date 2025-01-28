@@ -612,5 +612,9 @@ the goodthing about this model is that it allow us to see if there is an effect 
 
 now how do we plot model m1.9nb that is another pedo.
 
+------------------------------------------------------------------------
+
 \
-\
+1/28/2025
+
+I managed to play with the marginal effects package to plot graphs like the previous ones. \

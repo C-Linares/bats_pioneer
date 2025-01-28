@@ -35,7 +35,7 @@ if (!require("pacman")) install.packages("pacman")
 
 # Use pacman to load libraries
 pacman::p_load(tidyverse, magrittr, lme4, sjPlot, ggeffects, 
-               car, glmmTMB, corrplot, effects, reshape2, DHARMa, marginaleffects)
+               car, glmmTMB, corrplot, effects, reshape2, DHARMa, marginaleffects, MuMIn, performance)
 
 #load environment 
 #last worked 09/03/2024
@@ -412,10 +412,28 @@ plot_model(m1.8nb)
 
 m1.9nb <- update(m1.8nb, ~ . + yr_s * trmt_bin) # adding year as an interaction 
 summary(m1.9nb)
+
+# just rewrote the model below to make it more readable.
+m1.9nb <- glmmTMB(
+  n ~ trmt_bin + jday_s + I(jday_s^2) + percent_s + l.illum_s + 
+    avg_wind_speed_s + avg_temperature_s + yr_s +
+    (1 | site) + (1 + trmt_bin + jday_s + I(jday_s^2) | sp) +
+    jday_s * trmt_bin + I(jday_s^2) * trmt_bin + yr_s * trmt_bin,
+  data = bm2,
+  family = nbinom2(link = "log")
+)
+
+
+m1.9nb_no_percent <- update(m1.9nb, . ~ . - percent_s)
 # plot model with title
 plot_model(m1.9nb, title = "Negative Binomial GLMM with Year, jday and Treatment Interaction")
+anova(m1.9nb, m1.9nb_no_percent, test = "Chisq") #seems like percent_s is not an predictor. 
 
+# Summary of the updated model
+summary(m1.9nb_no_percent)
 
+# Plot the updated model
+plot_model(m1.9nb_no_percent)
 
 # Simulate residuals using DHARMa for GLMM
 sim_residuals <- simulateResiduals(m1.9nb, plot = FALSE,quantreg=T)
@@ -430,13 +448,16 @@ t4 <- testOutliers(sim_residuals) # model has some outliers...
 residual_deviance <- deviance(m1.9nb)
 residual_df <- df.residual(m1.9nb)
 
-# Calculate c-hat using residual deviance
+# Calculate c-hat using residual deviance seems like the model m1.9nb is not over dispersed. 
 c_hat_deviance <- residual_deviance / residual_df
 print(c_hat_deviance)
 
 # Calculate R-squared values
-r_squared <- r.squaredGLMM(m1.9nb) 
+# seems like the fixed effects only explain 1.2% percent of the variance, while the fixed and random explain 70%. 
+r_squared <- r2(m1.9nb) 
 print(r_squared)
+
+
 
 
 m1.10<- update(m1.9nb, ~ . , nbinom1(link = "log")) # testing the other negative binomial family option 
@@ -469,6 +490,9 @@ anova(m1.9nb, m1.11, test = "Chisq") # adding jday and year as an interaction in
 AIC(m1.9nb, m1.11)
 
 
+# marignal effect plots ---------------------------------------------------
+
+
 # marginal with marginal effects package. 
 
 plot_predictions(m1.9nb,                # The model we fit
@@ -483,11 +507,74 @@ plot_predictions(m1.9nb,                # The model we fit
 plot_predictions(m1.9nb,                # The model we fit
                  type = "response",     # We'd like the predictions on the scale of the response
                  conf_level = 0.95,     # With a 95% confidence interval
-                 condition = c("trmt_bin", "jday_s"), # Plot predictions for "l.illum_s" while holding all others at their mean
+                 condition = c("jday_s","trmt_bin"), 
                  vcov = TRUE) +         # Compute and display the variance-covariance matrix
   xlab("") +            # Labels for axes
   ylab("bat calls") +
   theme_bw()        
+
+# marginal effect for trmt_bin by sp 
+plot_predictions(m1.9nb,
+                 type = "response",
+                 conf_level = 0.95,
+                 condition = c("sp", "trmt_bin"),
+                 vcov = TRUE)
+
+
+# marginal effect for jday by sp
+pred2 <- predictions(m1.9nb,
+                     newdata = datagrid(sp = bm2$sp,
+                                        jday_s = seq(min(bm2$jday_s), max(bm2$jday_s), length.out = 100)))
+
+p2 <- ggplot(pred2, aes(jday_s, estimate, color = sp)) +
+  geom_line() +
+  labs(y = "bat calls", x = "jday", title = "Quadratic growth model")+
+  facet_wrap(~sp, scales = "free_y")
+p2
+
+p2 <- ggplot(pred2, aes(x = jday_s, y = estimate, color = sp, linetype = sp)) +
+  geom_line(linewidth = 1) +  # Adjust line size for better visibility
+  scale_color_viridis(discrete = TRUE, option = "D") +  # Use a colorblind-friendly palette
+  labs(y = "Bat calls", x = "Julian day", title = "Marginal effect plot jday_s by sp") +
+  theme_minimal() +  # Optional: adding a theme for better aesthetics
+  theme(legend.title = element_blank())  # Remove legend title for cleaner appearance
+p2
+
+# marginal effect for year by sp
+
+
+pred3 <- predictions(m1.9nb,
+                     newdata = datagrid(sp = bm2$sp,
+                                        yr_s = unique(bm2$yr_s)))
+
+p3<- ggplot(pred3, aes(x =yr_s, y= estimate))+
+              geom_point()+
+  geom_errorbar( aes( ymin = conf.low, ymax = conf.high ) )+ 
+  facet_wrap(~sp, scales="free")
+  
+            
+p3
+pred4<- predictions(m1.9nb,
+                     newdata = datagrid(sp = bm2$sp,
+                                        trmt_bin = unique(bm2$trmt_bin)))
+p4 <- ggplot(pred4, aes(x = trmt_bin, y = estimate, col=sp)) +
+  geom_point() +
+  geom_line()
+p4
+
+p4+ facet_wrap(~sp, scales = "free_y")
+
+preds<- predictions(m1.9nb)
+p5<- ggplot(preds, aes(x = jday_s, y = estimate, col=trmt_bin))+ # not sure what is happening here. 
+  geom_line()+
+  facet_wrap(~sp, scales = "free_y")
+p5
+
+ggplot(preds, aes(trmt_bin, estimate, col = sp)) +
+  geom_point()+
+  geom_line() +
+  ylab("Predicted Weight") +
+  facet_wrap(~ yr_s, labeller = label_both)
 # plots -------------------------------------------------------------------
 
 
@@ -1036,6 +1123,8 @@ ggsave(filename = "trmt_raneff_v2.png",plot = p7.1,device = "png", path = 'figur
 save.image(file = "working_env/glmm_v1.RData")
 
 save(m1.5nb, file = "models/my_models.RData")
+save(m1.9nb, file = "models/m1.9nb.RData")
+
 load("models/my_models.RData")
 
 
