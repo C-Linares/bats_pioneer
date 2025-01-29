@@ -617,4 +617,12 @@ now how do we plot model m1.9nb that is another pedo.
 \
 1/28/2025
 
-I managed to play with the marginal effects package to plot graphs like the previous ones. \
+I managed to play with the marginal effects package to plot graphs like the previous ones. I created realy good tables to talk with Jesse about.
+
+the results for the m1.9nb model are like so. \
+\
+![](images/clipboard-771574111.png)
+
+the plots are the following.
+
+![There an interaction between year and teatment. As seasons progress we see consistently more bats at the light sites but fewer as seasons progre, we see consistently more bats at the light sites but fewer as seasons progress. ](images/clipboard-1015599823.png)

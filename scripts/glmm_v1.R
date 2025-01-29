@@ -35,7 +35,7 @@ if (!require("pacman")) install.packages("pacman")
 
 # Use pacman to load libraries
 pacman::p_load(tidyverse, magrittr, lme4, sjPlot, ggeffects, 
-               car, glmmTMB, corrplot, effects, reshape2, DHARMa, marginaleffects, MuMIn, performance)
+               car, glmmTMB, corrplot, effects, reshape2, DHARMa, marginaleffects, MuMIn, performance,viridis)
 
 #load environment 
 #last worked 09/03/2024
@@ -490,12 +490,12 @@ anova(m1.9nb, m1.11, test = "Chisq") # adding jday and year as an interaction in
 AIC(m1.9nb, m1.11)
 
 
-# marignal effect plots ---------------------------------------------------
+# Marginal effect plots ---------------------------------------------------
 
 
 # marginal with marginal effects package. 
 
-plot_predictions(m1.9nb,                # The model we fit
+p1.1<-plot_predictions(m1.9nb,                # The model we fit
                  type = "response",     # We'd like the predictions on the scale of the response
                  conf_level = 0.95,     # With a 95% confidence interval
                  condition = c("trmt_bin", "yr_s"), # Plot predictions for "l.illum_s" while holding all others at their mean
@@ -504,7 +504,22 @@ plot_predictions(m1.9nb,                # The model we fit
   ylab("bat calls") +
   theme_bw()                             # White background
 
-plot_predictions(m1.9nb,                # The model we fit
+p1.1 <- plot_predictions(m1.9nb,                # The model we fit
+                         type = "response",     # We'd like the predictions on the scale of the response
+                         conf_level = 0.95,     # With a 95% confidence interval
+                         condition = c("trmt_bin", "yr_s"), # Plot predictions for "l.illum_s" while holding all others at their mean
+                         vcov = TRUE) +         # Compute and display the variance-covariance matrix
+  xlab("") +            # Labels for axes
+  ylab("bat calls") +
+  theme_bw() +          # White background
+  scale_color_manual(values = c("-1" = "blue", "0" = "green", "1" = "red"), 
+                     labels = c("-1" = "2021", "0" = "2022", "1" = "2023"), 
+                     name = "Year") +
+  scale_fill_manual(values = c("-1" = "blue", "0" = "green", "1" = "red"), 
+                    labels = c("-1" = "2021", "0" = "2022", "1" = "2023"), 
+                    name = "Year")
+
+p1.2<-plot_predictions(m1.9nb,                # The model we fit
                  type = "response",     # We'd like the predictions on the scale of the response
                  conf_level = 0.95,     # With a 95% confidence interval
                  condition = c("jday_s","trmt_bin"), 
@@ -513,19 +528,12 @@ plot_predictions(m1.9nb,                # The model we fit
   ylab("bat calls") +
   theme_bw()        
 
-# marginal effect for trmt_bin by sp 
-plot_predictions(m1.9nb,
-                 type = "response",
-                 conf_level = 0.95,
-                 condition = c("sp", "trmt_bin"),
-                 vcov = TRUE)
-
 
 # marginal effect for jday by sp
 pred2 <- predictions(m1.9nb,
                      newdata = datagrid(sp = bm2$sp,
                                         jday_s = seq(min(bm2$jday_s), max(bm2$jday_s), length.out = 100)))
-
+print(pred2)
 p2 <- ggplot(pred2, aes(jday_s, estimate, color = sp)) +
   geom_line() +
   labs(y = "bat calls", x = "jday", title = "Quadratic growth model")+
@@ -540,8 +548,26 @@ p2 <- ggplot(pred2, aes(x = jday_s, y = estimate, color = sp, linetype = sp)) +
   theme(legend.title = element_blank())  # Remove legend title for cleaner appearance
 p2
 
-# marginal effect for year by sp
+plot_marginal_effects <- function(model, x_var, group_var = NULL, title = NULL) {
+  pred <- predictions(model, newdata = datagrid(!!x_var := unique(bm2[[x_var]]),
+                                                sp = unique(bm2$sp)))
+  
+  p <- ggplot(pred, aes_string(x = x_var, y = "estimate", color = "sp")) +
+    geom_line() +
+    labs(y = "Bat calls", x = x_var, title = title) +
+    scale_color_viridis(discrete = TRUE, option = "D") +
+    theme_minimal()
+  
+  if (!is.null(group_var)) {
+    p <- p + facet_wrap(as.formula(paste("~", group_var)), scales = "free_y")
+  }
+  return(p)
+}
 
+
+p2 <- plot_marginal_effects(m1.9nb, "jday_s", "sp", "Marginal effect of jday_s by species")
+
+# marginal effect for year by sp
 
 pred3 <- predictions(m1.9nb,
                      newdata = datagrid(sp = bm2$sp,
@@ -554,6 +580,7 @@ p3<- ggplot(pred3, aes(x =yr_s, y= estimate))+
   
             
 p3
+
 pred4<- predictions(m1.9nb,
                      newdata = datagrid(sp = bm2$sp,
                                         trmt_bin = unique(bm2$trmt_bin)))
@@ -562,19 +589,60 @@ p4 <- ggplot(pred4, aes(x = trmt_bin, y = estimate, col=sp)) +
   geom_line()
 p4
 
-p4+ facet_wrap(~sp, scales = "free_y")
+p4+ facet_wrap(~sp)
 
 preds<- predictions(m1.9nb)
-p5<- ggplot(preds, aes(x = jday_s, y = estimate, col=trmt_bin))+ # not sure what is happening here. 
+preds$tmt<-ifelse(preds$trmt_bin==1, "light", "dark")
+# now add the years -1=2021, 0=2022, 1=2023
+preds$yr_s<-ifelse(preds$yr_s==-1, "2021", ifelse(preds$yr_s==0, "2022", "2023"))
+
+p5.1<- ggplot(preds, aes(x = jday_s, y = estimate, col=tmt))+ # not sure what is happening here. 
   geom_line()+
   facet_wrap(~sp, scales = "free_y")
+p5.1
+
+p5<-ggplot(preds, aes(tmt, estimate, col=yr_s)) +
+  geom_violin() +
+  geom_jitter(position = position_jitterdodge(jitter.width = 0.1, dodge.width = .75), size=0.4, alpha=0.9) +  #The jitter.width argument controls the amount of jitter, and the dodge.width argument controls the spacing between the categories (treatments and years).
+  facet_wrap(~sp, scales = "free_y")+
+  labs(y="estimate bat calls", x="", title="Boxplot of Estimated bat calls by Treatment, Year, and Species")+
+  scale_color_viridis(discrete = TRUE, option = "H")   # Use the viridis color palette
+  # scale_colour_brewer(palette = "Spectral")+
+  # theme_minimal()   # Optional: adding a theme for better aesthetics
+  # theme(legend.position = "none")  # Optional: remove legend if not needed
 p5
 
-ggplot(preds, aes(trmt_bin, estimate, col = sp)) +
+
+print(predictions(model = m1.9nb, 
+                  newdata = datagrid( yr_s= c(-1, 0, 1),
+                                      sp= unique(bm2$sp)),
+                  conf_level = 0.95))
+
+p6<- ggplot(preds, aes(x = jday_s, y = estimate, col=sp))+ # not sure what is happening here. 
   geom_point()+
-  geom_line() +
-  ylab("Predicted Weight") +
-  facet_wrap(~ yr_s, labeller = label_both)
+  ylab("predicted bat calls")+
+  scale_color_viridis(discrete = TRUE, option = "H") +  # Use the viridis color palette
+  facet_grid(tmt~yr_s)
+p6
+
+# Create a list of plots and their corresponding filenames
+figures_dir <- "figures/glmm_v1/marginleffects_out"
+
+
+plots <- list(p1.1, p1.2, p2, p3, p4, p5.1, p5, p6)
+filenames <- c("p1.1.png", "p1.2.png", "p2.png", "p3.png", "p4.png", "p5.1.png", "p5.png", "p6.png")
+
+# Save all plots
+lapply(seq_along(plots), function(i) {
+  ggsave(filename = file.path(figures_dir, filenames[i]), plot = plots[[i]], device = "tiff", width = 15, height = 10, units = "cm")
+})
+
+library(sjPlot)
+a1<-tab_model(m1.9nb, show.icc = TRUE, show.aic = TRUE, show.re.var = TRUE)
+a1
+plot_predictions(m1.9nb, condition = c("jday_s", "trmt_bin"), type = "response", vcov = T) +
+  theme_minimal() +
+  labs(y = "Predicted Bat Calls", x = "Julian Day", color = "Treatment")
 # plots -------------------------------------------------------------------
 
 
@@ -1131,6 +1199,14 @@ load("models/my_models.RData")
 
 
 # trash -------------------------------------------------------------------
+
+# # marginal effect for trmt_bin by sp 
+# plot_predictions(m1.9nb,
+#                  type = "response",
+#                  conf_level = 0.95,
+#                  condition = c("sp", "trmt_bin"),
+#                  vcov = TRUE)
+
 
 # m1.7
 # we run this one with the model we neede 
