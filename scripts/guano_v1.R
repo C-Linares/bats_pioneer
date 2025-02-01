@@ -52,11 +52,11 @@ a<-read.guano(dirname)
 library(batr)
 
 # path to the z drive new suggestion of code
-pp<-"data_for_analysis/sample_wavs/"
-ppsave<-""
+pp<-"data_for_analysis/IRON01__1__20230706_203741.wav"
+pp2<-"E:/pioneer2023/robomoth_2023_all"
+
 GUANO_reader(pp)
 batr::read.guano('data_for_analysis/sample_wavs/IRON01_20210729_232359-Mylu.wav') # this function did not work...
 
-GUANO_reader(pp, "pioneer") # function to be retired soon. # this worked
-import_GUANO("New","data_for_analysis/sample_wavs/", 
-             "C:/Users/Carlos/Documents/R/bats_pioneer/data_for_analysis/sample_wavs/batr_out")
+GUANO_reader(pp2, "robomoth_2023") # function to be retired soon. # this worked
+import_GUANO("New",pp2,site_col = "pioneer",site_col="user","E:/pioneer2023/robomoth_2023_all/sonobat_output")
