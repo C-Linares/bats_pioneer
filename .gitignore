@@ -2,7 +2,8 @@
 .Rhistory
 .RData
 .Ruserdata
-# Ignore the data base files as these are large files. 
+# Ignore the data base files as these are large files.
 /data_for_analysis
 notes.docx
 bats_pioneer.Rproj
+Project_notes.nb.html

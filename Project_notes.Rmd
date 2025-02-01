@@ -619,10 +619,26 @@ now how do we plot model m1.9nb that is another pedo.
 
 I managed to play with the marginal effects package to plot graphs like the previous ones. I created realy good tables to talk with Jesse about.
 
-the results for the m1.9nb model are like so. \
+the results for the m1.9nb model are like so.\
 \
 ![](images/clipboard-771574111.png)
 
 the plots are the following.
 
-![There an interaction between year and teatment. As seasons progress we see consistently more bats at the light sites but fewer as seasons progre, we see consistently more bats at the light sites but fewer as seasons progress. ](images/clipboard-1015599823.png)
+![There an interaction between year and teatment. As seasons progress we see consistently more bats at the light sites but fewer as seasons progre, we see consistently more bats at the light sites but fewer as seasons progress.](images/clipboard-1015599823.png)
+
+------------------------------------------------------------------------
+
+1/31/2025
+
+I tried to make the code for guano y batr to work but just one function returned results. \
+GUANO_reader(pp, "pioneer") \# function to be retired soon. \# this worked\
+Unfortunately, the function will be retired soon, so figuring out a walk-around with a different function is important.
+
+I created the guano_v1.R file to work on this and a folder in the data_for_analysis called sample_waves. Here there's a .txt file with the data from the guano_reader function.
+
+\
+\
+
+\
+\
