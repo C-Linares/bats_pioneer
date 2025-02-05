@@ -49,6 +49,39 @@ a<-read.guano(dirname)
 # install.packages("devtools")
 # devtools::install_github("vulpes-vulpes/batr")
 
+
+# another try at guano function to work. This one works. It is a little tricky to install guano. 
+# 
+library(guano)
+dt1 <- read.guano.dir(dirname = 'data_for_analysis/sample_wavs/' ,
+                      pattern = "*.wav" ,
+                      recursive = T) # this code from guano in R worked.
+
+# now I want to see if the files that have been ID with kp and sono bat show or if running Kp erase sonobat. 
+
+# I ran the same files but with kaleidoscope to see if the process changed the metadata. 
+dt2 <- read.guano.dir(dirname = 'data_for_analysis/sample_wavs/',
+                      recursive = F)
+a<-read.guano()
+
+
+# now let's try with the bioacustics package
+# the following code work but does not provide an easy way to save the metadata into R. 
+# I also learnt that Kaleidoscope metadata is not recovered this way unless it writes audio files. 
+
+
+
+install.packages("bioacoustics")
+
+library(bioacoustics)
+t<-read_audio('data_for_analysis/sample_wavs/IRON01_20210729_232359-Mylu.wav')
+class(t)
+a<-metadata("data_for_analysis/sample_wavs/IRON01_20210729_232359-Mylu.wav")
+a<-metadata(t)
+
+
+
+# Another package that did not work. 
 library(batr)
 
 # path to the z drive new suggestion of code
@@ -80,33 +113,3 @@ model <- g['Model']
 print(version)
 print(make)
 print(model)
-
-
-# another try at guano function to work. 
-# 
-library(guano)
-dt1 <- read.guano.dir(dirname = 'data_for_analysis/sample_wavs/' ,
-                      pattern = "*.wav" ,
-                      recursive = T) # this code from guano in R worked.
-
-# now I want to see if the files that have been ID with kp and sono bat show or if running Kp erase sonobat. 
-
-# I ran the same files but with kaleidoscope to see if the process changed the metadata. 
-dt2 <- read.guano.dir(dirname = 'data_for_analysis/sample_wavs/',
-                      recursive = F)
-a<-read.guano()
-
-
-# now let's try with the bioacustics package
-# the following code work but does not provide an easy way to save the metadata into R. 
-# I also learnt that 
-
-
-
-install.packages("bioacoustics")
-
-library(bioacoustics)
-t<-read_audio('data_for_analysis/sample_wavs/IRON01_20210729_232359-Mylu.wav')
-class(t)
-a<-metadata("data_for_analysis/sample_wavs/IRON01_20210729_232359-Mylu.wav")
-a<-metadata(t)
