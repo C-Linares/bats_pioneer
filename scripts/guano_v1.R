@@ -46,10 +46,12 @@ dt1 <- read.guano.dir(dirname = 'data_for_analysis/sample_wavs/' ,
 # now I want to see if the files that have been ID with kp and sono bat show or if running Kp erase sonobat. 
 
 # I ran the same files but with kaleidoscope to see if the process changed the metadata. 
-dt2 <- read.guano.dir(dirname = 'data_for_analysis/sample_wavs/',
-                      recursive = F)
-a<-read.guano()
+execution_time <- system.time({  #processing 882 files took 83 secs. Maybe I can do all of them...
+  dt2 <- read.guano.dir(dirname = 'Z:/PioneerLights_2021/iron01/sm4/Data', recursive = FALSE)
+})
 
+# Print the execution time
+print(execution_time)
 
 # now let's try with the bioacustics package
 # the following code work but does not provide an easy way to save the metadata into R. 

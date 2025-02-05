@@ -15,9 +15,19 @@ library(purrr)
 
 
 
+# inputs ------------------------------------------------------------------
+
+# data source: Data was obtainde from https://mesowest.utah.edu/ statition KSUN in Idaho. 
+# Craters of the moon data: obtain directly from Craters. 
+
+
+# outputs -----------------------------------------------------------------
+
+# data with weather data summarized. 
+
 
 #----------- load data ---------------
-#Data was obtainde from https://mesowest.utah.edu/ statition KSUN in Idaho. 
+
 #list data
 wetfls<-list.files('data_for_analysis/weather/',pattern = "^KSUN.*\\.csv$",full.names = T)
 
@@ -86,6 +96,79 @@ write.csv(daily_averages, file = "data_for_analysis/weather/nigh_averages.csv",r
 #write data
 
 write.csv(wetdb,file = "data_for_analysis/weather/rawweather.csv",row.names = F)
+
+
+
+
+# crater data -------------------------------------------------------------
+
+# here we load the creates of the moon data. There are two types of data sets one called export.csv and another called Creaters_of_Moon_2023. they both have complementary data.
+# 
+
+cmon<-read_csv(file = "data_for_analysis/weather/craters_weater/CRMO_met_2021-2023.csv", skip = 9, col_names = T)
+
+# check for NAs
+sum(is.na(cmon)) # none
+
+# check for duplicate
+sum(duplicated(cmon)) # none
+
+# change col names
+cmon <- setnames(
+  cmon,
+  old = c(
+    "DATE_TIME",
+    "CRMO-VC_SWS_M_S",
+    "CRMO-VC_VWS_M_S",
+    "CRMO-VC_VWD_DEG",
+    "CRMO-VC_TMP_DEGC",
+    "CRMO-VC_SOL_W_M2"
+  ),
+  new = c(
+    "date.time",
+    "wnspd_ms",
+    "vwndspd_ms",
+    "wnddir_deg",
+    "temp_degc",
+    "sol_wm2"
+  )
+) # change col name to date
+
+# date and time 
+
+cmon$date_time<- mdy_hm(cmon$date.time, tz = "America/Denver") # seems 3 failed to parse but it is ok because they are in march.
+
+# Extract the date part
+cmon$date <- as.Date(cmon$date_time)
+
+# Extract the time part
+
+cmon$hour <- hour(cmon$date_time)
+
+
+# filter months 5-9 may to sept
+
+cromo_wtr <- cmon %>%
+  filter(month(date) %in% 5:9)
+
+summary(cromo_wtr)
+
+
+
+
+# Write data --------------------------------------------------------------
+
+
+
+
+write.csv(cromo_wtr, file = "data_for_analysis/weather/craters_weater/craters_wtr.csv", row.names = F)
+
+# Create a README file with information about the script
+readme_content <- "Carlos Linares, 2/5/2025
+the firle craters_wtr.csv contains the weather data from the Craters of the Moon National Monument and Preserve. The data was collected from 2021 to 2023. The data was filtered to include only the months of May to September. The data includes the following columns: date.time, wnspd_ms, vwndspd_ms, wnddir_deg, temp_degc, sol_wm2, date, and hour. It was produced with the weather_prep.R script.
+ "
+# Write the README content to a file
+writeLines(readme_content, "data_for_analysis/weather/craters_weater/README.txt")
 
 
 
