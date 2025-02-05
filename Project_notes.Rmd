@@ -631,11 +631,18 @@ the plots are the following.
 
 1/31/2025
 
-I tried to make the code for guano y batr to work but just one function returned results. \
+I tried to make the code for guano y batr to work but just one function returned results.\
 GUANO_reader(pp, "pioneer") \# function to be retired soon. \# this worked\
 Unfortunately, the function will be retired soon, so figuring out a walk-around with a different function is important.
 
 I created the guano_v1.R file to work on this and a folder in the data_for_analysis called sample_waves. Here there's a .txt file with the data from the guano_reader function.
+
+------------------------------------------------------------------------
+
+2/04/2025
+
+I managed to make the following line of code to work. Now the issue is that it just gives you the Sonobat metadata. If you are interested in the Kaleidoscope metadata, it is not displayed unless some files are produced. \
+On the NABat website, they indicate that the best way to analyze files is with two pieces of software is to produce two metadatas. Kaleidoscope produces the output metadata as the id.csv file. it would be a matter of combining them later to see if this produces any changes.
 
 \
 \
