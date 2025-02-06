@@ -153,14 +153,34 @@ cromo_wtr <- cmon %>%
 
 summary(cromo_wtr)
 
+# summarize data by night. 
 
+cromo_night <- cromo_wtr %>%
+  filter(hour >= 18 | hour < 6) %>%
+  group_by(date) %>%
+  summarize(
+    nit_avg_tempC = mean(temp_degc, na.rm = TRUE),
+    nit_avg_wspm.s = mean(wnspd_ms, na.rm = TRUE)
+  )
 
+summary(cromo_night)
+
+# summarize data by day
+
+cromo_day <- cromo_wtr %>%
+  filter(hour >= 6 & hour < 18) %>%
+  group_by(date) %>%
+  summarize(
+    day_avg_tempC = mean(temp_degc, na.rm = TRUE),
+    day_avg_wspm.s = mean(wnspd_ms, na.rm = TRUE)
+  )
 
 # Write data --------------------------------------------------------------
 
-
-
-
+# night and day summaries
+write.csv(cromo_night, file = "data_for_analysis/weather/craters_weater/craters_night.csv", row.names = F)
+write.csv(cromo_day, file = "data_for_analysis/weather/craters_weater/craters_day.csv", row.names = F)
+# hourly data raw
 write.csv(cromo_wtr, file = "data_for_analysis/weather/craters_weater/craters_wtr.csv", row.names = F)
 
 # Create a README file with information about the script
