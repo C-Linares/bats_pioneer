@@ -1,16 +1,29 @@
 # bats_pioneer
 
-This is the second try to have the work ready in Github to start building population models in R.
 
-Intention: have data organized by to be run in a N-mixture population model.
+Analysis of bat call data collected at the Pioneer Mountains in south-central Idaho. 
+Project dates: 2021-2023
+Tools:
+sm3 wildlife acoustic recorders with ultrasonic microphones. 
 
-Updates:
 
-script:
 
--   glmm_v1.R contains the latest for bats and light response.
+Scripts:
 
-Example of scrip heading:
+-   glmm_v1.R contains the latest for bats and light response
+-   
+
+
+
+
+
+
+
+
+
+
+
+Example of scrip heading: I try to use this when I start a script. 
 
 ---------------------------
 
