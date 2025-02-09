@@ -642,8 +642,19 @@ I created the guano_v1.R file to work on this and a folder in the data_for_analy
 2/04/2025
 
 I managed to make the following line of code to work. Now the issue is that it just gives you the Sonobat metadata. If you are interested in the Kaleidoscope metadata, it is not displayed unless some files are produced.\
-On the NABat website, they indicate that the best way to analyze files is with two pieces of software is to produce two metadatas. Kaleidoscope produces the output metadata as the id.csv file. it would be a matter of combining them later to see if this produces any changes.\
+On the NABat website, they indicate that the best way to analyze files is with two pieces of software is to produce two metadatas. Kaleidoscope produces the output metadata as the id.csv file. it would be a matter of combining them later to see if this produces any changes.
+
+------------------------------------------------------------------------
+
+2/5/2025
+
+I found out you can run projects with in the background with background jobs, but I haven't finished finding out how to do it properly (<https://docs.posit.co/ide/user/ide/guide/tools/jobs.html>)\
 \
+Weather :
+
+-   I updated the weather_prep.R script with the data crom craters of the moon and created the creates_wtr.csv\
+
+------------------------------------------------------------------------
 
 \
 \
