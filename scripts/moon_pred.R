@@ -147,6 +147,11 @@ sts<-read.csv("data_for_analysis/sites_coordinates.csv")
 
 bat_combined<-read_csv(file = 'data_for_analysis/prep_for_glmm/bat_combined.csv') # 70 rows are missing the time for the date time column. see below. 
 
+# filter noise out
+
+bat_combined<- bat_combined %>% filter(sp !="Noise")
+
+
 #--- 1pm times -----
   # here we are exploring if there are any wrong dates in the original data set because there are wrong dates in the moon intensity. For some reason there are recordings made at 1 pm at one site but these are all noise and will be filter out at the end. 
   
@@ -169,10 +174,68 @@ sidalo$date_time<- force_tz(sidalo$date_time, tzone = "America/Denver")
 
 summary(sidalo)
 
+# write site and dates. 
+
 dir.create("data_for_analysis/moon_pred", recursive = TRUE, showWarnings = FALSE)
-fwrite(sidalo, file = "data_for_analysis/moon_pred/sidalo.csv", row.names = FALSE) # should remove noise first. 
+fwrite(sidalo, file = "data_for_analysis/moon_pred/sidalo.csv", row.names = FALSE) # fwrite does better than write.csv for large files and is faster. 
 
 
+
+
+# code from Kyle Shanon ---------------------------------------------------
+
+print(nrow(sidalo))
+
+print("calculating intensity...")
+system.time(moon.int <- calculateMoonlightIntensity(
+  sidalo$lat,
+  sidalo$lon,
+  sidalo$date_time ,
+  e = 0.16
+))
+
+# this is the metadata for the moon.int data set.
+metadata <- data.frame(
+  night = "Logical, TRUE when sun is below the horizon",
+  sunAltDegrees = "Solar altitude in degrees",
+  moonlightModel = "Predicted moonlight illumination, relative to an 'average' full moon",
+  twilightModel = "Predicted twilight illumination in lux",
+  illumination = "Combined moon and twilight intensity, in lux",
+  moonPhase = "Lunar phase as a numerical value (% of moon face illuminated)"
+)
+# Convert the metadata data frame to a data table
+metadata_dt <- as.data.table(t(metadata))
+
+# Combine the metadata and moon.int data frames
+combined_data <- rbindlist(list(metadata_dt, moon.int), use.names = FALSE, fill = TRUE)
+fwrite(combined_data, file = "data_for_analysis/moon_pred/moon.int.csv", row.names = FALSE)
+
+# now the moon stats
+
+
+
+cl <- makeCluster(detectCores())
+print("calculating parApply statistics")
+moon.stat <- NULL
+system.time(moon.stat <- parRapply(cl, sidalo, function(row) {
+  library(moonlit)
+  stats <- calculateMoonlightStatistics(
+    as.double(row[3]),
+    as.double(row[4]), row[2],
+    e = 0.16,
+    t = "1 hour",
+    timezone = "America/Denver")
+  return(stats)
+}
+))
+stopCluster(cl)
+
+moon.df <- do.call(rbind, moon.stat)
+
+#make it a dataframe with data.table 
+moon.df<-as.data.frame(moon.df)
+#write it as csv
+fwrite(moon.df, file = "data_for_analysis/moon_pred/moon.stat.csv", row.names = FALSE)
 
 # calculate moon intensity
 # we use the combine data set to extract the bat calls time and dates for the 2021-2023 time frame. 
