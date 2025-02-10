@@ -656,5 +656,10 @@ Weather :
 
 ------------------------------------------------------------------------
 
+2/9/2025
+
+I am revisiting the moon calculations for predictors. I looked at the moon_pred. R script and it seems not to be working very well. I use suncal and lunar package but these not be very good measures of moon illumination. With lunar I ran into a problem with the UTM times. times in R are read as UTM I need to force them to be Mountain standard time. Then transform them into UTM to calculate lunar illumination with the lunar package. \
+I need two things to move forward, some value for moon illumination, and some variable for sunrise sunset and moonrise moonset. \
+I think I can get the positions from suncal y moonlit for illumination. \
 \
 \

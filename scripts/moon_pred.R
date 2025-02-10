@@ -10,7 +10,7 @@
 # 
 # ---------------------------
 #   
-#   Notes: early in the analysis we calculated moon illumination using suncal and lunar. 11/21/2024 as recomended by Kayba we will use the moonlit. packae 
+#   Notes: early in the analysis we calculated moon illumination using suncal and lunar. 11/21/2024 as recomended by Kayba we will use the moonlit. package 
 
 
 # inputs ------------------------------------------------------------------
@@ -18,21 +18,20 @@
 # data_for_analysis/prep_for_glmm/bat_combined.csv -> data base with the date and times
 
 
-#script to calculate the average and median moon phase for use a predictor in a population model
-#we will be using the suncalc package
+#Notes:
+#script to calculate the average and median moon phase for use a predictor in models.
+#we will be using the suncalc, lunar, and moonlit package.
 
 
 # libraries ---------------------------------------------------------------
 
 
+if(!require("pacman"))
+  install.packages("pacman")
 
-library(suncalc)
-library(sf)
-library(ggplot2)
-library(lunar)
-library(tidyverse)
-library(moonlit)recomende Kayba
-library(beepr)
+pacman::p_load(suncal, sf, ggplot2, lunar, tidyverse, moonlit, beepr, data.table)
+
+# moonlit was recomended by Kayba.
 
 
 #load environment 
@@ -74,6 +73,8 @@ t1<-merge(dates, sts, by=NULL)
 
 # moon illumination, times, and pos ----------------------
 
+
+
 t1<-left_join(datesite,sts, by = "site")
 # t1<-rename(t1, date=noche) # rename noche as date but remember this when rejoining the other data.
 t1<-t1 %>% select(date,lat,lon)
@@ -86,7 +87,7 @@ t1$date<-as.Date(t1$date)
 moon_times<-unique(getMoonTimes(data = t1))
 
 t2 <- as.Date(unique(t1[, 1]), tz = "America/Denver")
-moon_illumination <- getMoonIllumination(date = t2)
+moon_illumination <- getMoonIllumination(date = t2) # moon illumination as fraction of the moon 0(new moon) to 1(full moon) 
 
 
 moon_pred <- left_join(left_join(moon_pos, moon_times), moon_illumination)
@@ -98,6 +99,8 @@ moon_pred$above_horizon <- moon_pred$altitude > 0
 
 
 #lunar illumination calculated with lunar package
+# this package needs some kind of shift in the time zone. 
+# The number of hours by which to shift the calculation of lunar phase. By default lunar phase is calculated at 12 noon UT.
 
 
 attr(moon_pred$date, "tzone") <- "UTC" # make them UTM so the calculation is ok
@@ -151,7 +154,7 @@ rows_13pm <- bat_combined %>%
   filter(format(as.POSIXct(date_time, tz = "UTC"), "%H") == "13")
 
 #------
-
+# below we extract sites and dates from the combined data sets from 2021-2023. 
 
 site.date<- bat_combined %>% select(site, date_time)
 
@@ -166,6 +169,8 @@ sidalo$date_time<- force_tz(sidalo$date_time, tzone = "America/Denver")
 
 summary(sidalo)
 
+dir.create("data_for_analysis/moon_pred", recursive = TRUE, showWarnings = FALSE)
+fwrite(sidalo, file = "data_for_analysis/moon_pred/sidalo.csv", row.names = FALSE) # should remove noise first. 
 
 
 
@@ -182,10 +187,13 @@ moon.int <- calculateMoonlightIntensity(
 summary(moon.int) # yes there is no NAs now we need to merge it with sidalo. 
 
 
-
 s.sidalo <- sidalo[sample(nrow(t), size = 5000, replace = TRUE), ]
 s.sidalo<- head(sidalo)
-saveRDS(sidalo, file = "data_for_analysis/moon_pred/sidalo.csv")
+
+# Create directory if it doesn't exist
+dir.create("data_for_analysis/moon_pred", recursive = TRUE, showWarnings = FALSE)
+
+# saveRDS(sidalo, file = "data_for_analysis/moon_pred/sidalo.csv") this saves it in a non human readable format.
 
 moon.stat <- calculateMoonlightStatistics(
   s.sidalo$lat,
