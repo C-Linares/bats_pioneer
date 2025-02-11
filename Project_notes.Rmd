@@ -662,4 +662,11 @@ I am revisiting the moon calculations for predictors. I looked at the moon_pred.
 I need two things to move forward, some value for moon illumination, and some variable for sunrise sunset and moonrise moonset.\
 I think I can get the positions from suncal y moonlit for illumination.\
 \
-\
+
+------------------------------------------------------------------------
+
+2/11/2025
+
+created new moon.stat and moon.lit data sets and saved them. The script. moon_pred has been updated. \
+the glmm_v2 script created to analyze data with updated weather, moon, and trait data\
+bat trait script also needs work.
