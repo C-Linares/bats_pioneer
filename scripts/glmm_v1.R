@@ -27,7 +27,6 @@
 # this should be a database ready to analyze with the glmm_v1 script. 
 
 
-
 # libraries  --------------------------------------------------------------
 
 
@@ -438,11 +437,14 @@ plot_model(m1.9nb_no_percent)
 # Simulate residuals using DHARMa for GLMM
 sim_residuals <- simulateResiduals(m1.9nb, plot = FALSE,quantreg=T)
 plot(sim_residuals)
+#less zeros that expected talk about it. 
 
 t1 <- testUniformity(sim_residuals) # model deviates from the expected distribution. What can we do about it? Jen said may not matter much. 
 t2 <- testZeroInflation(sim_residuals)
 t3 <- testDispersion(sim_residuals)
-t4 <- testOutliers(sim_residuals) # model has some outliers...
+t4 <- testOutliers(sim_residuals) # model has some outliers... We have to find out where the outliers are coing from methodology or actual data or some other shit. 
+
+# play with the comparison function in the marginal effects plot. 
 
 # Calculate residual deviance and residual degrees of freedom
 residual_deviance <- deviance(m1.9nb)
@@ -453,12 +455,13 @@ c_hat_deviance <- residual_deviance / residual_df
 print(c_hat_deviance)
 
 # Calculate R-squared values
-# seems like the fixed effects only explain 1.2% percent of the variance, while the fixed and random explain 70%. 
-r_squared <- r2(m1.9nb) 
+# seems like the fixed effects only explain 1.2% percent of the variance, while the fixed and random explain 70%
+# where is the R-squared function from? the r quared is comming from dharma package. (Allison suggest)
+# the answer is we use the performance package. 
+r_squared <- performance::r2(m1.9nb) 
 print(r_squared)
 
-
-
+ 
 
 m1.10<- update(m1.9nb, ~ . , nbinom1(link = "log")) # testing the other negative binomial family option 
 summary(m1.10)
@@ -489,6 +492,20 @@ plot_model(m1.11)
 anova(m1.9nb, m1.11, test = "Chisq") # adding jday and year as an interaction in slopes
 AIC(m1.9nb, m1.11)
 
+
+# According to Allison I could just run a model with the light and that should be it. # tried that below and also tried adding moon as an interacting term. it did not improve the fit. 
+m1.12<-glmmTMB(
+  n ~ trmt_bin + jday_s + I(jday_s^2) +  yr_s + 
+    (1 | site) + (1 + trmt_bin + jday_s + I(jday_s^2) | sp) + 
+    l.illum_s * trmt_bin +
+    jday_s * trmt_bin + I(jday_s^2) * trmt_bin + yr_s * trmt_bin,
+  
+  data = bm2,
+  family = nbinom2(link = "log")
+)
+summary(m1.12)
+plot_model(m1.12)
+AIC(m1.9nb, m1.12)
 
 # Marginal effect plots ---------------------------------------------------
 
@@ -543,7 +560,7 @@ p2
 p2 <- ggplot(pred2, aes(x = jday_s, y = estimate, color = sp, linetype = sp)) +
   geom_line(linewidth = 1) +  # Adjust line size for better visibility
   scale_color_viridis(discrete = TRUE, option = "D") +  # Use a colorblind-friendly palette
-  labs(y = "Bat calls", x = "Julian day", title = "Marginal effect plot jday_s by sp") +
+  labs(y = "Bat calls", x = "Julian day", title = "Marginal effect plot jday by sp") +
   theme_minimal() +  # Optional: adding a theme for better aesthetics
   theme(legend.title = element_blank())  # Remove legend title for cleaner appearance
 p2
@@ -643,6 +660,7 @@ a1
 plot_predictions(m1.9nb, condition = c("jday_s", "trmt_bin"), type = "response", vcov = T) +
   theme_minimal() +
   labs(y = "Predicted Bat Calls", x = "Julian Day", color = "Treatment")
+
 # plots -------------------------------------------------------------------
 
 

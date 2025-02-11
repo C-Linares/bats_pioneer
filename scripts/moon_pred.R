@@ -210,7 +210,11 @@ metadata_dt <- as.data.table(t(metadata))
 combined_data <- rbindlist(list(metadata_dt, moon.int), use.names = FALSE, fill = TRUE)
 fwrite(combined_data, file = "data_for_analysis/moon_pred/moon.int.csv", row.names = FALSE)
 
-# now the moon stats
+
+
+
+# now the moon statistics. 
+
 
 
 
@@ -234,8 +238,25 @@ moon.df <- do.call(rbind, moon.stat)
 
 #make it a dataframe with data.table 
 moon.df<-as.data.frame(moon.df)
+
 #write it as csv
 fwrite(moon.df, file = "data_for_analysis/moon_pred/moon.stat.csv", row.names = FALSE)
+# we read back the data set. 
+moon.df<-fread("data_for_analysis/moon_pred/moon.stat.csv")
+# now we include metadata. 
+metadata <- data.frame(
+  sunset = "Time of sunset",
+  sunrise = "Time of sunrise",
+  meanMoonlightIntensity = "Mean value of modeled illumination for the night",
+  minMoonlightIntensity = "Min value of modeled illumination for the night",
+  maxMoonlightIntensity = "Max value of modeled illumination for the night",
+  meanMoonPhase = "Mean value of moon phase (% of moon illuminated)",
+  minMoonPhase = "Min value of moon phase (% of moon illuminated)",
+  maxMoonPhase = "Max value of moon phase (% of moon illuminated)"
+)
+
+
+
 
 # calculate moon intensity
 # we use the combine data set to extract the bat calls time and dates for the 2021-2023 time frame. 
