@@ -3,28 +3,42 @@
 # 
 # author: Carlos Linares
 # date: Enero 2024
-# 
+
+
+# Notes: there are some species missing so we will have to add them. 
 
 #------------  load libraries
-library(tidyverse)
-library(magrittr)
-library(waldo)#compare objects in R
-library(data.table)
+
+pacman::p_load(
+  tidyverse, # for data manipulation
+  magrittr, # for the pipe operator %>%
+  waldo, # compare objects in R
+  data.table, # for fread and fwrite
+  ggplot2 # for plotting
+)
 
 
-
-# now we cant to caculate the ratio earlenght forarm length provided by Dr.Corsini. 
+# now we cant to calculate the ratio ear-lenght to forearm length provided by Dr.Corsini. 
 
 # Load necessary libraries
-library(ggplot2)
 
 # Create data frame
 bat_trait <- data.frame(
-  Species = c("Silver-haired", "Hoary bat", "Little brown bat", "Big brown bat", 
+  Species = c("Silver-haired bat", "Hoary bat", "Little brown bat", "Big brown bat", 
               "Long-legged Myotis", "Yuma myotis", "Myotis californicus", 
-              "Long-eared Myotis", "Pallid bat"),
+              "Long-eared Myotis", "Pallid bat", "Silver-haired bat","Western small-footed myotis","Long-legged myotis",""),
   Ear_Forearm_Ratio = c(0.22, 0.25, 0.28, 0.30, 0.34, 0.36, 0.38, 0.42, 0.50)
 )
+
+# load Species bat data
+# this file contains the four letter species codes.
+
+spcodes<-fread("data_for_analysis/Species_bats.csv")
+
+
+# Merge the bat trait and spcodes by species
+
+bat_trait <- merge(bat_trait, spcodes, by.x = "Species", by.y = "Common name")
 
 # Create the plot
 ggplot(bat_trait, aes(x = reorder(Species, Ear_Forearm_Ratio), y = Ear_Forearm_Ratio)) +
