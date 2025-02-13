@@ -55,31 +55,33 @@ pacman::p_load(
 )
 
 #load environment 
-#last worked 09/03/2024
-load(file = "working_env/glmm_v1.RData")
+load(file = "working_env/glmm_v2.RData") # not up to date
 
 #load data ---------------------------------------------------------------
 
 bm <- read_csv('data_for_analysis/prep_for_glmm/bm.csv')
-filtered_bm <- bm[!(bm$AUTO.ID. %in% c("Noise", "NoID")), ] # Noise needs to be filter out before analysis other whise there are more records in dark areas.
+
+filtered_bm <- bm[!(bm$AUTO.ID. %in% c("Noise", "NoID")), ] # Noise needs to be filter out before analysis other wise there are more records in dark areas.
+# rename col
 colnames(filtered_bm)[2] <- "sp" # change from AUTO.ID to sp
 
-#
+
 #load activity index
 
 bm.ai<- read_csv('data_for_analysis/prep_for_glmm/bm.miller.day.csv') # activity index for the bat species.
 filtered_bm.ai<-bm.ai[!(bm.ai$sp %in% c("Noise", "NoID")), ] # Noise needs to be filter out before analysis
 colnames(filtered_bm.ai)
+filtered_bm.ai$...1<-NULL # remove unnecessary variable. 
 # predictors --------------------------------------------------------------
 
 
 # bat traits arm/ear ratio
 
-btrait<-read.csv('data_for_analysis/bat_eararm.csv')
+btrait<-read.csv('data_for_analysis/bat_traits/bat_eararm_v2.csv') # load bat traits')
 
-# Creaters weather.
+# Creaters weather (night).
 
-crmo.wet<-fread("data_for_analysis/weather/craters_weater/craters_night.csv") # load creaters night weather. 
+crmo.wet.night<-read_csv("data_for_analysis/weather/craters_weater/craters_night.csv") # load creaters night weather. 
 
 
 # Moon
@@ -95,41 +97,43 @@ moon.int.night$date<-as_date(moon.int.night$date)
 bm2 <- left_join(filtered_bm, filtered_bm.ai[, c("sp", "site", "noche", "activity_min")], by = c("sp", "site", "noche"))
 
 # merge with traits
-bm2<- left_join(bm2, btrait, by=c("sp"="Six.letter.species.code"))
+bm2<- left_join(bm2, select(btrait, six_sp, ear.arm), by = c("sp" = "six_sp"))
 
-
-# it seems like the ear_forearm_ratio is missing for a few species. 
 summary(bm2)
 
-na_species_count <- bm2 %>%
-  group_by(sp, Species, Four.letter.species.code) %>%
-  filter(is.na(Ear_Forearm_Ratio)) %>%
-  summarise(na_count = n()) %>%
-  arrange(desc(na_count))
+# merge with weather
 
-#load sp names
-
-#merge na_species_count and spnames
-
-# rows_with_na <- filtered_bm[rowSums(is.na(filtered_bm)) > 0, ]
-
-bm2<-left_join(filtered_bm, elev, by="site" )
-bm2 <- left_join(bm2, ndvi, by = "site") %>%
-  select(-c( "time", "buff_area.x", "buff_area.y"))
-
-colnames(bm2)[1]<-"date" # change name noche to date for merging
-
-bm2$date<-lubridate::as_date(bm2$date)
-bm2<- left_join(bm2, weather, by="date")
+bm2<- left_join(bm2, crmo.wet.night, by=c("noche"="date"))
 
 
-bm2<- left_join(bm2, moon.adj, by=c("date"))
-# bm2<- left_join(bm2, effort_hrs, by=c("jday","site"))
+# merge with moon
+# summarize moon.int.night by date.
+m.moon.int<- moon.int.night %>%
+  group_by(date) %>%
+  summarise(
+    moonlight = mean(moonlightModel, na.rm = TRUE),
+    mphase = mean(moonPhase, na.rm = TRUE),
+    twilight = mean(twilightModel, na.rm = TRUE),
+    tillum = mean(illumination, na.rm = TRUE)
+  )
 
-bm2<-left_join(bm2, dst.mat, by="site")
+
+#
+bm2<- left_join(bm2, m.moon.int, by=c("noche"="date")) # merge with moon data
+
+
 
 # Identify rows with NA values
 rows_with_na <- bm2[rowSums(is.na(bm2)) > 0, ] # some wind and temp have NAs because we are missing august 2021 weather data.
+
+# make the rows with NAs to 0 
+bm2<- bm2 %>%
+  mutate(
+    moonlight = ifelse(is.na(moonlight), 0, moonlight),
+    mphase = ifelse(is.na(mphase), 0, mphase),
+    twilight = ifelse(is.na(twilight), 0, twilight),
+    tillum = ifelse(is.na(tillum), 0, tillum),
+  )
 
 summary(bm2)
 
@@ -1205,7 +1209,7 @@ ggsave(filename = "trmt_raneff_v2.png",plot = p7.1,device = "png", path = 'figur
 # save models -------------------------------------------------------------
 
 #save image 
-save.image(file = "working_env/glmm_v1.RData")
+save.image(file = "working_env/glmm_v2.RData")
 
 save(m1.5nb, file = "models/my_models.RData")
 save(m1.9nb, file = "models/m1.9nb.RData")
@@ -1521,6 +1525,12 @@ ggplot(abunddf, aes(x = jday_s_values, y = Mean)) +
 # print(c_hat_deviance)
 # 
 # model with offset effort  -------------------------------------------------------
+
+# na_species_count <- bm2 %>%
+#   group_by(sp, Species, Four.letter.species.code) %>%
+#   filter(is.na(Ear_Forearm_Ratio)) %>%
+#   summarise(na_count = n()) %>%
+#   arrange(desc(na_count))
 
 
 # m1.4_off <- glmer.nb(

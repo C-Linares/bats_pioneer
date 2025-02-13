@@ -667,6 +667,24 @@ I think I can get the positions from suncal y moonlit for illumination.\
 
 2/11/2025
 
-created new moon.stat and moon.lit data sets and saved them. The script. moon_pred has been updated. \
+created new moon.stat and moon.lit data sets and saved them. The script. moon_pred has been updated.\
 the glmm_v2 script created to analyze data with updated weather, moon, and trait data\
 bat trait script also needs work.
+
+------------------------------------------------------------------------
+
+2/12/2025
+
+💡Learned: I learned that the function read_csv from the package readr provides loads the data and keeps dates as dates when loaded. Maybe reduce the problems when parsing data.
+
+-   Working on bat traits to get all the traits possible.
+
+    -   done created the bat_eararm_v2.csv file.
+
+-   working on glmm_v2
+
+    -   I was mergen predictors with the data set and realize the moonlit data is missing dates. it seems like those are missing because they should be zeros. I don't know why. Now I know it was because some days the moon was zero or below the horizon so it should not be affecting.
+
+-   I also realized that summarizing the moon by night might not tell us much about the effect. for that we would need to find some other way to asses the effect of moon on bat calls. because the moon sometimes was not affecting or present when all bats were there.
+
+-   
