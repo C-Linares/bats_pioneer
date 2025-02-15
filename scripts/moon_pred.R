@@ -30,10 +30,9 @@
 # libraries ---------------------------------------------------------------
 
 
-if(!require("pacman"))
-  install.packages("pacman")
+if (!require("pacman")) install.packages("pacman")
 
-pacman::p_load(suncalc, sf, ggplot2, lunar, tidyverse, moonlit, beepr, data.table, parallel)
+pacman::p_load(suncalc, sf, ggplot2, lunar, tidyverse, moonlit, beepr, data.table, parallel, future)
 
 # moonlit  recommended by Kayba to Jesse Barber.
 
@@ -156,7 +155,6 @@ bat_combined<-read_csv(file = 'data_for_analysis/prep_for_glmm/bat_combined.csv'
 
 bat_combined<- bat_combined %>% filter(sp !="Noise")
 
-
 #--- 1pm times -----
   # here we are exploring if there are any wrong dates in the original data set because there are wrong dates in the moon intensity. For some reason there are recordings made at 1 pm at one site but these are all noise and will be filter out at the end. 
   
@@ -190,8 +188,16 @@ dir.create("data_for_analysis/moon_pred", recursive = TRUE, showWarnings = FALSE
 fwrite(sidalo, file = "data_for_analysis/moon_pred/sidalo.csv", row.names = FALSE) # fwrite does better than write.csv for large files and is faster. 
 
 
+# below is the non-reproducible way to get the results I need. 
+sidalo<-fread("data_for_analysis/moon_pred/sidalo.csv") # read the file to check it is ok.
+# extract date time for bm2
+nightsummary<-bm2 %>% select(site, noche) # get dates for summarized bat data from glmm_v2
 
+# merge with the coordinates
 
+sidalo<-left_join(nightsummary, sts, by="site") # merge with the coordinates
+str(sidalo) # check the data set.)
+sidalo$date_time<- as.POSIXct(sidalo$noche) # convert to date time
 # code suggestions by Kyle Shanon ---------------------------------------------------
 
 #
@@ -204,6 +210,11 @@ system.time(moon.int <- calculateMoonlightIntensity(
   sidalo$date_time ,
   e = 0.16
 ))
+
+
+# Optionally, retrieve the result once it is completed
+result <- value(moon_int_future)
+print(result)
 
 # this is the metadata for the moon.int data set.
 metadata <- data.frame(

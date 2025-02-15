@@ -683,8 +683,14 @@ bat trait script also needs work.
 
 -   working on glmm_v2
 
-    -   I was mergen predictors with the data set and realize the moonlit data is missing dates. it seems like those are missing because they should be zeros. I don't know why. Now I know it was because some days the moon was zero or below the horizon so it should not be affecting.
+    -   I merged predictors with the data set and realize the moonlit data is missing dates. it seems like those are missing because they should be zeros. I don't know why. Now I know it was because some days the moon was zero or below the horizon so it should not be affecting.
 
--   I also realized that summarizing the moon by night might not tell us much about the effect. for that we would need to find some other way to asses the effect of moon on bat calls. because the moon sometimes was not affecting or present when all bats were there.
+-   I also realized that summarizing the moon by night might not tell us much about the effect. for that we would need to find some other way to asses the effect of moon on bat calls. because the moon sometimes was not affecting or present when all bats were there
 
--   
+------------------------------------------------------------------------
+
+2/14/2025
+
+I was able to run a model with the new data. there's not much change in the results and predictions. I think we are good to go in this end. \
+
+next I will try to use the recomendations of allison and add some insect data as a predictor.

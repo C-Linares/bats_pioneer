@@ -138,42 +138,35 @@ bm2<- bm2 %>%
 summary(bm2)
 
 # correlation  ------------------------------------------------------------
-
-
+# before modelling we have to check for correlation between the predictors as VIF is not adequate for negative binomial models.
 # check for correlation 
+
 numeric_cols<- sapply(bm2, is.numeric) # separate all the num col
 cor1<-bm2[,numeric_cols] #keeps just the numeric
-cor1<-cor1 %>% select(-c("X_min","X_max","altitude","parallacticAngle","angle","lat", "lon", "yr" ))
+# cor1<-cor1 %>% select(-c("X_min","X_max","altitude","parallacticAngle","angle","lat", "lon", "yr" ))
 
 c1<- cor(cor1,use="pairwise.complete.obs")
 corrplot(c1, order= 'AOE')
 
-# make jday 
+# from the plot it seems like the tmp and wind speed, twilight and total illumination, and moonphase and moonlight are correlated not to be included in the model at the same time.
 
-bm2$jday<-yday(bm2$date)
-
-
+# standardize predictors ---------------------------------------------
+# calculate jday
+bm2$jday<-yday(bm2$noche)
 
 # List of variable names to be scaled
 variables_to_scale <- c(
-  "elev_mean",
-  "ndvi_mean",
-  "percent",
-  "jday",
-  "l.illum",
-  "avg_wind_speed",
-  "avg_temperature",
-  "phase",
-  "fraction",
-  "Sum_Distance"
+  "ear.arm",
+  "nit_avg_tempC",
+  "nit_avg_wspm.s",
+  "moonlight",
+  "mphase",
+  "twilight",
+  "tillum",
+  "jday"
 )
 
-# # Loop over each variable, scale it, and assign it back to the data frame with a new name
-# for (var in variables_to_scale) {
-#   bm2[[paste0(var, "_s")]] <- scale(bm2[[var]], center = TRUE, scale = TRUE)
-# }
-
-# 
+ 
 # # Loop over each variable, scale it by dividing by two standard deviations, and assign it back to the data frame with a new name
 for (var in variables_to_scale) {
   # Check if the column exists and is numeric
@@ -186,6 +179,7 @@ for (var in variables_to_scale) {
   }
 }
 
+summary(bm2) # visual check for new standardize variables.
 # make treatment -1 to 1
 
 bm2$trmt_bin <- ifelse(bm2$trmt_bin == 1, 1, -1)
@@ -210,7 +204,7 @@ cattle <- c( # sites with cattle
   "vizc02"
 )
 
-bm2$moo<- ifelse(bm2$site %in% cattle, 1, -1)htrfr
+bm2$moo<- ifelse(bm2$site %in% cattle, 1, -1)
 
 # explore data ------------------------------------------------------------
 
@@ -262,185 +256,45 @@ ggplot(bm2, aes(x = factor(jday), y = n, fill = treatmt)) +
 # glm no random effects ---------------------------------------------------
 
 
-# the model below is severely over-disperse. 
-m1.4 <- glmmTMB(
-  n ~ trmt_bin + jday_s + I(jday_s ^ 2) + percent_s + l.illum_s + elev_mean_s+
-    avg_wind_speed_s + avg_temperature_s+ yr_s,
-  data = bm2,
-  nbinom2(link = "log"))
-          
-
-summary(m1.4)
-
-# calculate c-hat
-# Calculate residual deviance and residual degrees of freedom
-residual_deviance <- deviance(m1.4)
-residual_df <- df.residual(m1.4)
-
-# Calculate c-hat using residual deviance
-c_hat_deviance <- residual_deviance / residual_df
-print(c_hat_deviance)
-
-# Calculate Pearson's chi-square statistic
-pearson_chisq <- sum(residuals(m1.4, type = "pearson")^2)
-
-# Calculate c-hat using Pearson's chi-square statistic
-c_hat_pearson <- pearson_chisq / residual_df
-print(c_hat_pearson)
-
-plot_model(m1.4, vline.color = "grey", transform = "exp")
-
-plot_model(m1.4, type = "pred", terms = c("trmt_bin[exp]"), ci.lvl = NA)
-plot_residuals(m1.4)
-get_model_data(m1.4)
 
 
 
 
 # Negative Binomial -------------------------------------------------------
 
-#this one needs a long time to run 
-library(MASS)
-m1.4_nb <- glmer.nb(
-  n ~ trmt_bin + jday_s + I(jday_s^2) + ndvi_mean_s + percent_s + PeakFreq_s + l.illum_s +
-    avg_wind_speed_s + avg_temperature_s + (1 | site) + (1 + trmt_bin + ndvi_mean_s + jday_s + I(jday_s^2) | sp),
-  data = bm2
-)
-summary(m1.4_nb)
-
-
-# Calculate residual deviance and residual degrees of freedom
-residual_deviance <- deviance(m1.4_nb)
-residual_df <- df.residual(m1.4_nb)
-
-# Calculate c-hat using residual deviance
-c_hat_deviance <- residual_deviance / residual_df
-print(c_hat_deviance)
-
-model_convergence <- m1.4_nb@optinfo$conv$opt
-print(model_convergence)
-
-#coefficients
-mcoef<-coef(m1.4_nb)
-
-?vif()
-
-
-
-# m1.5nb ------------------------------------------------------------------
-
- m1.5anb <- glmmTMB(
-   n ~ trmt_bin + jday_s + I(jday_s ^ 2) + percent_s  + l.illum_s +  # less complex model 
-     avg_wind_speed_s + avg_temperature_s + yr_s + elev_mean_s +
-     (1 |site) + (1 | sp),
-   data = bm2,
-   nbinom2(link = "log"))
-
- 
-m1.5nb <- glmmTMB(
-  n ~ trmt_bin + jday_s + I(jday_s ^ 2) + percent_s  + l.illum_s + # best model to date. 
-    avg_wind_speed_s + avg_temperature_s + yr_s + elev_mean_s +
-    (1 |site) + (1 + trmt_bin + jday_s + I(jday_s ^ 2) | sp),
-  data = bm2,   nbinom2(link = "log")
-)
-
-save(m1.5nb, 'models/')
-summary(m1.5nb)
-confint(m1.5nb)
-
-# Calculate residual deviance and residual degrees of freedom
-residual_deviance <- deviance(m1.5nb)
-residual_df <- df.residual(m1.5nb)
-
-# Calculate c-hat using residual deviance
-c_hat_deviance <- residual_deviance / residual_df
-print(c_hat_deviance)
-
-saveRDS(m1.5nb,"models/m1.5nb")
-
-
-p0<-plot_model(m1.5nb,colors = "gs")
-p0<-p0 + theme(
-  panel.grid.major = element_blank(),  # Remove major gridlines
-  panel.grid.minor = element_blank(),  # Remove minor gridlines
-  text = element_text(size = 16, color = "white"),  # Set text size and color
-  plot.background = element_rect(fill = "black"),  # Set background to black
-  panel.background = element_rect(fill = "black"),  # Set panel background to black
-  axis.text = element_text(color = "white"),  # Set axis text color to white
-  axis.title = element_text(color = "white"),  # Set axis title color to white
-  legend.background = element_rect(fill = "black"),  # Set legend background to black
-  legend.text = element_text(color = "white"),  # Set legend text to white
-  legend.title = element_text(color = "white")  # Set legend title to white
-)
-
-ggsave(filename = "m1.5nb_eff.tiff",plot = p0,device = "tiff", path = 'figures/glmm_v1/' , width = 12,height=6, units = "in" )
-ggsave(filename = "m1.5nb_eff.svg",plot = p0,device = "svg", path = 'figures/glmm_v1/',  width = 12,height=6, units = "in" )
-
-
-load('models/m1.5nb')
-
-tab_model(m1.5nb)
-
-
-# m1.6nb <- glmmTMB(
-#   n ~ trmt_bin + jday_s + I(jday_s ^ 2) + percent_s  + l.illum_s + # this one didn't even converge. 
-#     avg_wind_speed_s + avg_temperature_s + yr_s + elev_mean_s +
-#     (1 |site) + (1 + trmt_bin + jday_s + I(jday_s ^ 2) | sp),
-#   data = bm2,   nbinom1(link = "log") # change in the family from nbinom2 to nbinom1
-# )
-# summary(m1.6nb)
-
-
-# after meeting with Dr.Cruz suggested to try to do a interaction effect to see if the time and treatment have an effect
-
-m1.7nb <- glmmTMB(
-  n ~ trmt_bin + jday_s + I(jday_s^2) + percent_s  + l.illum_s + # just removed elevation. 
-    avg_wind_speed_s + avg_temperature_s + yr_s +
-    (1 | site) + (1 + trmt_bin + jday_s + I(jday_s^2) | sp),
-  data = bm2,
-  nbinom2(link = "log")
-) 
-
-# Compare the nested models using the anova function
-anova(m1.7nb, m1.5nb, test = "Chisq") #adding or removing elevation does not change much the model. 
-summary(m1.7nb)
-plot_model(m1.7nb)
-
-
-m1.8nb<-update(m1.7nb, ~  .+ jday_s * trmt_bin + I(jday_s^2) * trmt_bin) # adding jday and jday^2 as intereacting
-
-summary(m1.8nb)
-plot_model(m1.8nb)
-
-m1.9nb <- update(m1.8nb, ~ . + yr_s * trmt_bin) # adding year as an interaction 
-summary(m1.9nb)
-
-# just rewrote the model below to make it more readable.
-m1.9nb <- glmmTMB(
-  n ~ trmt_bin + jday_s + I(jday_s^2) + percent_s + l.illum_s + 
-    avg_wind_speed_s + avg_temperature_s + yr_s +
+m1.1nb <- glmmTMB(
+  n ~ trmt_bin + jday_s + I(jday_s^2) + moonlight_s +
+    nit_avg_wspm.s + yr_s +
     (1 | site) + (1 + trmt_bin + jday_s + I(jday_s^2) | sp) +
     jday_s * trmt_bin + I(jday_s^2) * trmt_bin + yr_s * trmt_bin,
   data = bm2,
   family = nbinom2(link = "log")
 )
 
+summary(m1.1nb)
+plot_model(m1.1nb)
+residual_deviance <- deviance(m1.1nb)
+residual_df <- df.residual(m1.1nb)
 
-m1.9nb_no_percent <- update(m1.9nb, . ~ . - percent_s)
-# plot model with title
-plot_model(m1.9nb, title = "Negative Binomial GLMM with Year, jday and Treatment Interaction")
-anova(m1.9nb, m1.9nb_no_percent, test = "Chisq") #seems like percent_s is not an predictor. 
+# Calculate c-hat using residual deviance
+c_hat_deviance <- residual_deviance / residual_df
+print(c_hat_deviance)
 
-# Summary of the updated model
-summary(m1.9nb_no_percent)
 
-# Plot the updated model
-plot_model(m1.9nb_no_percent)
+# using a poisson model did not converged...
+m1.1poisson <- glmmTMB(
+  n ~ trmt_bin + jday_s + I(jday_s^2) + moonlight_s +
+    nit_avg_wspm.s + yr_s +
+    (1 | site) + (1 + trmt_bin + jday_s + I(jday_s^2) | sp) +
+    jday_s * trmt_bin + I(jday_s^2) * trmt_bin + yr_s * trmt_bin,
+  data = bm2,
+  family = poisson(link = "log")
+)
+
+
 
 # Simulate residuals using DHARMa for GLMM
-sim_residuals <- simulateResiduals(m1.9nb, plot = FALSE,quantreg=T)
-plot(sim_residuals)
-#less zeros that expected talk about it. 
+sim_residuals <- simulateResiduals(m1.1nb, plot = T,quantreg=T)
 
 t1 <- testUniformity(sim_residuals) # model deviates from the expected distribution. What can we do about it? Jen said may not matter much. 
 t2 <- testZeroInflation(sim_residuals)
@@ -449,34 +303,11 @@ t4 <- testOutliers(sim_residuals) # model has some outliers... We have to find o
 
 # play with the comparison function in the marginal effects plot. 
 
-# Calculate residual deviance and residual degrees of freedom
-residual_deviance <- deviance(m1.9nb)
-residual_df <- df.residual(m1.9nb)
-
-# Calculate c-hat using residual deviance seems like the model m1.9nb is not over dispersed. 
-c_hat_deviance <- residual_deviance / residual_df
-print(c_hat_deviance)
-
 # Calculate R-squared values
-# seems like the fixed effects only explain 1.2% percent of the variance, while the fixed and random explain 70%
-# where is the R-squared function from? the r quared is comming from dharma package. (Allison suggest)
-# the answer is we use the performance package. 
-r_squared <- performance::r2(m1.9nb) 
+
+r_squared <- performance::r2(m1.1nb) 
 print(r_squared)
 
- 
-
-m1.10<- update(m1.9nb, ~ . , nbinom1(link = "log")) # testing the other negative binomial family option 
-summary(m1.10)
-
-
-# The comparison indicates that the model m1.9nb is preferable:
-# - It has the lowest AIC and deviance values, indicating a better fit.
-# - The differences in fit between m1.9nb and the more complex model m1.10 are not significant.
-# Therefore, m1.9nb is the best model among those compared.
-#it seems like there's no change between models. 
-AIC( m1.5nb,m1.7nb, m1.8nb, m1.9nb, m1.10) 
-anova(m1.5nb, m1.7nb, m1.8nb, m1.9nb, m1.10)
 
 
 # now we run a model with the interaction of yead and jday interaction with treatment inside the random slopes.
@@ -515,7 +346,7 @@ AIC(m1.9nb, m1.12)
 
 # marginal with marginal effects package. 
 
-p1.1<-plot_predictions(m1.9nb,                # The model we fit
+p1.1<-plot_predictions(m1.1nb,                # The model we fit
                  type = "response",     # We'd like the predictions on the scale of the response
                  conf_level = 0.95,     # With a 95% confidence interval
                  condition = c("trmt_bin", "yr_s"), # Plot predictions for "l.illum_s" while holding all others at their mean
@@ -524,7 +355,7 @@ p1.1<-plot_predictions(m1.9nb,                # The model we fit
   ylab("bat calls") +
   theme_bw()                             # White background
 
-p1.1 <- plot_predictions(m1.9nb,                # The model we fit
+p1.1 <- plot_predictions(m1.1nb,                # The model we fit
                          type = "response",     # We'd like the predictions on the scale of the response
                          conf_level = 0.95,     # With a 95% confidence interval
                          condition = c("trmt_bin", "yr_s"), # Plot predictions for "l.illum_s" while holding all others at their mean
@@ -539,7 +370,7 @@ p1.1 <- plot_predictions(m1.9nb,                # The model we fit
                     labels = c("-1" = "2021", "0" = "2022", "1" = "2023"), 
                     name = "Year")
 
-p1.2<-plot_predictions(m1.9nb,                # The model we fit
+p1.2<-plot_predictions(m1.1nb,                # The model we fit
                  type = "response",     # We'd like the predictions on the scale of the response
                  conf_level = 0.95,     # With a 95% confidence interval
                  condition = c("jday_s","trmt_bin"), 
@@ -550,7 +381,7 @@ p1.2<-plot_predictions(m1.9nb,                # The model we fit
 
 
 # marginal effect for jday by sp
-pred2 <- predictions(m1.9nb,
+pred2 <- predictions(m1.1nb,
                      newdata = datagrid(sp = bm2$sp,
                                         jday_s = seq(min(bm2$jday_s), max(bm2$jday_s), length.out = 100)))
 print(pred2)
@@ -589,7 +420,7 @@ p2 <- plot_marginal_effects(m1.9nb, "jday_s", "sp", "Marginal effect of jday_s b
 
 # marginal effect for year by sp
 
-pred3 <- predictions(m1.9nb,
+pred3 <- predictions(m1.1nb,
                      newdata = datagrid(sp = bm2$sp,
                                         yr_s = unique(bm2$yr_s)))
 
@@ -601,7 +432,7 @@ p3<- ggplot(pred3, aes(x =yr_s, y= estimate))+
             
 p3
 
-pred4<- predictions(m1.9nb,
+pred4<- predictions(m1.1nb,
                      newdata = datagrid(sp = bm2$sp,
                                         trmt_bin = unique(bm2$trmt_bin)))
 p4 <- ggplot(pred4, aes(x = trmt_bin, y = estimate, col=sp)) +
@@ -611,7 +442,7 @@ p4
 
 p4+ facet_wrap(~sp)
 
-preds<- predictions(m1.9nb)
+preds<- predictions(m1.1nb)
 preds$tmt<-ifelse(preds$trmt_bin==1, "light", "dark")
 # now add the years -1=2021, 0=2022, 1=2023
 preds$yr_s<-ifelse(preds$yr_s==-1, "2021", ifelse(preds$yr_s==0, "2022", "2023"))
