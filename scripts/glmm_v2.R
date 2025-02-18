@@ -89,7 +89,10 @@ crmo.wet.night<-read_csv("data_for_analysis/weather/craters_weater/craters_night
 moon.int.night<-fread("data_for_analysis/moon_pred/moon.int.night.csv")
 moon.int.night$date<-as_date(moon.int.night$date)
 
+# insects 
 
+c_bugs<-read_csv("data_for_analysis/insect_wranglin/c_bugs.csv") # load insect data.
+colnames(c_bugs)[3]<-"yr" # rename site
 
 # merge -------------------------------------------------------------------
 
@@ -137,18 +140,38 @@ bm2<- bm2 %>%
 
 summary(bm2)
 
+# merge with insects
+
+# calculate week for bm2 
+bm2$wk<-week(bm2$noche) # week of the year
+
+bm2<- left_join(bm2, c_bugs, by = c("site", "wk", "yr")) # merge with insects data
+
+# check for NAs
+summary(bm2)  
+
+#make NAs the 0 for t.insect, and t. lepidoptera given we don't have that data.
+
+bm2<- bm2 %>%
+  mutate(
+    t.insect = ifelse(t.insect==0, NA, t.insect),
+    t.lepidoptera = ifelse(t.lepidoptera==0, NA, t.lepidoptera)
+  )
+
+# we have several weeks in 2023 where there is no data 5600 lines.
+
+
 # correlation  ------------------------------------------------------------
 # before modelling we have to check for correlation between the predictors as VIF is not adequate for negative binomial models.
 # check for correlation 
 
 numeric_cols<- sapply(bm2, is.numeric) # separate all the num col
 cor1<-bm2[,numeric_cols] #keeps just the numeric
-# cor1<-cor1 %>% select(-c("X_min","X_max","altitude","parallacticAngle","angle","lat", "lon", "yr" ))
 
 c1<- cor(cor1,use="pairwise.complete.obs")
 corrplot(c1, order= 'AOE')
 
-# from the plot it seems like the tmp and wind speed, twilight and total illumination, and moonphase and moonlight are correlated not to be included in the model at the same time.
+# from the plot it seems like the tmp and wind speed, twilight, total illumination, moon phase and moonlight are correlated not to be included in the model at the same time. Insect variables like total lepidoptera and and total insects are also correlated with moon phase and light but less than 0.4
 
 # standardize predictors ---------------------------------------------
 # calculate jday
@@ -163,7 +186,9 @@ variables_to_scale <- c(
   "mphase",
   "twilight",
   "tillum",
-  "jday"
+  "jday",
+  "t.insect",
+  "t.lepidoptera"
 )
 
  
@@ -209,7 +234,6 @@ bm2$moo<- ifelse(bm2$site %in% cattle, 1, -1)
 # explore data ------------------------------------------------------------
 
 summary(bm2)
-# there are some bat 
 
 # Plot the distribution of the count data
 ggplot(bm2, aes(x = n)) +
@@ -250,15 +274,7 @@ ggplot(bm2, aes(x = factor(jday), y = n, fill = treatmt)) +
        fill = "Treatment") +  # Label adjustments
   theme(axis.text.x = element_text(angle = 45, hjust = 1))  # Rotate x-axis labels for better readability
 
-# models -------------------------------------------------------------------
-
-
-# glm no random effects ---------------------------------------------------
-
-
-
-
-
+# models ------------------------------------------------------------------
 
 # Negative Binomial -------------------------------------------------------
 
@@ -309,37 +325,70 @@ r_squared <- performance::r2(m1.1nb)
 print(r_squared)
 
 
+# m1.2nb Model ear/arm ratio and insects 
 
-# now we run a model with the interaction of yead and jday interaction with treatment inside the random slopes.
-# however the model does not converge.
-m1.11<- glmmTMB(
-  n ~ trmt_bin + jday_s + I(jday_s^2)  + l.illum_s + 
-    avg_wind_speed_s + avg_temperature_s + yr_s +
-    (1 | site) + (1 + trmt_bin * jday_s + I(jday_s^2) * trmt_bin + jday_s + I(jday_s^2)+ yr_s*trmt_bin  | sp),
-  data = bm2,
-  nbinom2(link = "log")
-)
-
-ranef(m1.11)
-summary(m1.11)
-plot_model(m1.11)
-anova(m1.9nb, m1.11, test = "Chisq") # adding jday and year as an interaction in slopes
-AIC(m1.9nb, m1.11)
-
-
-# According to Allison I could just run a model with the light and that should be it. # tried that below and also tried adding moon as an interacting term. it did not improve the fit. 
-m1.12<-glmmTMB(
-  n ~ trmt_bin + jday_s + I(jday_s^2) +  yr_s + 
-    (1 | site) + (1 + trmt_bin + jday_s + I(jday_s^2) | sp) + 
-    l.illum_s * trmt_bin +
+m1.2nb <- glmmTMB(
+  #fixed effects
+  n ~ trmt_bin + jday_s + I(jday_s^2) + moonlight_s +
+    nit_avg_wspm.s + yr_s + ear.arm_s + t.lepidoptera_s +
+    #random effects
+    (1 | site) + (1 + trmt_bin + jday_s + I(jday_s^2) | sp) +
+    #interactions
     jday_s * trmt_bin + I(jday_s^2) * trmt_bin + yr_s * trmt_bin,
-  
   data = bm2,
   family = nbinom2(link = "log")
 )
-summary(m1.12)
-plot_model(m1.12)
-AIC(m1.9nb, m1.12)
+
+# Output model summary
+summary(m1.2nb)
+
+# Plot model
+plot_model(m1.2nb)
+
+# Calculate and print c-hat using residual deviance
+c_hat_deviance <- deviance(m1.2nb) / df.residual(m1.2nb)
+print(c_hat_deviance)
+
+# Simulate residuals using DHARMa for GLMM
+sim_residuals <- simulateResiduals(m1.2nb, plot = TRUE, quantreg = TRUE)
+
+# Perform diagnostic tests on residuals
+testUniformity(sim_residuals)
+testZeroInflation(sim_residuals)
+testDispersion(sim_residuals)
+testOutliers(sim_residuals)
+
+# Calculate and print R-squared values
+r_squared <- performance::r2(m1.2nb)
+print(r_squared)
+
+
+# According to Allison I could just run a model with the light and that should be it. # tried that below and also tried adding moon as an interacting term. it did not improve the fit. 
+m1.3nb <- glmmTMB(
+  #fixed effects
+  n ~ trmt_bin + jday_s + I(jday_s^2) + yr_s +
+    (1 | site) + (1 + trmt_bin | sp) ,
+  data = bm2,
+  family = nbinom2(link = "log")
+)
+summary(m1.3nb)
+plot_model(m1.3nb)
+AIC(m1.3nb, m1.2nb) # AIC is lower for the model with the insects and ear/arm ratio.
+
+# Simulate residuals using DHARMa for GLMM
+sim_residuals <- simulateResiduals(m1.3nb, plot = TRUE, quantreg = TRUE)
+
+# Perform diagnostic tests on residuals
+testUniformity(sim_residuals)
+testZeroInflation(sim_residuals)
+testDispersion(sim_residuals)
+testOutliers(sim_residuals)
+
+# Calculate and print R-squared values
+r_squared <- performance::r2(m1.3nb)
+print(r_squared)
+
+
 
 # Marginal effect plots ---------------------------------------------------
 
@@ -494,6 +543,218 @@ a1
 plot_predictions(m1.9nb, condition = c("jday_s", "trmt_bin"), type = "response", vcov = T) +
   theme_minimal() +
   labs(y = "Predicted Bat Calls", x = "Julian Day", color = "Treatment")
+
+
+
+
+
+
+
+
+
+# Marginal effect plots m1.2nb --------------------------------------------
+
+# Below is marginal effect plot for moon illumination. 
+
+p2.1<-plot_predictions(m1.2nb,                # The model we fit
+                       type = "response",     # We'd like the predictions on the scale of the response
+                       conf_level = 0.95,     # With a 95% confidence interval
+                       condition = c("moonlight_s"), # Plot predictions 
+                       vcov = TRUE) +         # Compute and display the variance-covariance matrix
+  xlab("") +            # Labels for axes
+  ylab("bat calls") +
+  theme_bw()                             # White background
+p2.1
+
+# Create a data grid for predictions
+pred2.1 <- predictions(m1.2nb, 
+                       newdata = datagrid(moonlight_s = seq(min(bm2$moonlight_s), max(bm2$moonlight_s), 
+                                                            length.out = 100)))
+# Calculate non-standardized moonlight for graphics moonlight_s x (2xsd)+mean
+sdmoon<-sd(bm2$moonlight)
+mmoon<-mean(bm2$moonlight)
+pred2.1$moonlight<-pred2.1$moonlight_s*(2*sdmoon)+mmoon
+
+
+p2.1<-ggplot(pred2.1, aes(x = moonlight, y = estimate)) +
+     geom_line() +
+     geom_ribbon(aes(ymin = conf.low, ymax = conf.high), alpha = 0.2) +
+     labs(y = "Bat Calls", x = "Moonlight", title = "Marginal Effect of Moonlight") +
+     theme_minimal() + 
+     scale_color_viridis(discrete = TRUE, option = "D") +  # Use a colorblind-friendly palette
+     theme(legend.title = element_blank())  # Remove legend title for cleaner appearance
+p2.1
+
+
+pred2.2<- predictions(m1.2nb, 
+                       newdata = datagrid(wspm.s = seq(min(bm2$nit_avg_wspm.s_s), max(bm2$nit_avg_wspm.s_s), 
+                                                            length.out = 100)))
+
+
+# pred2.2$wspm<-pred2.2$wspd*(2*sd(bm2$nit_avg_wspm.s))+mean(bm2$nit_avg_wspm.s) # recalculate the non-standardized wind speed for graphics.
+
+p2.2 <- ggplot(pred2.2, aes(x = wspm.s, y = estimate)) +
+        geom_line()+
+        geom_ribbon(aes(ymin = conf.low, ymax = conf.high), alpha = 0.2)+
+        labs(y = "Bat Calls", x = "Wind Speed", title = "Marginal Effect of Wind Speed") +
+        theme_minimal() +
+        scale_color_viridis(discrete = TRUE, option = "D") +  # Use a colorblind-friendly palette
+        theme(legend.title = element_blank())  # Remove legend title for cleaner appearance
+p2.2
+
+
+
+# Marginal effect plot for year. 
+
+pred2.3 <- predictions(m1.2nb, 
+                       newdata = datagrid(yr_s = c(-1, 0, 1)))
+
+pred2.3
+# calculate non-standardized year for graphics
+pred2.3 <- pred2.3 %>%
+  mutate(yr = case_when(
+    yr_s == -1 ~ 2021,
+    yr_s == 0 ~ 2022,
+    TRUE ~ 2023
+  ))
+
+p2.3 <- ggplot(pred2.3, aes(x= as.factor(yr),y = estimate)) +
+        geom_abline()+
+        geom_ribbon(aes(ymin = CI, ymax = conf.high), alpha = 0.2) +
+
+p2.3
+
+plot_predictions(m1.2nb, # The model we fit
+                 type="response", # We'd like the predictions on the scale of the response
+                 conf_level=0.95, # With a 95% confidence interval
+                 condition=c("yr_s"),
+                 vcov=TRUE) # Compute and display the variance-covariance matrix
+
+
+plot_comparisons(m1.2nb,
+                 variables = list("trmt_bin" = c(-1,1)),
+                 condition = c("yr_s"),
+                 comparison = "difference",
+                 vcov=T)
+
+
+  # Remove legend title for cleaner appearance
+
+# marginal effect for jday by sp
+pred2 <- predictions(m1.1nb,
+                     newdata = datagrid(sp = bm2$sp,
+                                        jday_s = seq(min(bm2$jday_s), max(bm2$jday_s), length.out = 100)))
+print(pred2)
+p2 <- ggplot(pred2, aes(jday_s, estimate, color = sp)) +
+  geom_line() +
+  labs(y = "bat calls", x = "jday", title = "Quadratic growth model")+
+  facet_wrap(~sp, scales = "free_y")
+p2
+
+p2 <- ggplot(pred2, aes(x = jday_s, y = estimate, color = sp, linetype = sp)) +
+  geom_line(linewidth = 1) +  # Adjust line size for better visibility
+  scale_color_viridis(discrete = TRUE, option = "D") +  # Use a colorblind-friendly palette
+  labs(y = "Bat calls", x = "Julian day", title = "Marginal effect plot jday by sp") +
+  theme_minimal() +  # Optional: adding a theme for better aesthetics
+  theme(legend.title = element_blank())  # Remove legend title for cleaner appearance
+p2
+
+plot_marginal_effects <- function(model, x_var, group_var = NULL, title = NULL) {
+  pred <- predictions(model, newdata = datagrid(!!x_var := unique(bm2[[x_var]]),
+                                                sp = unique(bm2$sp)))
+  
+  p <- ggplot(pred, aes_string(x = x_var, y = "estimate", color = "sp")) +
+    geom_line() +
+    labs(y = "Bat calls", x = x_var, title = title) +
+    scale_color_viridis(discrete = TRUE, option = "D") +
+    theme_minimal()
+  
+  if (!is.null(group_var)) {
+    p <- p + facet_wrap(as.formula(paste("~", group_var)), scales = "free_y")
+  }
+  return(p)
+}
+
+
+p2 <- plot_marginal_effects(m1.9nb, "jday_s", "sp", "Marginal effect of jday_s by species")
+
+# marginal effect for year by sp
+
+pred3 <- predictions(m1.1nb,
+                     newdata = datagrid(sp = bm2$sp,
+                                        yr_s = unique(bm2$yr_s)))
+
+p3<- ggplot(pred3, aes(x =yr_s, y= estimate))+
+  geom_point()+
+  geom_errorbar( aes( ymin = conf.low, ymax = conf.high ) )+ 
+  facet_wrap(~sp, scales="free")
+
+
+p3
+
+pred4<- predictions(m1.1nb,
+                    newdata = datagrid(sp = bm2$sp,
+                                       trmt_bin = unique(bm2$trmt_bin)))
+p4 <- ggplot(pred4, aes(x = trmt_bin, y = estimate, col=sp)) +
+  geom_point() +
+  geom_line()
+p4
+
+p4+ facet_wrap(~sp)
+
+preds<- predictions(m1.1nb)
+preds$tmt<-ifelse(preds$trmt_bin==1, "light", "dark")
+# now add the years -1=2021, 0=2022, 1=2023
+preds$yr_s<-ifelse(preds$yr_s==-1, "2021", ifelse(preds$yr_s==0, "2022", "2023"))
+
+p5.1<- ggplot(preds, aes(x = jday_s, y = estimate, col=tmt))+ # not sure what is happening here. 
+  geom_line()+
+  facet_wrap(~sp, scales = "free_y")
+p5.1
+
+p5<-ggplot(preds, aes(tmt, estimate, col=yr_s)) +
+  geom_violin() +
+  geom_jitter(position = position_jitterdodge(jitter.width = 0.1, dodge.width = .75), size=0.4, alpha=0.9) +  #The jitter.width argument controls the amount of jitter, and the dodge.width argument controls the spacing between the categories (treatments and years).
+  facet_wrap(~sp, scales = "free_y")+
+  labs(y="estimate bat calls", x="", title="Boxplot of Estimated bat calls by Treatment, Year, and Species")+
+  scale_color_viridis(discrete = TRUE, option = "H")   # Use the viridis color palette
+# scale_colour_brewer(palette = "Spectral")+
+# theme_minimal()   # Optional: adding a theme for better aesthetics
+# theme(legend.position = "none")  # Optional: remove legend if not needed
+p5
+
+
+print(predictions(model = m1.9nb, 
+                  newdata = datagrid( yr_s= c(-1, 0, 1),
+                                      sp= unique(bm2$sp)),
+                  conf_level = 0.95))
+
+p6<- ggplot(preds, aes(x = jday_s, y = estimate, col=sp))+ # not sure what is happening here. 
+  geom_point()+
+  ylab("predicted bat calls")+
+  scale_color_viridis(discrete = TRUE, option = "H") +  # Use the viridis color palette
+  facet_grid(tmt~yr_s)
+p6
+
+# Create a list of plots and their corresponding filenames
+figures_dir <- "figures/glmm_v1/marginleffects_out"
+
+
+plots <- list(p1.1, p1.2, p2, p3, p4, p5.1, p5, p6)
+filenames <- c("p1.1.png", "p1.2.png", "p2.png", "p3.png", "p4.png", "p5.1.png", "p5.png", "p6.png")
+
+# Save all plots
+lapply(seq_along(plots), function(i) {
+  ggsave(filename = file.path(figures_dir, filenames[i]), plot = plots[[i]], device = "tiff", width = 15, height = 10, units = "cm")
+})
+
+library(sjPlot)
+a1<-tab_model(m1.9nb, show.icc = TRUE, show.aic = TRUE, show.re.var = TRUE)
+a1
+plot_predictions(m1.9nb, condition = c("jday_s", "trmt_bin"), type = "response", vcov = T) +
+  theme_minimal() +
+  labs(y = "Predicted Bat Calls", x = "Julian Day", color = "Treatment")
+
 
 # plots -------------------------------------------------------------------
 
