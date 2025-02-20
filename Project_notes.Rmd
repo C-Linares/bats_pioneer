@@ -725,7 +725,7 @@ I detected a small problem with the model above. I didn't run it with the standa
 
 -   Update the weather files for wind and temp given there were some large negative numbers (-999). Probably to indicate some error in the data collection.
 
--   I managed to plot the marginal effects for the significant fixed effects above: Moon, wind, year, ear/arm, lepidoptera, treatment x jday. \
+-   I managed to plot the marginal effects for the significant fixed effects above: Moon, wind, year, ear/arm, lepidoptera, treatment x jday.\
     \
     for example: I can see that as the season progress there are more bat calls at lit sites compared to dark.
 

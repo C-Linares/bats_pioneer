@@ -55,7 +55,7 @@ pacman::p_load(
 )
 
 #load environment 
-load(file = "working_env/glmm_v2.RData") # not up to date
+load(file = "working_env/glmm_v2.RData") 
 
 #load data ---------------------------------------------------------------
 
@@ -377,6 +377,21 @@ testOutliers(sim_residuals)
 r_squared <- performance::r2(m1.3nb)
 print(r_squared)
 
+
+# model with the light: insect interaction
+
+m1.4nb <- glmmTMB(
+  #fixed effects
+  n ~ trmt_bin + jday_s + I(jday_s^2) + moonlight_s +
+    nit_avg_wspm.s_s + yr_s + ear.arm_s + t.lepidoptera_s +
+    #random effects
+    (1 | site) + (1 + trmt_bin + jday_s + I(jday_s^2) | sp) +
+    #interactions
+    jday_s * trmt_bin + I(jday_s^2) * trmt_bin + yr_s * trmt_bin + trmt_bin*t.lepidoptera_s + trmt_bin*moonlight_s,
+  data = bm2,
+  family = nbinom2(link = "log")
+)
+summary(m1.4nb)
 
 
 # Marginal effect plots ---------------------------------------------------
@@ -704,6 +719,26 @@ p2.6<-ggplot(pred2.6, aes(x = jday, y = estimate, colour =tmt )) +
 
 p2.6
 # now the random effects. 
+
+# treatment by sp.
+
+pred2.7 <- predictions(m1.2nb) # re.form = NULL to get the marginal effect without random effects
+
+pred2.7 <- predictions(m1.2nb,
+                     newdata = datagrid(sp = bm2$sp,
+                                        trmt_bin = unique(bm2$trmt_bin)))
+
+p2.7 <- ggplot(pred2.7, aes(x = trmt_bin, y = estimate, color = sp)) +
+  geom_point() +
+  geom_line() +
+  labs(y = "Bat Calls", x = "Treatment", title = "Marginal Effect of Treatment by Species") +
+  theme_minimal() +
+  scale_color_viridis(discrete = TRUE, option = "D") +  # Use a colorblind-friendly palette
+  theme(legend.title = element_blank())  # Remove legend title for cleaner appearance
+
+p2.7
+p2.7i<-p2.7+ facet_wrap(~sp, scales = "free_y")
+p2.7i
 
 
 
