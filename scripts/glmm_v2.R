@@ -1274,8 +1274,7 @@ ggsave(filename = "trmt_raneff_v2.png",plot = p7.1,device = "png", path = 'figur
 #save image 
 save.image(file = "working_env/glmm_v2.RData")
 
-save(m1.5nb, file = "models/my_models.RData")
-save(m1.9nb, file = "models/m1.9nb.RData")
+save(m1.2nb, file = "models/m1.2nb.RData") # best model up to 2/19/2025
 
 load("models/my_models.RData")
 
