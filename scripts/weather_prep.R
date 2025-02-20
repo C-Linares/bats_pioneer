@@ -153,6 +153,17 @@ cromo_wtr <- cmon %>%
 
 summary(cromo_wtr)
 
+# make any -999 into NA. Seems like that is the tag for errors
+cromo_wtr <- cromo_wtr %>%
+  mutate(
+    wnspd_ms = ifelse(wnspd_ms == -999, NA, wnspd_ms),
+    vwndspd_ms = ifelse(vwndspd_ms == -999, NA, vwndspd_ms),
+    wnddir_deg = ifelse(wnddir_deg == -999, NA, wnddir_deg),
+    temp_degc = ifelse(temp_degc == -999, NA, temp_degc),
+    sol_wm2 = ifelse(sol_wm2 == -999, NA, sol_wm2)
+  )
+
+
 # summarize data by night. 
 
 cromo_night <- cromo_wtr %>%
@@ -163,7 +174,8 @@ cromo_night <- cromo_wtr %>%
     nit_avg_wspm.s = mean(wnspd_ms, na.rm = TRUE)
   )
 
-summary(cromo_night)
+summary(cromo_night) # Observ that the min temp is -827.83 and the min wind speed is -831.592. I need to correct that data 
+
 
 # summarize data by day
 
@@ -174,6 +186,9 @@ cromo_day <- cromo_wtr %>%
     day_avg_tempC = mean(temp_degc, na.rm = TRUE),
     day_avg_wspm.s = mean(wnspd_ms, na.rm = TRUE)
   )
+
+summary(cromo_day) # Observ that the min temp is -827.83 and the min wind speed is -831.592. I need to correct that data
+
 
 # Write data --------------------------------------------------------------
 
@@ -186,6 +201,8 @@ write.csv(cromo_wtr, file = "data_for_analysis/weather/craters_weater/craters_wt
 # Create a README file with information about the script
 readme_content <- "Carlos Linares, 2/5/2025
 the firle craters_wtr.csv contains the weather data from the Craters of the Moon National Monument and Preserve. The data was collected from 2021 to 2023. The data was filtered to include only the months of May to September. The data includes the following columns: date.time, wnspd_ms, vwndspd_ms, wnddir_deg, temp_degc, sol_wm2, date, and hour. It was produced with the weather_prep.R script.
+
+2/19/2025 updated the csv files given there was large negative numbers in the wind speed and temperature (-999) probably a tag for indicating an error. 
  "
 # Write the README content to a file
 writeLines(readme_content, "data_for_analysis/weather/craters_weater/README.txt")

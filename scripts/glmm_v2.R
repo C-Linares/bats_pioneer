@@ -96,7 +96,8 @@ colnames(c_bugs)[3]<-"yr" # rename site
 
 # merge -------------------------------------------------------------------
 
-# bm and bm.ai merge
+# activity index with bat data. 
+
 bm2 <- left_join(filtered_bm, filtered_bm.ai[, c("sp", "site", "noche", "activity_min")], by = c("sp", "site", "noche"))
 
 # merge with traits
@@ -158,7 +159,7 @@ bm2<- bm2 %>%
     t.lepidoptera = ifelse(t.lepidoptera==0, NA, t.lepidoptera)
   )
 
-# we have several weeks in 2023 where there is no data 5600 lines.
+# we have several weeks in 2023 where there is no data 5659 lines.
 
 
 # correlation  ------------------------------------------------------------
@@ -261,18 +262,6 @@ ggplot(bm2, aes(x=jday, y=n, col=treatmt))+
        y = "n calls",
        color = "Treatment")
 
-# Adjusted code to create a violin plot
-ggplot(bm2, aes(x = factor(jday), y = n, fill = treatmt)) +
-  geom_violin(trim = FALSE) +  # Violin plot to show data distribution
-  geom_jitter(position = position_jitter(width = 0.2), alpha = 0.5) +  # Adding jitter for better visibility of individual points
-  facet_wrap(~ sp, scales = "free_y") +  # Facet by species with free y scales
-  theme_minimal() +  # Use a minimal theme for better aesthetics
-  scale_fill_manual(values = c("#0033A0", "#D64309")) +  # Custom color for treatments
-  labs(title = "Bat Acoustic Activity 2021-2023",
-       x = "Julian Day",
-       y = "Number of Calls",
-       fill = "Treatment") +  # Label adjustments
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))  # Rotate x-axis labels for better readability
 
 # models ------------------------------------------------------------------
 
@@ -330,7 +319,7 @@ print(r_squared)
 m1.2nb <- glmmTMB(
   #fixed effects
   n ~ trmt_bin + jday_s + I(jday_s^2) + moonlight_s +
-    nit_avg_wspm.s + yr_s + ear.arm_s + t.lepidoptera_s +
+    nit_avg_wspm.s_s + yr_s + ear.arm_s + t.lepidoptera_s +
     #random effects
     (1 | site) + (1 + trmt_bin + jday_s + I(jday_s^2) | sp) +
     #interactions
@@ -373,7 +362,7 @@ m1.3nb <- glmmTMB(
 )
 summary(m1.3nb)
 plot_model(m1.3nb)
-AIC(m1.3nb, m1.2nb) # AIC is lower for the model with the insects and ear/arm ratio.
+AIC(m1.3nb, m1.2nb,m1.1nb) # AIC is lower for the model with the insects and ear/arm ratio.
 
 # Simulate residuals using DHARMa for GLMM
 sim_residuals <- simulateResiduals(m1.3nb, plot = TRUE, quantreg = TRUE)
@@ -566,7 +555,7 @@ p2.1<-plot_predictions(m1.2nb,                # The model we fit
   theme_bw()                             # White background
 p2.1
 
-# Create a data grid for predictions
+# Create a data grid for predictions to replicate plot above.
 pred2.1 <- predictions(m1.2nb, 
                        newdata = datagrid(moonlight_s = seq(min(bm2$moonlight_s), max(bm2$moonlight_s), 
                                                             length.out = 100)))
@@ -585,31 +574,46 @@ p2.1<-ggplot(pred2.1, aes(x = moonlight, y = estimate)) +
      theme(legend.title = element_blank())  # Remove legend title for cleaner appearance
 p2.1
 
-
+# Marginal effect plot for wind speed.
 pred2.2<- predictions(m1.2nb, 
-                       newdata = datagrid(wspm.s = seq(min(bm2$nit_avg_wspm.s_s), max(bm2$nit_avg_wspm.s_s), 
-                                                            length.out = 100)))
+                       newdata = datagrid(nit_avg_wspm.s_s = seq(min(bm2$nit_avg_wspm.s_s), max(bm2$nit_avg_wspm.s_s), 
+                                                            length.out = 100)),
+                      re.form = NA) # re.form = NA to get the marginal effect of wind speed without random effects.)
 
+# Calculate non-standardized wind speed for graphics
+pred2.2$wspm.s<-pred2.2$nit_avg_wspm.s_s*(2*sd(bm2$nit_avg_wspm.s))+mean(bm2$nit_avg_wspm.s) # recalculate the non-standardized wind speed for graphics.
 
-# pred2.2$wspm<-pred2.2$wspd*(2*sd(bm2$nit_avg_wspm.s))+mean(bm2$nit_avg_wspm.s) # recalculate the non-standardized wind speed for graphics.
-
-p2.2 <- ggplot(pred2.2, aes(x = wspm.s, y = estimate)) +
+p2.2 <- ggplot(pred2.2, aes(x = wspm.s, y = estimate, ymin= conf.low, ymax=conf.high)) +
         geom_line()+
-        geom_ribbon(aes(ymin = conf.low, ymax = conf.high), alpha = 0.2)+
+        geom_ribbon( alpha = 0.2)+
         labs(y = "Bat Calls", x = "Wind Speed", title = "Marginal Effect of Wind Speed") +
         theme_minimal() +
         scale_color_viridis(discrete = TRUE, option = "D") +  # Use a colorblind-friendly palette
-        theme(legend.title = element_blank())  # Remove legend title for cleaner appearance
+        theme(legend.title = element_blank())+  # Remove legend title for cleaner appearance
 p2.2
-
 
 
 # Marginal effect plot for year. 
 
+t<-plot_predictions(m1.2nb,                # The model we fit
+                       type = "response",     # We'd like the predictions on the scale of the response
+                       conf_level = 0.95,     # With a 95% confidence interval
+                       condition = c("trmt_bin", "yr_s"), # Plot predictions for "l.illum_s" while holding all others at their mean
+                       vcov = TRUE) +         # Compute and display the variance-covariance matrix
+  xlab("") +            # Labels for axes
+  ylab("bat calls") +
+  theme_bw()       
+
+t
 pred2.3 <- predictions(m1.2nb, 
-                       newdata = datagrid(yr_s = c(-1, 0, 1)))
+                       newdata = datagrid(yr_s = unique(bm2$yr_s),
+                                          trmt_bin = unique(bm2$trmt_bin),
+                                          sp=NA),
+                       # re.form = NA,
+                       conf_level = 0.95) 
 
 pred2.3
+
 # calculate non-standardized year for graphics
 pred2.3 <- pred2.3 %>%
   mutate(yr = case_when(
@@ -617,124 +621,91 @@ pred2.3 <- pred2.3 %>%
     yr_s == 0 ~ 2022,
     TRUE ~ 2023
   ))
+# add dark and light 
 
-p2.3 <- ggplot(pred2.3, aes(x= as.factor(yr),y = estimate)) +
-        geom_abline()+
-        geom_ribbon(aes(ymin = CI, ymax = conf.high), alpha = 0.2) +
+pred2.3$treatment<-ifelse(pred2.3$trmt_bin==1, "light", "dark")
+
+# Create the plot using ggplot2
+p2.3 <- ggplot(pred2.3, aes(x = factor(yr), y = estimate, colour = factor(treatment))) +
+  geom_point() +
+  geom_line() +
+  geom_smooth(aes(ymin = conf.low, ymax = conf.high), alpha = 0.2) +
+  labs(x = "Year", y = "Predicted bat calls", color = "Treatment") +
+  theme_bw()
 
 p2.3
 
-plot_predictions(m1.2nb, # The model we fit
-                 type="response", # We'd like the predictions on the scale of the response
-                 conf_level=0.95, # With a 95% confidence interval
-                 condition=c("yr_s"),
-                 vcov=TRUE) # Compute and display the variance-covariance matrix
+# marginal effect ear/arm ratio. 
+pred2.4<- predictions(m1.2nb, 
+                      by= "ear.arm_s",
+                       newdata = datagrid(ear.arm_s = seq(min(bm2$ear.arm_s), max(bm2$ear.arm_s),
+                                                            length.out = 100)),
+                      re.form = NA) # re.form = NA to get the marginal effect of wind speed without random effects.)
+#calculate non-standardized ear/arm ratio for graphics
+pred2.4$ear.arm<-pred2.4$ear.arm_s*(2*sd(bm2$ear.arm))+mean(bm2$ear.arm) # recalculate the non-standardized ear/arm ratio for graphics.
 
 
-plot_comparisons(m1.2nb,
-                 variables = list("trmt_bin" = c(-1,1)),
-                 condition = c("yr_s"),
-                 comparison = "difference",
-                 vcov=T)
-
-
-  # Remove legend title for cleaner appearance
-
-# marginal effect for jday by sp
-pred2 <- predictions(m1.1nb,
-                     newdata = datagrid(sp = bm2$sp,
-                                        jday_s = seq(min(bm2$jday_s), max(bm2$jday_s), length.out = 100)))
-print(pred2)
-p2 <- ggplot(pred2, aes(jday_s, estimate, color = sp)) +
+p2.4<- ggplot(pred2.4, aes(x = ear.arm, y = estimate)) +
   geom_line() +
-  labs(y = "bat calls", x = "jday", title = "Quadratic growth model")+
-  facet_wrap(~sp, scales = "free_y")
-p2
-
-p2 <- ggplot(pred2, aes(x = jday_s, y = estimate, color = sp, linetype = sp)) +
-  geom_line(linewidth = 1) +  # Adjust line size for better visibility
+  geom_ribbon(aes(ymin = conf.low, ymax = conf.high), alpha = 0.2) +
+  labs(y = "Bat Calls", x = "Ear/Arm Ratio", title = "Marginal Effect of Ear/Arm Ratio") +
+  theme_minimal() +
   scale_color_viridis(discrete = TRUE, option = "D") +  # Use a colorblind-friendly palette
-  labs(y = "Bat calls", x = "Julian day", title = "Marginal effect plot jday by sp") +
-  theme_minimal() +  # Optional: adding a theme for better aesthetics
   theme(legend.title = element_blank())  # Remove legend title for cleaner appearance
-p2
 
-plot_marginal_effects <- function(model, x_var, group_var = NULL, title = NULL) {
-  pred <- predictions(model, newdata = datagrid(!!x_var := unique(bm2[[x_var]]),
-                                                sp = unique(bm2$sp)))
-  
-  p <- ggplot(pred, aes_string(x = x_var, y = "estimate", color = "sp")) +
-    geom_line() +
-    labs(y = "Bat calls", x = x_var, title = title) +
-    scale_color_viridis(discrete = TRUE, option = "D") +
-    theme_minimal()
-  
-  if (!is.null(group_var)) {
-    p <- p + facet_wrap(as.formula(paste("~", group_var)), scales = "free_y")
-  }
-  return(p)
-}
+p2.4
 
+# marginal effect for total lepidoptera.
 
-p2 <- plot_marginal_effects(m1.9nb, "jday_s", "sp", "Marginal effect of jday_s by species")
+# Remove NA values from the t.lepidoptera_s variable
+cleaned_t_lepidoptera_s <- na.omit(bm2$t.lepidoptera_s)
 
-# marginal effect for year by sp
+# Create the sequence without NA values
+t_lepidoptera_s_seq <- seq(min(cleaned_t_lepidoptera_s), max(cleaned_t_lepidoptera_s), length.out = 100)
 
-pred3 <- predictions(m1.1nb,
-                     newdata = datagrid(sp = bm2$sp,
-                                        yr_s = unique(bm2$yr_s)))
+# Generate predictions using the cleaned sequence
+pred2.5 <- predictions(m1.2nb, 
+                       by = "t.lepidoptera_s",
+                       newdata = datagrid(t.lepidoptera_s = t_lepidoptera_s_seq),
+                       re.form = NA) # re.form = NA to get the marginal effect without random effects
 
-p3<- ggplot(pred3, aes(x =yr_s, y= estimate))+
-  geom_point()+
-  geom_errorbar( aes( ymin = conf.low, ymax = conf.high ) )+ 
-  facet_wrap(~sp, scales="free")
+# Calculate non-standardized total lepidoptera for graphics
+
+pred2.5$t.lepidoptera<-pred2.5$t.lepidoptera_s*(2*sd(bm2$t.lepidoptera,na.rm = T))+mean(bm2$t.lepidoptera, na.rm=T) # recalculate the non-standardized total lepidoptera for graphics.
 
 
-p3
+p2.5 <- ggplot(pred2.5, aes(x = t.lepidoptera, y = estimate)) +
+  geom_line() +
+  geom_ribbon(aes(ymin = conf.low, ymax = conf.high), alpha = 0.2) +
+  labs(y = "Bat Calls", x = "Total Lepidoptera", title = "Marginal Effect of Total Lepidoptera") +
+  theme_minimal() +
+  scale_color_viridis(discrete = TRUE, option = "D") +  # Use a colorblind-friendly palette
+  theme(legend.title = element_blank())  # Remove legend title for cleaner appearance
+p2.5
 
-pred4<- predictions(m1.1nb,
-                    newdata = datagrid(sp = bm2$sp,
-                                       trmt_bin = unique(bm2$trmt_bin)))
-p4 <- ggplot(pred4, aes(x = trmt_bin, y = estimate, col=sp)) +
+# marginal effect for interaction treatment and yday
+
+pred2.6 <- predictions(m1.2nb,
+                       re.form = NA)
+#adding treatment labels
+pred2.6$tmt<-ifelse(pred2.6$trmt_bin==1, "light", "dark")
+#calculating non-standardized jday for graphics
+pred2.6$jday<-pred2.6$jday_s*(2*sd(bm2$jday))+mean(bm2$jday) # recalculate the non-standardized jday for graphics.
+
+
+p2.6<-ggplot(pred2.6, aes(x = jday, y = estimate, colour =tmt )) +
   geom_point() +
-  geom_line()
-p4
+  geom_smooth(method = 'auto', colour="black") +
+  facet_wrap(~tmt) +
+  labs(y = "Bat Calls", x = "Julian Day", title = "Marginal Effect of Julian") +
+  theme_minimal() +
+  scale_color_viridis(discrete = T, option = "H") +  # Use a colorblind-friendly palette
+  theme(legend.title = element_blank())  # Remove legend title for cleaner appearance
 
-p4+ facet_wrap(~sp)
-
-preds<- predictions(m1.1nb)
-preds$tmt<-ifelse(preds$trmt_bin==1, "light", "dark")
-# now add the years -1=2021, 0=2022, 1=2023
-preds$yr_s<-ifelse(preds$yr_s==-1, "2021", ifelse(preds$yr_s==0, "2022", "2023"))
-
-p5.1<- ggplot(preds, aes(x = jday_s, y = estimate, col=tmt))+ # not sure what is happening here. 
-  geom_line()+
-  facet_wrap(~sp, scales = "free_y")
-p5.1
-
-p5<-ggplot(preds, aes(tmt, estimate, col=yr_s)) +
-  geom_violin() +
-  geom_jitter(position = position_jitterdodge(jitter.width = 0.1, dodge.width = .75), size=0.4, alpha=0.9) +  #The jitter.width argument controls the amount of jitter, and the dodge.width argument controls the spacing between the categories (treatments and years).
-  facet_wrap(~sp, scales = "free_y")+
-  labs(y="estimate bat calls", x="", title="Boxplot of Estimated bat calls by Treatment, Year, and Species")+
-  scale_color_viridis(discrete = TRUE, option = "H")   # Use the viridis color palette
-# scale_colour_brewer(palette = "Spectral")+
-# theme_minimal()   # Optional: adding a theme for better aesthetics
-# theme(legend.position = "none")  # Optional: remove legend if not needed
-p5
+p2.6
+# now the random effects. 
 
 
-print(predictions(model = m1.9nb, 
-                  newdata = datagrid( yr_s= c(-1, 0, 1),
-                                      sp= unique(bm2$sp)),
-                  conf_level = 0.95))
-
-p6<- ggplot(preds, aes(x = jday_s, y = estimate, col=sp))+ # not sure what is happening here. 
-  geom_point()+
-  ylab("predicted bat calls")+
-  scale_color_viridis(discrete = TRUE, option = "H") +  # Use the viridis color palette
-  facet_grid(tmt~yr_s)
-p6
 
 # Create a list of plots and their corresponding filenames
 figures_dir <- "figures/glmm_v1/marginleffects_out"
@@ -1312,6 +1283,24 @@ load("models/my_models.RData")
 
 
 # trash -------------------------------------------------------------------
+
+# the plot below takes long to run and does not display the data well.
+# # Adjusted code to create a violin plot
+# ggplot(bm2, aes(x = factor(jday), y = n, fill = treatmt)) +
+#   geom_violin(trim = FALSE) +  # Violin plot to show data distribution
+#   geom_jitter(position = position_jitter(width = 0.2), alpha = 0.5) +  # Adding jitter for better visibility of individual points
+#   facet_wrap(~ sp, scales = "free_y") +  # Facet by species with free y scales
+#   theme_minimal() +  # Use a minimal theme for better aesthetics
+#   scale_fill_manual(values = c("#0033A0", "#D64309")) +  # Custom color for treatments
+#   labs(title = "Bat Acoustic Activity 2021-2023",
+#        x = "Julian Day",
+#        y = "Number of Calls",
+#        fill = "Treatment") +  # Label adjustments
+#   theme(axis.text.x = element_text(angle = 45, hjust = 1))  # Rotate x-axis labels for better readability
+
+
+
+
 
 # # marginal effect for trmt_bin by sp 
 # plot_predictions(m1.9nb,

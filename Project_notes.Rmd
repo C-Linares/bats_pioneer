@@ -693,24 +693,48 @@ bat trait script also needs work.
 
 I was able to run a model with the new data. there's not much change in the results and predictions. I think we are good to go in this end.\
 
-next I will try to use Allison's recommendations for plotting graphs and will add insect data as predictors too. \
+next I will try to use Allison's recommendations for plotting graphs and will add insect data as predictors too.\
 
 ------------------------------------------------------------------------
 
 2/18/2025
 
-I will try some models using insects and trait data as predictors now. \
+I will try some models using insects and trait data as predictors now.\
 
 -   I tried the model and did a good model m1.2nb. Needs to be rerun because the crom.wet.night has some values that are negative but should not be there.
 
 ![](images/clipboard-3240820724.png)
 
-See above, there are negative wind speeds that should be made into NAs. Same for temperature see below. \
+See above, there are negative wind speeds that should be made into NAs. Same for temperature see below.\
 ![](images/clipboard-2214509172.png)
 
-I did some progress but I need to improve my graphs for marginal effects. I have one of the overall effect of year but it is very shity. I need to improve it (see below). Predicted bat calls by year \
+I did some progress but I need to improve my graphs for marginal effects. I have one of the overall effect of year but it is very shity. I need to improve it (see below). Predicted bat calls by year\
 \
 ![](images/clipboard-488047144.png)
 
-Last model I feel good about. \
+Last model I feel good about.\
 ![](images/clipboard-2074473109.png)
+
+------------------------------------------------------------------------
+
+2/19/2025
+
+I detected a small problem with the model above. I didn't run it with the standardized wind speed. results are not that much different see below.
+
+![](images/clipboard-2295829368.png)
+
+-   Update the weather files for wind and temp given there were some large negative numbers (-999). Probably to indicate some error in the data collection.
+
+-   I managed to plot the marginal effects for the significant fixed effects above: Moon, wind, year, ear/arm, lepidoptera, treatment x jday. \
+    \
+    for example: I can see that as the season progress there are more bat calls at lit sites compared to dark.
+
+![](images/clipboard-3830088763.png)
+
+I also realized I don't know the difference between different ways of predicting using the marginal effects plots (below):\
+\
+![](images/clipboard-288233758.png)
+
+and this other way.
+
+![](images/clipboard-1758015563.png)
