@@ -738,3 +738,23 @@ I also realized I don't know the difference between different ways of predicting
 and this other way.
 
 ![](images/clipboard-1758015563.png)
+
+------------------------------------------------------------------------
+
+2/20/2025
+
+I ran another model with the interaction of treatment and moonlight and I also did the interaction of treatment and lepidoptera.
+
+I have trouble interpreting the interaction between treatment and lepidoptera. the summary of the model indicates it is negative. So where there's more light there are less insects and thus less bats???? but where there are more insects there are more bats?
+
+![](images/clipboard-2221427296.png)
+
+------------------------------------------------------------------------
+
+2/21/2025
+
+I had a meeting with Jesse, he suggested removing the ear/arm ratio. Also he say the importance of seeing overall insect counts instead of just lepidoptera to see if the pattern holds. I ran a model just using 2021-2022 data. It seemed like the number of insects would be detrimental for the number of calls. (see below). The model also has the highest RMSE indicating not a great fit.
+
+![](images/clipboard-3574308006.png)
+
+I also ran a model with the acoustic index instead of the bat calls counts. The results are also slightly different.

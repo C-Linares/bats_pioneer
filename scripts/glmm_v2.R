@@ -394,6 +394,55 @@ m1.4nb <- glmmTMB(
 summary(m1.4nb)
 
 
+# after meeting with Jesse we discuss running a model without the ear/arm ratio and try to run a model with the insects and the try to use all insects but with just the two years. to see what is the pattern observed. 
+
+#select just years 2021-2022 from the bm2 data.
+bm2.y21.22<-bm2[bm2$yr != 2023,]
+
+m1.5nb<- glmmTMB(
+  #fixed effects
+  n ~ trmt_bin + jday_s + I(jday_s^2) + moonlight_s +
+    nit_avg_wspm.s_s + yr_s + t.insect_s +
+    #random effects
+    (1 | site) + (1 + trmt_bin + jday_s + I(jday_s^2) + moonlight_s | sp) +
+    #interactions
+    jday_s * trmt_bin + I(jday_s^2) * trmt_bin + yr_s * trmt_bin,
+  data = bm2.y21.22,
+  family = nbinom2(link = "log")
+)
+
+summary(m1.5nb)
+performance(m1.5nb)
+r2(m1.5nb)
+check_model(m1.5nb)
+check_overdispersion(m1.5nb)
+check_collinearity(m1.5nb)
+
+per1<-compare_performance(m1.5nb, m1.4nb, m1.3nb, m1.2nb, m1.1nb)
+
+plot_model(m1.5nb)
+
+
+# acoustic activity index models ------------------------------------
+
+# now instead of using the bat call counts we are going to use the activity index from the bm2 dataset (activity_min).
+
+m2.1<-glmmTMB(
+  #fixed effects
+  activity_min ~ trmt_bin + jday_s + I(jday_s^2) + moonlight_s +
+    nit_avg_wspm.s_s + yr_s + t.lepidoptera_s +
+    #random effects
+    (1 | site) + (1 + trmt_bin + jday_s + I(jday_s^2) | sp) +
+    #interactions
+    jday_s * trmt_bin + I(jday_s^2) * trmt_bin + yr_s * trmt_bin,
+  data = bm2,
+  family = nbinom2(link = "log")
+)
+
+summary(m2.1)
+plot_model(m2.1)
+r2(m2.1)
+
 # Marginal effect plots ---------------------------------------------------
 
 
@@ -452,24 +501,6 @@ p2 <- ggplot(pred2, aes(x = jday_s, y = estimate, color = sp, linetype = sp)) +
   theme(legend.title = element_blank())  # Remove legend title for cleaner appearance
 p2
 
-plot_marginal_effects <- function(model, x_var, group_var = NULL, title = NULL) {
-  pred <- predictions(model, newdata = datagrid(!!x_var := unique(bm2[[x_var]]),
-                                                sp = unique(bm2$sp)))
-  
-  p <- ggplot(pred, aes_string(x = x_var, y = "estimate", color = "sp")) +
-    geom_line() +
-    labs(y = "Bat calls", x = x_var, title = title) +
-    scale_color_viridis(discrete = TRUE, option = "D") +
-    theme_minimal()
-  
-  if (!is.null(group_var)) {
-    p <- p + facet_wrap(as.formula(paste("~", group_var)), scales = "free_y")
-  }
-  return(p)
-}
-
-
-p2 <- plot_marginal_effects(m1.9nb, "jday_s", "sp", "Marginal effect of jday_s by species")
 
 # marginal effect for year by sp
 
@@ -583,7 +614,7 @@ pred2.1$moonlight<-pred2.1$moonlight_s*(2*sdmoon)+mmoon
 p2.1<-ggplot(pred2.1, aes(x = moonlight, y = estimate)) +
      geom_line() +
      geom_ribbon(aes(ymin = conf.low, ymax = conf.high), alpha = 0.2) +
-     labs(y = "Bat Calls", x = "Moonlight", title = "Marginal Effect of Moonlight") +
+     labs(y = "Bat Calls", x = "Moonlight", title = "Marginal Effect of Moonlight m1.2nb") +
      theme_minimal() + 
      scale_color_viridis(discrete = TRUE, option = "D") +  # Use a colorblind-friendly palette
      theme(legend.title = element_blank())  # Remove legend title for cleaner appearance
@@ -601,7 +632,7 @@ pred2.2$wspm.s<-pred2.2$nit_avg_wspm.s_s*(2*sd(bm2$nit_avg_wspm.s))+mean(bm2$nit
 p2.2 <- ggplot(pred2.2, aes(x = wspm.s, y = estimate, ymin= conf.low, ymax=conf.high)) +
         geom_line()+
         geom_ribbon( alpha = 0.2)+
-        labs(y = "Bat Calls", x = "Wind Speed", title = "Marginal Effect of Wind Speed") +
+        labs(y = "Bat Calls", x = "Wind Speed", title = "Marginal Effect of Wind Speed m1.2nb") +
         theme_minimal() +
         scale_color_viridis(discrete = TRUE, option = "D") +  # Use a colorblind-friendly palette
         theme(legend.title = element_blank())+  # Remove legend title for cleaner appearance
@@ -663,7 +694,7 @@ pred2.4$ear.arm<-pred2.4$ear.arm_s*(2*sd(bm2$ear.arm))+mean(bm2$ear.arm) # recal
 p2.4<- ggplot(pred2.4, aes(x = ear.arm, y = estimate)) +
   geom_line() +
   geom_ribbon(aes(ymin = conf.low, ymax = conf.high), alpha = 0.2) +
-  labs(y = "Bat Calls", x = "Ear/Arm Ratio", title = "Marginal Effect of Ear/Arm Ratio") +
+  labs(y = "Bat Calls", x = "Ear/Arm Ratio", title = "Marginal Effect of Ear/Arm Ratio m1.2nb") +
   theme_minimal() +
   scale_color_viridis(discrete = TRUE, option = "D") +  # Use a colorblind-friendly palette
   theme(legend.title = element_blank())  # Remove legend title for cleaner appearance
@@ -692,7 +723,7 @@ pred2.5$t.lepidoptera<-pred2.5$t.lepidoptera_s*(2*sd(bm2$t.lepidoptera,na.rm = T
 p2.5 <- ggplot(pred2.5, aes(x = t.lepidoptera, y = estimate)) +
   geom_line() +
   geom_ribbon(aes(ymin = conf.low, ymax = conf.high), alpha = 0.2) +
-  labs(y = "Bat Calls", x = "Total Lepidoptera", title = "Marginal Effect of Total Lepidoptera") +
+  labs(y = "Bat Calls", x = "Total Lepidoptera", title = "Marginal Effect of Total Lepidoptera m1.2nb") +
   theme_minimal() +
   scale_color_viridis(discrete = TRUE, option = "D") +  # Use a colorblind-friendly palette
   theme(legend.title = element_blank())  # Remove legend title for cleaner appearance
@@ -712,7 +743,7 @@ p2.6<-ggplot(pred2.6, aes(x = jday, y = estimate, colour =tmt )) +
   geom_point() +
   geom_smooth(method = 'auto', colour="black") +
   facet_wrap(~tmt) +
-  labs(y = "Bat Calls", x = "Julian Day", title = "Marginal Effect of Julian") +
+  labs(y = "Bat Calls", x = "Julian Day", title = "Marginal Effect of Julian m1.2nb") +
   theme_minimal() +
   scale_color_viridis(discrete = T, option = "H") +  # Use a colorblind-friendly palette
   theme(legend.title = element_blank())  # Remove legend title for cleaner appearance
@@ -727,11 +758,13 @@ pred2.7 <- predictions(m1.2nb) # re.form = NULL to get the marginal effect witho
 pred2.7 <- predictions(m1.2nb,
                      newdata = datagrid(sp = bm2$sp,
                                         trmt_bin = unique(bm2$trmt_bin)))
+# Calculate non-standardized treatment for graphics
+pred2.7$trmt<-ifelse(pred2.7$trmt_bin==1, "light", "dark")
 
-p2.7 <- ggplot(pred2.7, aes(x = trmt_bin, y = estimate, color = sp)) +
+p2.7 <- ggplot(pred2.7, aes(x = trmt, y = estimate, color = sp, group = sp)) +
   geom_point() +
   geom_line() +
-  labs(y = "Bat Calls", x = "Treatment", title = "Marginal Effect of Treatment by Species") +
+  labs(y = "Bat Calls", x = "Treatment", title = "Marginal Effect of Treatment by Species m1.2nb") +
   theme_minimal() +
   scale_color_viridis(discrete = TRUE, option = "D") +  # Use a colorblind-friendly palette
   theme(legend.title = element_blank())  # Remove legend title for cleaner appearance
@@ -746,8 +779,8 @@ p2.7i
 figures_dir <- "figures/glmm_v1/marginleffects_out"
 
 
-plots <- list(p1.1, p1.2, p2, p3, p4, p5.1, p5, p6)
-filenames <- c("p1.1.png", "p1.2.png", "p2.png", "p3.png", "p4.png", "p5.1.png", "p5.png", "p6.png")
+plots <- list(p2.1, p2.2, p2.3, p2.4, p2.5, p2.6, p2.7, p2.7i)
+filenames <- c("p2.1.png", "p2.2.png", "p2.3.png", "p3.png", "p4.png", "p5.1.png", "p5.png", "p6.png")
 
 # Save all plots
 lapply(seq_along(plots), function(i) {
@@ -762,547 +795,32 @@ plot_predictions(m1.9nb, condition = c("jday_s", "trmt_bin"), type = "response",
   labs(y = "Predicted Bat Calls", x = "Julian Day", color = "Treatment")
 
 
-# plots -------------------------------------------------------------------
-
-
-
-# partial predictor manual jday -------------------------------------------
-
-
-
-# jday --------------------------------------------------------------------
-
-
-# values to use
-n <- 100
-int <- rep(1, n)
-
-# obs. values
-ord.day <- seq(min(bm2[, "jday"]), max(bm2[, "jday"]), length.out = n)
-# extraer el jday sqr 
-ord.day.sqr<-ord.day^2
-#std pred
-jday.s <- scale(ord.day)
-jday.sqr<- scale(ord.day.sqr)
-#extract fixed coef jday
-
-#predicted ab
-#
-fday<-confint(m1.5nb)
-
-
-predabund <- exp(t(fday[c(1,3,4),]) %*% t(cbind(int, jday.s, jday.sqr)))
-
-
-#Data
-
-abunddf <- data.frame(t(predabund), jday.s, ord.day) # make a df with all the above
-
-colnames(abunddf)[1:3] <- c( "lowCI", "highCI", "Mean")
-
-ggplot(abunddf, aes(x = ord.day, y = Mean)) +
-  theme_classic(base_size = 17) +
-  ylab("bat calls") +
-  xlab("jday") +
-  geom_line(size = 1.5) +
-  geom_ribbon(alpha = 0.3, aes(ymin = lowCI, ymax = highCI))
-
-
-
-
-
-# trmt_bin partial predictor ----------------------------------------------
-
-
-# obs. values
-trmt_bin<-c("dark", "light") # how do you plot the obs. values when you have
-trmt_bin_s<- c(-1,1) # this should be -1 and 1  and remember to rerun the model for that 
-
-
-
-# summary_m1.5nb <- summary(m1.5nb) # save the summary of the model
-# feff<-summary_m1.5nb$coefficients$cond # get fixed eff
-# c0<-feff["(Intercept)","Estimate"] # get intercept
-# b2<-feff["trmt_bin", "Estimate"]   # get slope for treatment
-cint<- confint(m1.5nb)[c(1,2 ), ]
-cint
-
-# mean.pred <- c(exp( trmt_bin_s[1]*f.trmt[1]), exp(trmt_bin_s[2]*(f.trmt[1]+f.trmt[2]) )) example 
-# mean.pred <- c(exp( trmt_bin_s[1]*c0), exp(trmt_bin_s[2]*(c0+b2) ))
-
-mean.pred <- c(exp(cint[1,3]+trmt_bin_s[1]*cint[2,3]),
-               exp(cint[1,3]+trmt_bin_s[2]*cint[2,3]))
-
-
-lowCI <-  c(exp( cint[1,1]+trmt_bin_s[1]*cint[2,1]), exp(cint[1,1]+trmt_bin_s[2]*cint[2,1] ))
-
-highCI <- c(exp( cint[1,2]+trmt_bin_s[1]*cint[2,2]), exp(cint[1,2]+trmt_bin_s[2]*cint[2,2] ))
-abunddf <- data.frame(mean.pred, lowCI, highCI, trmt_bin)
-
-colnames(abunddf )[1:3] <- c( "Mean", "lowCI", "highCI" )
-
-ggplot( abunddf, aes( x = trmt_bin, y = Mean) ) +  
-  theme_classic( base_size = 17) +
-  ylab( "bat calls" ) +
-  xlab( "treatment" ) +
-  geom_point()+
-  geom_errorbar( aes( ymin = lowCI, ymax = highCI ) )
-
-
-
-
-# lunar illumination partial predictor ------------------------------------
-
-# obs. values
-n<-100
-int <- rep(1, n) #generate an interval of ones
-
-
-l.illum<-seq(min(bm2$l.illum), max(bm2$l.illum),length.out = n) # get the observed values
-# scale  l.illum
-l.illum_s<- scale(l.illum)
-
-# extract fixed coefficients
-
-
-cint<-confint(m1.5nb)
-cint[c(1,6),]
-
-predcalls <- exp(t(cint[c(1,6),]) %*% t(cbind(int, l.illum_s)))
-
-
-
-#Data
-
-l.illumdf <- data.frame(t(predcalls), l.illum_s, l.illum) # make a df with all the above
-
-colnames(l.illumdf)[1:3] <- c( "lowCI", "highCI", "Mean")
-
-ggplot(l.illumdf, aes(x = l.illum, y = Mean)) +
-  theme_classic(base_size = 12) +
-  ylab("bat calls") +
-  xlab("lunar illumination") +
-  geom_line(size = .4) +
-  geom_ribbon(alpha = 0.3, aes(ymin = lowCI, ymax = highCI))
-
-# Improved plot
-p1<-ggplot(l.illumdf, aes(x = l.illum, y = Mean)) +
-  geom_line(size = .75, color = "black") + # Adjust line size and color
-  geom_ribbon(aes(ymin = lowCI, ymax = highCI), fill = "grey", alpha = 0.5) + # Customize ribbon fill and transparency
-  theme_classic(base_size = 12) +
-  theme(
-    plot.title = element_text(hjust = 0.5, ), # Center and bold title
-    axis.title = element_text(), # Bold axis titles
-    axis.text = element_text(color = "black"), # Ensure axis text is visible
-    axis.line = element_line(color = "black"), # Darken axis lines for better visibility
-    panel.grid = element_blank(), # Remove grid lines for a cleaner look
-    plot.margin = margin(10, 10, 10, 10) # Add margin around the plot
-  ) +
-  labs(
-    title = "Effect of Lunar Illumination on Bat Calls", # Add a title
-    y = "Bat Calls", # More descriptive y-axis label
-    x = "Lunar Illumination " # More descriptive x-axis label
-  ) +
-  scale_y_continuous(expand = expansion(mult = c(0, 0.05))) + # Adjust y-axis to avoid clipping
-  scale_x_continuous(expand = expansion(mult = c(0.01, 0.01))) # Adjust x-axis for balance
-
-p1
-ggsave(filename = "l.illum_feff_v1.png",plot = p1,device = "png", path = 'figures/glmm_v1/' )
-
-
-
-
-
-# temperature -------------------------------------------------------------
-
-n=100
-int # interval of 1s
-# observed values 
-
-tmp<-seq(min(bm2$avg_temperature, na.rm = T ), max(bm2$avg_temperature, na.rm = T), length.out= n)
-tmp_s<- scale(tmp)
-
-#fixed effect
-
-cint<- confint(m1.5nb)
-cint[c(1,7),]
-
-predcalls <- exp(t(cint[c(1,7),]) %*% t(cbind(int, tmp_s)))
-
-tmpdf <- data.frame(t(predcalls), tmp, tmp_s) # make a df with all the above
-colnames(tmpdf)[1:3] <- c( "lowCI", "highCI", "Mean")  #This is to label the data frame appropiately. 
-
-p2<-ggplot(tmpdf, aes(x = tmp, y = Mean)) +
-  geom_line(size = .75, color = "black") + # Adjust line size and color
-  geom_ribbon(aes(ymin = lowCI, ymax = highCI), fill = "grey", alpha = 0.5) + # Customize ribbon fill and transparency
-  theme_classic(base_size = 12) +
-  theme(
-    plot.title = element_text(hjust = 0.5, ), # Center and bold title
-    axis.title = element_text(), # Bold axis titles
-    axis.text = element_text(color = "black"), # Ensure axis text is visible
-    axis.line = element_line(color = "black"), # Darken axis lines for better visibility
-    panel.grid = element_blank(), # Remove grid lines for a cleaner look
-    plot.margin = margin(10, 10, 10, 10) # Add margin around the plot
-  ) +
-  labs(
-    title = "Effect of average night temperature on Bat Calls", # Add a title
-    y = "Bat Calls", # More descriptive y-axis label
-    x = "Temperature °C" # More descriptive x-axis label
-  ) +
-  scale_y_continuous(expand = expansion(mult = c(0, 0.05))) + # Adjust y-axis to avoid clipping
-  scale_x_continuous(expand = expansion(mult = c(0.01, 0.01))) # Adjust x-axis for balance
-p2
-ggsave(filename = "temp_feff_v1.png",plot = p2,device = "png", path = 'figures/glmm_v1/' )
-
-
-# wind --------------------------------------------------------------------
-
-
-n=100
-int # interval of 1s
-
-# observed values 
-
-wnd<-seq(min(bm2$avg_wind_speed, na.rm = T ), max(bm2$avg_wind_speed, na.rm = T), length.out= n)
-wnd_s<- scale(wnd)
-
-#fixed effect
-
-cint<- confint(m1.5nb)
-cint[c(1,8),]
-
-predcalls <- exp(t(cint[c(1,8),]) %*% t(cbind(int, wnd_s)))
-
-wnddf <- data.frame(t(predcalls), wnd, wnd_s) # make a df with all the above
-colnames(wnddf)[1:3] <- c( "lowCI", "highCI", "Mean")  #This is to label the data frame appropiately. 
-
-p3<-ggplot(wnddf, aes(x = tmp, y = Mean)) +
-  geom_line(size = .75, color = "black") + # Adjust line size and color
-  geom_ribbon(aes(ymin = lowCI, ymax = highCI), fill = "grey", alpha = 0.5) + # Customize ribbon fill and transparency
-  theme_classic(base_size = 12) +
-  theme(
-    plot.title = element_text(hjust = 0.5, ), # Center and bold title
-    axis.title = element_text(), # Bold axis titles
-    axis.text = element_text(color = "black"), # Ensure axis text is visible
-    axis.line = element_line(color = "black"), # Darken axis lines for better visibility
-    panel.grid = element_blank(), # Remove grid lines for a cleaner look
-    plot.margin = margin(10, 10, 10, 10) # Add margin around the plot
-  ) +
-  labs(
-    title = "Effect of average night wind on Bat Calls", # Add a title
-    y = "Bat Calls", # More descriptive y-axis label
-    x = "wind m/s" # More descriptive x-axis label
-  ) +
-  scale_y_continuous(expand = expansion(mult = c(0, 0.05))) + # Adjust y-axis to avoid clipping
-  scale_x_continuous(expand = expansion(mult = c(0.01, 0.01))) # Adjust x-axis for balance
-p3
-ggsave(filename = "wnd_feff_v1.png",plot = p3,device = "png", path = 'figures/glmm_v1/' )
-
-
-# elevation ---------------------------------------------------------------
-# obs. values
-n<-100
-int <- rep(1, n) #generate an interval of ones
-
-
-elv<-seq(min(bm2$elev_mean), max(bm2$elev_mean),length.out = n) # get the observed values
-# scale  
-elv_s<- scale(elv)
-
-# extract fixed coefficients
-cint<-confint(m1.5nb)
-cint[c(1,10),]
-
-predcalls <- exp(t(cint[c(1,10),]) %*% t(cbind(int, elv_s)))
-
-#Data
-
-elvdf <- data.frame(t(predcalls), elv, elv_s) # make a df with all the above
-head(elvdf)
-colnames(elvdf)[1:3] <- c( "lowCI", "highCI", "Mean")
-
-ggplot(elvdf, aes(x = elv, y = Mean)) +
-  theme_classic(base_size = 12) +
-  ylab("bat calls") +
-  xlab("elevation") +
-  geom_line(size = .4) +
-  geom_ribbon(alpha = 0.3, aes(ymin = lowCI, ymax = highCI))
-
-# Improved plot
-p4<-ggplot(elvdf, aes(x = elv, y = Mean)) +
-  geom_line(size = .75, color = "black") + # Adjust line size and color
-  geom_ribbon(aes(ymin = lowCI, ymax = highCI), fill = "grey", alpha = 0.5) + # Customize ribbon fill and transparency
-  theme_classic(base_size = 12) +
-  theme(
-    plot.title = element_text(hjust = 0.5, ), # Center and bold title
-    axis.title = element_text(), # Bold axis titles
-    axis.text = element_text(color = "black"), # Ensure axis text is visible
-    axis.line = element_line(color = "black"), # Darken axis lines for better visibility
-    panel.grid = element_blank(), # Remove grid lines for a cleaner look
-    plot.margin = margin(10, 10, 10, 10) # Add margin around the plot
-  ) +
-  labs(
-    title = "Effect of elevation on Bat Calls", # Add a title
-    y = "Bat Calls", # More descriptive y-axis label
-    x = "elevation m " # More descriptive x-axis label
-  ) 
-  # scale_y_continuous(expand = expansion(mult = c(0, 0.05))) + # Adjust y-axis to avoid clipping
-  # scale_x_continuous(expand = expansion(mult = c(0.01, 0.01))) # Adjust x-axis for balance
-
-p4
-ggsave(filename = "elv_feff_v1.png",plot = p4,device = "png", path = 'figures/glmm_v1/' )
-
-
-# year marginal effect ----------------------------------------------------
-
-
-# obs. values
-yr<- unique(bm2$yr)
-yr
-yr_s<- unique(bm2$yr_s)
-yr_s
-
-cint <- confint(m1.5nb)[c(1, 9), ]
-cint 
-
-mcalls <- c(exp(cint[1, 3] + yr_s[1] * cint[2, 3]),
-            exp(cint[1, 3] + yr_s[2] * cint[2, 3]),
-            exp(cint[1, 3] + yr_s[3] * cint[2, 3]))# after Jen's correction
-
-lowCI <-  c(exp(cint[1, 1] + yr_s[1] * cint[2, 1]),
-            exp(cint[1, 1] + yr_s[2] * cint[2, 1]),
-            exp(cint[1, 1] + yr_s[3] * cint[2, 1]))
-
-highCI <- c(exp(cint[1, 2] + yr_s[1] * cint[2, 2]),
-            exp(cint[1, 2] + yr_s[2] * cint[2, 2]),
-            exp(cint[1, 2] + yr_s[3] * cint[2, 2]))
-
-
-abunddf <- data.frame(mcalls, lowCI, highCI, yr)
-
-colnames(abunddf )[1:3] <- c( "Mean", "lowCI", "highCI" )
-
-p5<-ggplot( abunddf, aes( x = yr, y = Mean) ) +  
-  theme_classic( base_size = 12) +
-  ylab( "bat calls" ) +
-  xlab( "year" ) +
-  geom_point()+
-  geom_errorbar( aes( ymin = lowCI, ymax = highCI ) )+
-# labels
-  ylab("Bat Calls") +
-  xlab("Year") +
-  
-  # Customize axis text and title
-  theme(
-    axis.title = element_text(size = 12),
-    axis.text = element_text(size = 12),
-    plot.title = element_text(hjust = 0.5, face = "bold", size = 12),
-    plot.subtitle = element_text(hjust = 0.5, size = 12),
-    panel.grid = element_blank(),
-    axis.line = element_line(color = "black"),
-    plot.margin = margin(10, 10, 10, 10)
-  ) +
-  
-  # Optionally, add a title and subtitle
-  ggtitle("Distribution of Bat Calls by Year")
-
-p5
-ggsave(filename = "yr_feff_v1.png",plot = p5,device = "png", path = 'figures/glmm_v1/' )
-
-# random effects plots ----------------------------------------------------
-
-
-sl=100
-ones = rep(1,100)
-
-# obs. values
-ord.day <- seq(min(bm2[, "jday"]), max(bm2[, "jday"]), length.out = n)
-# extraer el jday sqr 
-ord.day.sqr<-ord.day^2
-#std pred
-jday.s <- scale(ord.day)
-jday.sqr<- scale(ord.day.sqr)
-
-#extract fixed coef jday
-#pull out random effects at the sp level #
-ran.efs <- ranef( m1.5nb )$cond$sp
-
-#pull out fixed effects
-fix.efs <- fixef( m1.5nb )$cond
-#view
-fix.efs
-
-cint<-confint(m1.5nb)
-
-rss <- ran.efs
-
-# we correct the random effects adding the fixes effects. 
-
-rss[, 1] <- rss[, 1] + fix.efs[1]  #adding fixed effects to each of the random effects
-rss[, 2] <- rss[, 2] + fix.efs[2]
-rss[, 3] <- rss[, 3] + fix.efs[3]
-rss[, 4] <- rss[, 4] + fix.efs[4]
-
-#view
-rss
-a<-rss[,c(1,3,4)]
-t(a)                      # why we have to transpose the tables?
-
-b<-t( cbind( ones, jday.s, jday.sqr))
-b
-indpred<- exp( as.matrix(a) %*% as.matrix(b) )
-
-abunddf <- data.frame(t(indpred), jday.s, ord.day)
-
-ggplot(abunddf, aes(x = ord.day, y = MYOLUC    )) +
-  theme_classic(base_size = 17) +
-  ylab("bat calls Myluc") +
-  xlab("jday") +
-  geom_line(linewidth = 1.5) 
-
-
-# Create the melted data for plotting# Create the melted data for plotting# Create the melted data for plotting all columns
-abunddf_melted <- melt(abunddf, id.vars = "ord.day",variable.name = "sp", value.name ="predicted calls" , measure.vars = 1:14)
-unique(abunddf_melted$sp)
-t<-left_join(abunddf_melted, batnames, )
-
-abunddf_long<- pivot_longer(abunddf, cols= 1:14, names_to = "sp", values_to = "predicted calls")
-unique(abunddf_long$sp)
-head(abunddf_long)
-
-# Create the ggplot object
-p6<-ggplot(abunddf_melted, aes(x = ord.day, y = `predicted calls`, color = sp)) +
-  scale_color_viridis_d()+
-  # Add geom_point to plot points for each variable
-  scale_shape_manual(values = 1:14)+ 
-  geom_point(size = 2) +
-    # Use different shapes
-  # Set labels and title
-  labs(title = "Abundance by Day", x = "Day", y = "bat calls") +
-  # Set theme for better visuals (optional)
-  theme_classic()
-p6
-
-p6 <- ggplot(abunddf_melted, aes(x = ord.day, y = `predicted calls`, color = sp, shape = sp)) +
-  scale_color_manual(values = rep("white", length(unique(abunddf_melted$sp)))) +  # Set all points to white
-  scale_shape_manual(values = 1:14) +  # Custom shapes for each bat species
-  geom_point(size = 2) +
-  # Set labels and title
-  labs(title = "", x = "Day", y = "Bat Calls") +
-  # Set theme for better visuals
-  theme_classic(base_size = 14) +
-  theme(
-    plot.background = element_rect(fill = "black"),  # Set plot background to black
-    panel.background = element_rect(fill = "black"),  # Set panel background to black
-    text = element_text(color = "white"),  # Set all text to white
-    axis.text = element_text(color = "white"),  # Set axis text to white
-    axis.title = element_text(color = "white"),  # Set axis titles to white
-    panel.grid.major = element_blank(),  # Remove major grid lines
-    panel.grid.minor = element_blank(),  # Remove minor grid lines
-    legend.background = element_rect(fill = "black"),  # Set legend background to black
-    legend.key = element_rect(fill = "black"),  # Set legend keys to black
-    legend.text = element_text(color = "white"),  # Set legend text to white
-    legend.title = element_text(color = "white")  # Set legend title to white
-  )
-
-
-print(p6)
-
-p6.1<-ggplot(abunddf_long, aes(x = ord.day, y = `predicted calls`, color = sp)) +
-  # Add geom_point to plot points for each variable
-  geom_point(size = 1) +
-  facet_wrap( ~ sp, scales = "free_y") +
-  # Set labels and title
-  labs(title = "Bat calls by julian day", x = "julian day", y = "bat calls") +
-  # Set theme for better visuals (optional)
-  theme_classic()
-rm(abunddf)
-p6.1
-
-
-
-
-p6
-ggsave(filename = "jday_raneff_v2.png",plot = p6,device = "png", path = 'figures/glmm_v1/' )
-ggsave(filename = "jday_raneff_v2.png",plot = p6.1,device = "png", path = 'figures/glmm_v1/' )
-
-
-# treatment  random effects plot
-
-trmt<- c("lit", "dark") 
-trmt_bin_s <- c(-1,1)
-trmt_bin_s
-
-# correcting random eff
-ran.efs <- ranef( m1.5nb )$cond$sp # get the random effects 
-randint<- ran.efs[,1]
-randslope<- ran.efs[,2]
-
-cint<-confint(m1.5nb)[1:2,] # get fixed effects from the model
-fixint<-cint[1,3]
-fixslope<-cint[2,3]
-
-
-#y = int + random.int[sp] + beta[1]treatment + random.slope[sp] * treatment
-
-pred<- c(exp((randint+fixint)+(randslope+fixslope)*trmt_bin_s[1]),
-         exp((randint+fixint)+(randslope+fixslope)*trmt_bin_s[2]))
-
-
-abunddf <- data.frame(pred, trmt_bin, trmt_bin_s)
-
-sp_names <- rownames(ran.efs)
-sp_doubled <- rep(sp_names, each = 2)
-
-# Check the length to match the number of rows in the dataframe
-if (length(sp_doubled) == nrow(abunddf)) {
-  # Add the new column to the dataframe
-  abunddf$sp <- sp_doubled
-} else {
-  stop("The length of sp_doubled does not match the number of rows in abunddf.")
-}
-
-# View the updated dataframe
-head(abunddf)
-
-p7<-ggplot( abunddf, aes( x = trmt_bin, y = pred, colour = sp, group = sp, shape = sp) ) +  
-  theme_classic( base_size = 12) +
-  # scale_color_viridis_d(direction = -1, option = "A")+
-  scale_shape_manual(values = 1:14) +  # Customize shapes for each 'sp', adjust as needed
-  ylab( "bat calls" ) +
-  xlab( "year" ) +
-  geom_point(size=3)+
-  geom_line()+
-  # labels
-  ylab("Bat calls") +
-  xlab("") 
-p7
-
-#black and greys graph
-p7.1 <- ggplot(abunddf, aes(x = trmt_bin, y = pred, colour = sp, group = sp, shape = sp)) +  
-  theme_classic(base_size = 12) +
-  scale_color_grey(start = 0, end = 1) +  # Use grayscale colors
-  scale_shape_manual(values = 1:14) +  # Customize shapes for each 'sp'
-  ylab("Bat calls") +
-  xlab("Year") +
-  geom_point(size = 3) +
+# Marginal effect plots m1.5nb --------------------------------------------
+
+pred1.5<- predictions(m1.5nb, 
+                       newdata = datagrid(sp = bm2$sp,
+                                          trmt_bin = unique(bm2$trmt_bin)),
+                       conf_level = 0.95)
+
+# Calculate non-standardized treatment for graphics
+pred1.5$trmt<-ifelse(pred1.5$trmt_bin==1, "light", "dark")
+
+# create the plot for treatment by species
+p1.5.1 <- ggplot(pred1.5, aes(x = trmt, y = estimate, color = sp, group = sp)) +
+  geom_point() +
   geom_line() +
-  theme(
-    plot.background = element_rect(fill = "black"),  # Set plot background to black
-    panel.background = element_rect(fill = "black"),  # Set panel background to black
-    axis.text = element_text(color = "white"),  # Set axis text to white
-    axis.title = element_text(color = "white"),  # Set axis titles to white
-    legend.background = element_rect(fill = "black"),  # Set legend background to black
-    legend.text = element_text(color = "white"),  # Set legend text to white
-    legend.title = element_text(color = "white")  # Set legend title to white
-  )
+  labs(y = "Bat Calls", x = "Treatment", title = "Marginal Effect of Treatment by Species m1.5nb") +
+  theme_minimal() +
+  scale_color_viridis(discrete = TRUE, option = "D") +  # Use a colorblind-friendly palette
+  theme(legend.title = element_blank())  # Remove legend title for cleaner appearance
 
-p7.1
+p1.5.1
 
-ggsave(filename = "trmt_raneff_v1.png",plot = p7,device = "png", path = 'figures/glmm_v1/' )
-ggsave(filename = "trmt_raneff_v2.png",plot = p7.1,device = "png", path = 'figures/glmm_v1/' )
+# effect sizes plots -------------------------------------------------------------------
 
+plot_model(m1.5nb, type = "est", show.values = TRUE, value.offset = 0.3)
 
+plot_model(m1.5nb, type = "re", terms = "trmt_bin", show.values = TRUE, value.offset = 0.3)
 
 # save models -------------------------------------------------------------
 
@@ -1317,6 +835,30 @@ load("models/my_models.RData")
 
 
 # trash -------------------------------------------------------------------
+
+
+# the function below is not working. 
+plot_marginal_effects <- function(model, x_var, group_var = NULL, title = NULL) {
+  pred <- predictions(model, newdata = datagrid(!!x_var := unique(bm2[[x_var]]),
+                                                sp = unique(bm2$sp)))
+  
+  p <- ggplot(pred, aes_string(x = x_var, y = "estimate", color = "sp")) +
+    geom_line() +
+    labs(y = "Bat calls", x = x_var, title = title) +
+    scale_color_viridis(discrete = TRUE, option = "D") +
+    theme_minimal()
+  
+  if (!is.null(group_var)) {
+    p <- p + facet_wrap(as.formula(paste("~", group_var)), scales = "free_y")
+  }
+  return(p)
+}
+
+
+p2 <- plot_marginal_effects(m1.1nb, "jday_s", "sp", "Marginal effect of jday_s by species")
+
+
+
 
 # the plot below takes long to run and does not display the data well.
 # # Adjusted code to create a violin plot

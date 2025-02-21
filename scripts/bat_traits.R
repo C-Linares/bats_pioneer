@@ -114,7 +114,18 @@ p2<-ggplot(bat_trait, aes(x = reorder(cname, ear.arm), y = ear.arm)) +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 p2
 
-ggsave("figures/bat_traits/ear_arm_ratio_v2.png", p2, width = 10, height = 5, units = "in", dpi = 300)
+p3<-p2+theme_sjplot(base_size = 20, base_family = "Arial") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+ggsave(
+  "figures/bat_traits/ear_arm_ratio_v3.png",
+  p3,
+  device = "tiff",
+  width = 10,
+  height = 5,
+  units = "in",
+  dpi = 300
+)
 
 
 # trash
