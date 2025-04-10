@@ -758,3 +758,21 @@ I had a meeting with Jesse, he suggested removing the ear/arm ratio. Also he say
 ![](images/clipboard-3574308006.png)
 
 I also ran a model with the acoustic index instead of the bat calls counts. The results are also slightly different.
+
+------------------------------------------------------------------------
+
+4/9/2025
+
+I am working with the map_bat_activity.R and I realized that iron06 in 2023 has just 763 bat totals. I might need to check the data to see if this is correct or I am missing some stuff.
+
+-   1 check recordings to see if all dates are present.
+
+-   2 check for recordings if same dates are present.
+
+-   check if the build data base script missed some dates or files.
+
+-   differentiate between lit and dark sites. what is magnitude of change and no base map... change in bat calls? number of calls? number of minutes calling?
+
+    ![](images/clipboard-2052547050.png)
+
+-   

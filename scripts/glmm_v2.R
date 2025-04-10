@@ -383,7 +383,7 @@ print(r_squared)
 m1.4nb <- glmmTMB(
   #fixed effects
   n ~ trmt_bin + jday_s + I(jday_s^2) + moonlight_s +
-    nit_avg_wspm.s_s + yr_s + ear.arm_s + t.lepidoptera_s +
+    nit_avg_wspm.s_s + yr_s  + t.lepidoptera_s +
     #random effects
     (1 | site) + (1 + trmt_bin + jday_s + I(jday_s^2) | sp) +
     #interactions
@@ -392,7 +392,11 @@ m1.4nb <- glmmTMB(
   family = nbinom2(link = "log")
 )
 summary(m1.4nb)
+check_zeroinflation(m1.4nb)
+check_overdispersion(m1.4nb)
+r2(m1.4nb)
 
+anova(m1.4nb) 
 
 # after meeting with Jesse we discuss running a model without the ear/arm ratio and try to run a model with the insects and the try to use all insects but with just the two years. to see what is the pattern observed. 
 
@@ -448,7 +452,7 @@ r2(m2.1)
 
 # marginal with marginal effects package. 
 
-p1.1<-plot_predictions(m1.1nb,                # The model we fit
+p1.1<-plot_predictions(m1.4nb,                # The model we fit
                  type = "response",     # We'd like the predictions on the scale of the response
                  conf_level = 0.95,     # With a 95% confidence interval
                  condition = c("trmt_bin", "yr_s"), # Plot predictions for "l.illum_s" while holding all others at their mean
@@ -457,7 +461,7 @@ p1.1<-plot_predictions(m1.1nb,                # The model we fit
   ylab("bat calls") +
   theme_bw()                             # White background
 
-p1.1 <- plot_predictions(m1.1nb,                # The model we fit
+p1.1 <- plot_predictions(m1.4nb,                # The model we fit
                          type = "response",     # We'd like the predictions on the scale of the response
                          conf_level = 0.95,     # With a 95% confidence interval
                          condition = c("trmt_bin", "yr_s"), # Plot predictions for "l.illum_s" while holding all others at their mean
@@ -472,7 +476,7 @@ p1.1 <- plot_predictions(m1.1nb,                # The model we fit
                     labels = c("-1" = "2021", "0" = "2022", "1" = "2023"), 
                     name = "Year")
 
-p1.2<-plot_predictions(m1.1nb,                # The model we fit
+p1.2<-plot_predictions(m1.4nb,                # The model we fit
                  type = "response",     # We'd like the predictions on the scale of the response
                  conf_level = 0.95,     # With a 95% confidence interval
                  condition = c("jday_s","trmt_bin"), 
@@ -483,7 +487,7 @@ p1.2<-plot_predictions(m1.1nb,                # The model we fit
 
 
 # marginal effect for jday by sp
-pred2 <- predictions(m1.1nb,
+pred2 <- predictions(m1.4nb,
                      newdata = datagrid(sp = bm2$sp,
                                         jday_s = seq(min(bm2$jday_s), max(bm2$jday_s), length.out = 100)))
 print(pred2)
@@ -504,7 +508,7 @@ p2
 
 # marginal effect for year by sp
 
-pred3 <- predictions(m1.1nb,
+pred3 <- predictions(m1.4nb,
                      newdata = datagrid(sp = bm2$sp,
                                         yr_s = unique(bm2$yr_s)))
 
@@ -516,7 +520,7 @@ p3<- ggplot(pred3, aes(x =yr_s, y= estimate))+
             
 p3
 
-pred4<- predictions(m1.1nb,
+pred4<- predictions(m1.4nb,
                      newdata = datagrid(sp = bm2$sp,
                                         trmt_bin = unique(bm2$trmt_bin)))
 p4 <- ggplot(pred4, aes(x = trmt_bin, y = estimate, col=sp)) +
@@ -524,15 +528,15 @@ p4 <- ggplot(pred4, aes(x = trmt_bin, y = estimate, col=sp)) +
   geom_line()
 p4
 
-p4+ facet_wrap(~sp)
+p4 + facet_wrap( ~ sp, )
 
-preds<- predictions(m1.1nb)
+preds<- predictions(m1.4nb)
 preds$tmt<-ifelse(preds$trmt_bin==1, "light", "dark")
 # now add the years -1=2021, 0=2022, 1=2023
 preds$yr_s<-ifelse(preds$yr_s==-1, "2021", ifelse(preds$yr_s==0, "2022", "2023"))
 
 p5.1<- ggplot(preds, aes(x = jday_s, y = estimate, col=tmt))+ # not sure what is happening here. 
-  geom_line()+
+  geom_point()+
   facet_wrap(~sp, scales = "free_y")
 p5.1
 
@@ -548,10 +552,31 @@ p5<-ggplot(preds, aes(tmt, estimate, col=yr_s)) +
 p5
 
 
-print(predictions(model = m1.9nb, 
-                  newdata = datagrid( yr_s= c(-1, 0, 1),
-                                      sp= unique(bm2$sp)),
-                  conf_level = 0.95))
+p5 <- ggplot(preds, aes(x = tmt, y = estimate, color = yr_s)) +
+  geom_violin(width = 0.8, alpha = 0.4, position = position_dodge(width = 0.75)) +
+  geom_point(position = position_dodge(width = 0.75), size = 1.5, alpha = 0.9) +
+  facet_wrap(~sp, scales = "free_y") +
+  labs(
+    y = "Estimated Bat Calls",
+    x = "",
+    title = "Estimated Bat Calls by Treatment, Year, and Species",
+    color = "Year"
+  ) +
+  scale_color_brewer(palette = "Dark2") +  # Choose a harmonious, colorblind-friendly palette
+  theme_minimal(base_size = 16) +
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5),
+    axis.text.x = element_text(face = "bold"),
+    legend.position = "right",
+    panel.grid.major.x = element_blank()
+  )
+p5
+
+
+# print(predictions(model = m1.9nb, 
+#                   newdata = datagrid( yr_s= c(-1, 0, 1),
+#                                       sp= unique(bm2$sp)),
+#                   conf_level = 0.95))
 
 p6<- ggplot(preds, aes(x = jday_s, y = estimate, col=sp))+ # not sure what is happening here. 
   geom_point()+
@@ -581,6 +606,8 @@ plot_predictions(m1.9nb, condition = c("jday_s", "trmt_bin"), type = "response",
 
 
 
+# write the preds object to be able to map it on R. 
+write.csv(preds, "data_for_analysis/glmm_v2/preds.csv")
 
 
 
@@ -591,7 +618,7 @@ plot_predictions(m1.9nb, condition = c("jday_s", "trmt_bin"), type = "response",
 
 # Below is marginal effect plot for moon illumination. 
 
-p2.1<-plot_predictions(m1.2nb,                # The model we fit
+p2.1<-plot_predictions(m1.4nb,                # The model we fit
                        type = "response",     # We'd like the predictions on the scale of the response
                        conf_level = 0.95,     # With a 95% confidence interval
                        condition = c("moonlight_s"), # Plot predictions 
@@ -602,7 +629,7 @@ p2.1<-plot_predictions(m1.2nb,                # The model we fit
 p2.1
 
 # Create a data grid for predictions to replicate plot above.
-pred2.1 <- predictions(m1.2nb, 
+pred2.1 <- predictions(m1.4nb, 
                        newdata = datagrid(moonlight_s = seq(min(bm2$moonlight_s), max(bm2$moonlight_s), 
                                                             length.out = 100)))
 # Calculate non-standardized moonlight for graphics moonlight_s x (2xsd)+mean
@@ -614,14 +641,14 @@ pred2.1$moonlight<-pred2.1$moonlight_s*(2*sdmoon)+mmoon
 p2.1<-ggplot(pred2.1, aes(x = moonlight, y = estimate)) +
      geom_line() +
      geom_ribbon(aes(ymin = conf.low, ymax = conf.high), alpha = 0.2) +
-     labs(y = "Bat Calls", x = "Moonlight", title = "Marginal Effect of Moonlight m1.2nb") +
+     labs(y = "Predicted Bat Calls", x = "Moonlight", title = "Marginal Effect of Moonlight") +
      theme_minimal() + 
      scale_color_viridis(discrete = TRUE, option = "D") +  # Use a colorblind-friendly palette
      theme(legend.title = element_blank())  # Remove legend title for cleaner appearance
 p2.1
 
 # Marginal effect plot for wind speed.
-pred2.2<- predictions(m1.2nb, 
+pred2.2<- predictions(m1.4nb, 
                        newdata = datagrid(nit_avg_wspm.s_s = seq(min(bm2$nit_avg_wspm.s_s), max(bm2$nit_avg_wspm.s_s), 
                                                             length.out = 100)),
                       re.form = NA) # re.form = NA to get the marginal effect of wind speed without random effects.)
@@ -635,13 +662,13 @@ p2.2 <- ggplot(pred2.2, aes(x = wspm.s, y = estimate, ymin= conf.low, ymax=conf.
         labs(y = "Bat Calls", x = "Wind Speed", title = "Marginal Effect of Wind Speed m1.2nb") +
         theme_minimal() +
         scale_color_viridis(discrete = TRUE, option = "D") +  # Use a colorblind-friendly palette
-        theme(legend.title = element_blank())+  # Remove legend title for cleaner appearance
+        theme(legend.title = element_blank())  # Remove legend title for cleaner appearance
 p2.2
 
 
 # Marginal effect plot for year. 
 
-t<-plot_predictions(m1.2nb,                # The model we fit
+t<-plot_predictions(m1.4nb,                # The model we fit
                        type = "response",     # We'd like the predictions on the scale of the response
                        conf_level = 0.95,     # With a 95% confidence interval
                        condition = c("trmt_bin", "yr_s"), # Plot predictions for "l.illum_s" while holding all others at their mean
@@ -651,7 +678,7 @@ t<-plot_predictions(m1.2nb,                # The model we fit
   theme_bw()       
 
 t
-pred2.3 <- predictions(m1.2nb, 
+pred2.3 <- predictions(m1.4nb, 
                        newdata = datagrid(yr_s = unique(bm2$yr_s),
                                           trmt_bin = unique(bm2$trmt_bin),
                                           sp=NA),
@@ -710,7 +737,7 @@ cleaned_t_lepidoptera_s <- na.omit(bm2$t.lepidoptera_s)
 t_lepidoptera_s_seq <- seq(min(cleaned_t_lepidoptera_s), max(cleaned_t_lepidoptera_s), length.out = 100)
 
 # Generate predictions using the cleaned sequence
-pred2.5 <- predictions(m1.2nb, 
+pred2.5 <- predictions(m1.4nb, 
                        by = "t.lepidoptera_s",
                        newdata = datagrid(t.lepidoptera_s = t_lepidoptera_s_seq),
                        re.form = NA) # re.form = NA to get the marginal effect without random effects
@@ -731,7 +758,7 @@ p2.5
 
 # marginal effect for interaction treatment and yday
 
-pred2.6 <- predictions(m1.2nb,
+pred2.6 <- predictions(m1.4nb,
                        re.form = NA)
 #adding treatment labels
 pred2.6$tmt<-ifelse(pred2.6$trmt_bin==1, "light", "dark")
@@ -741,7 +768,7 @@ pred2.6$jday<-pred2.6$jday_s*(2*sd(bm2$jday))+mean(bm2$jday) # recalculate the n
 
 p2.6<-ggplot(pred2.6, aes(x = jday, y = estimate, colour =tmt )) +
   geom_point() +
-  geom_smooth(method = 'auto', colour="black") +
+  geom_smooth(method = 'lm', colour="black") +
   facet_wrap(~tmt) +
   labs(y = "Bat Calls", x = "Julian Day", title = "Marginal Effect of Julian m1.2nb") +
   theme_minimal() +
@@ -753,9 +780,9 @@ p2.6
 
 # treatment by sp.
 
-pred2.7 <- predictions(m1.2nb) # re.form = NULL to get the marginal effect without random effects
+pred2.7 <- predictions(m1.4nb) # re.form = NULL to get the marginal effect without random effects
 
-pred2.7 <- predictions(m1.2nb,
+pred2.7 <- predictions(m1.4nb,
                      newdata = datagrid(sp = bm2$sp,
                                         trmt_bin = unique(bm2$trmt_bin)))
 # Calculate non-standardized treatment for graphics
@@ -772,6 +799,10 @@ p2.7 <- ggplot(pred2.7, aes(x = trmt, y = estimate, color = sp, group = sp)) +
 p2.7
 p2.7i<-p2.7+ facet_wrap(~sp, scales = "free_y")
 p2.7i
+
+
+# marginal effect for treatment by year
+
 
 
 
