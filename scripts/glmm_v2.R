@@ -94,6 +94,22 @@ moon.int.night$date<-as_date(moon.int.night$date)
 c_bugs<-read_csv("data_for_analysis/insect_wranglin/c_bugs.csv") # load insect data.
 colnames(c_bugs)[3]<-"yr" # rename site
 
+# light
+
+light<-read_csv("data_for_analysis/lights/lightspectra_pioneer.csv") # load light data.
+
+# filter col V/H and keep all horizontal 
+
+light<-light %>%
+  filter(vert_horiz == "Horizontal") # keep only horizontal light
+
+# calculate the mean light for m1-m3 
+light$mwatts <- rowMeans(light[, c("Watts (m1)", "Watts (m1)", "Watts (m3)")], na.rm = TRUE) # calculate the mean of the three columns mwat_1, mwat_2, mwat_3
+
+# remove unnecessary columns
+light <- light %>%
+  select(c("site", "Lux", "yr", "mwatts")) # keep only the columns we need
+
 # merge -------------------------------------------------------------------
 
 # activity index with bat data. 
@@ -151,7 +167,7 @@ bm2<- left_join(bm2, c_bugs, by = c("site", "wk", "yr")) # merge with insects da
 # check for NAs
 summary(bm2)  
 
-#make NAs the 0 for t.insect, and t. lepidoptera given we don't have that data.
+#make 0 the NAs for t.insect, and t. lepidoptera given we don't have that data.
 
 bm2<- bm2 %>%
   mutate(
@@ -161,6 +177,10 @@ bm2<- bm2 %>%
 
 # we have several weeks in 2023 where there is no data 5659 lines.
 
+# merge light 
+
+t<- bm2 %>% 
+  left_join(light, by = c("site", "yr")) # merge with light data
 
 # correlation  ------------------------------------------------------------
 # before modelling we have to check for correlation between the predictors as VIF is not adequate for negative binomial models.
@@ -523,9 +543,15 @@ p3
 pred4<- predictions(m1.4nb,
                      newdata = datagrid(sp = bm2$sp,
                                         trmt_bin = unique(bm2$trmt_bin)))
-p4 <- ggplot(pred4, aes(x = trmt_bin, y = estimate, col=sp)) +
+# add species names with actual species. 
+pred4<-left_join(pred4, btrait, by = c("sp" = "six_sp"))
+# add light and dark treatment
+pred4$tmt<-ifelse(pred4$trmt_bin==1, "light", "dark")
+
+
+p4 <- ggplot(pred4, aes(x = trmt_bin, y = estimate, col=sname)) +
   geom_point() +
-  geom_line()
+  geom_line(aes(group = sname)) 
 p4
 
 p4 + facet_wrap( ~ sp, )
@@ -534,6 +560,8 @@ preds<- predictions(m1.4nb)
 preds$tmt<-ifelse(preds$trmt_bin==1, "light", "dark")
 # now add the years -1=2021, 0=2022, 1=2023
 preds$yr_s<-ifelse(preds$yr_s==-1, "2021", ifelse(preds$yr_s==0, "2022", "2023"))
+preds<-left_join(preds, btrait, by = c("sp" = "six_sp"))
+
 
 p5.1<- ggplot(preds, aes(x = jday_s, y = estimate, col=tmt))+ # not sure what is happening here. 
   geom_point()+
@@ -787,17 +815,20 @@ pred2.7 <- predictions(m1.4nb,
                                         trmt_bin = unique(bm2$trmt_bin)))
 # Calculate non-standardized treatment for graphics
 pred2.7$trmt<-ifelse(pred2.7$trmt_bin==1, "light", "dark")
+# add sp names with actual species.
+pred2.7<-left_join(pred2.7, btrait, by = c("sp" = "six_sp"))
 
-p2.7 <- ggplot(pred2.7, aes(x = trmt, y = estimate, color = sp, group = sp)) +
+
+p2.7 <- ggplot(pred2.7, aes(x = trmt, y = estimate, color = cname, group = sp)) +
   geom_point() +
   geom_line() +
-  labs(y = "Bat Calls", x = "Treatment", title = "Marginal Effect of Treatment by Species m1.2nb") +
+  labs(y = "Bat Calls", x = "Treatment", title = "Marginal Effect of Treatment by Species") +
   theme_minimal() +
   scale_color_viridis(discrete = TRUE, option = "D") +  # Use a colorblind-friendly palette
   theme(legend.title = element_blank())  # Remove legend title for cleaner appearance
 
 p2.7
-p2.7i<-p2.7+ facet_wrap(~sp, scales = "free_y")
+p2.7i<-p2.7+ facet_wrap(~cname)
 p2.7i
 
 

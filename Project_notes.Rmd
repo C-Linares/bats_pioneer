@@ -775,4 +775,12 @@ I am working with the map_bat_activity.R and I realized that iron06 in 2023 has 
 
     ![](images/clipboard-2052547050.png)
 
--   
+    ------------------------------------------------------------------------
+
+7/29/2025
+
+I am including light as lux and watts in a model to see how it performs.
+
+apparently we have several weeks in 2023 where there is no data 5659 lines. I figure I have to check those NAs and make them into the mean of that site for that years season. that way we will have the data correctly.
+
+the light data has some errors, long 02 has no data for one of the years.

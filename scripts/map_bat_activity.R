@@ -175,10 +175,27 @@ ggplot(site_sf) +
     caption = "Each point represents a site. Color and size reflect predicted activity."
   )
 
+ggplot(site_sf) +
+  geom_sf(aes(color = estimate, size = estimate), alpha = 0.8) +
+  scale_color_viridis_c(option = "plasma", name = "Predicted Activity") +
+  scale_size(range = c(1, 12), name = "Predicted Activity") +
+  facet_wrap(~ yr_s) +
+  scale_x_continuous(breaks = c(-113.5, -113.0, -112.5)) +  # ← Only 3 tick marks
+  theme_minimal() +
+  labs(
+    title = "Predicted Bat Activity by Site and Year",
+    subtitle = "Model-based estimates of bat calls (GLMM)",
+    caption = "Each point represents a site. Color and size reflect predicted activity."
+  )
+
 unique(site_sf$year)
 
 
 library(gganimate)
+
+site_sf <- site_sf %>% 
+  filter(!is.na(year)) %>%
+  mutate(year = as.numeric(as.character(year)))  # or as.factor(year) if categorical
 
 ggplot(site_sf) +
   geom_sf(aes(color = estimate, size = estimate), alpha = 0.8) +
@@ -192,7 +209,6 @@ ggplot(site_sf) +
   ) +
   transition_time(year) +
   ease_aes("linear")
-
 
 site_change <- preds %>%
   group_by(site) %>%
