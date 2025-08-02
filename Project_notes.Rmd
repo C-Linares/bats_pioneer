@@ -781,6 +781,20 @@ I am working with the map_bat_activity.R and I realized that iron06 in 2023 has 
 
 I am including light as lux and watts in a model to see how it performs.
 
-apparently we have several weeks in 2023 where there is no data 5659 lines. I figure I have to check those NAs and make them into the mean of that site for that years season. that way we will have the data correctly.
+apparently we have several weeks in 2023 where there is no insect data 5659 lines. I figure I have to check those NAs and make them into the mean of that site for that years season. that way we will have the data correctly.
 
 the light data has some errors, long 02 has no data for one of the years.
+
+------------------------------------------------------------------------
+
+7/31/2025
+
+-   I was looking at the moon data and it seems we are missing data for the early period of sampling 21-22 06 2021 and for
+
+    |            |     |
+    |------------|-----|
+    | 2023-09-05 |     |
+
+    I might need to recheck the moon script to produce the estimates.
+
+-   updated the glmm_v2 and found included light data from the spectral measurements. Now I am testing model m1.6nb to see if it does a better job.

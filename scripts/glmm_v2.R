@@ -13,7 +13,7 @@
 ##
 ## ---------------------------
 ##
-## Notes: 
+## Notes:  
 ##   
 ##
 ## ---------------------------
@@ -51,7 +51,8 @@ pacman::p_load(
   "MuMIn", #models
   "performance",
   "viridis",
-  "data.table"
+  "data.table",
+  "janitor" # to clean names
 )
 
 #load environment 
@@ -59,12 +60,12 @@ load(file = "working_env/glmm_v2.RData")
 
 #load data ---------------------------------------------------------------
 
-bm <- read_csv('data_for_analysis/prep_for_glmm/bm.csv')
+bm <- read_csv('data_for_analysis/prep_for_glmm/bm.csv') %>% 
+  clean_names() # load bat data.
 
-filtered_bm <- bm[!(bm$AUTO.ID. %in% c("Noise", "NoID")), ] # Noise needs to be filter out before analysis other wise there are more records in dark areas.
-# rename col
-colnames(filtered_bm)[2] <- "sp" # change from AUTO.ID to sp
-
+filtered_bm <- bm %>%
+  filter(!auto_id %in% c("Noise", "NoID")) %>% # remove calls mark as Noise and NoID
+  rename(sp = auto_id) # safe rename
 
 #load activity index
 
@@ -96,7 +97,8 @@ colnames(c_bugs)[3]<-"yr" # rename site
 
 # light
 
-light<-read_csv("data_for_analysis/lights/lightspectra_pioneer.csv") # load light data.
+light<-read_csv("data_for_analysis/lights/lightspectra_pioneer.csv") %>% 
+  clean_names()# load light data.
 
 # filter col V/H and keep all horizontal 
 
@@ -104,23 +106,23 @@ light<-light %>%
   filter(vert_horiz == "Horizontal") # keep only horizontal light
 
 # calculate the mean light for m1-m3 
-light$mwatts <- rowMeans(light[, c("Watts (m1)", "Watts (m1)", "Watts (m3)")], na.rm = TRUE) # calculate the mean of the three columns mwat_1, mwat_2, mwat_3
+light$mwatts <- rowMeans(light[, c("watts_m1", "watts_m2", "watts_m3")], na.rm = TRUE) # calculate the mean of the three columns mwat_1, mwat_2, mwat_3
 
-# remove unnecessary columns
+# keep necessary columns
 light <- light %>%
-  select(c("site", "Lux", "yr", "mwatts")) # keep only the columns we need
+  select(c("site", "lux", "yr", "mwatts")) # keep only the columns we need
 
 # merge -------------------------------------------------------------------
 
 # activity index with bat data. 
-
 bm2 <- left_join(filtered_bm, filtered_bm.ai[, c("sp", "site", "noche", "activity_min")], by = c("sp", "site", "noche"))
+nrow(bm2)
 
 # merge with traits
 bm2<- left_join(bm2, select(btrait, six_sp, ear.arm), by = c("sp" = "six_sp"))
 
 summary(bm2)
-
+nrow(bm2) # 17772 rows
 # merge with weather
 
 bm2<- left_join(bm2, crmo.wet.night, by=c("noche"="date"))
@@ -179,20 +181,27 @@ bm2<- bm2 %>%
 
 # merge light 
 
-t<- bm2 %>% 
+bm2<- bm2 %>% 
   left_join(light, by = c("site", "yr")) # merge with light data
 
+summary(bm2) #this has the predictors and the y's 
+nrow(bm2) # 17772 rows
 # correlation  ------------------------------------------------------------
 # before modelling we have to check for correlation between the predictors as VIF is not adequate for negative binomial models.
-# check for correlation 
+# 1. Select numeric columns, optionally drop unique id/group columns
+numeric_data <- bm2 %>% 
+  select(where(is.numeric)) %>% 
+  select(-any_of(c("yr", "trmt_bin"))) # add/remove columns as needed
 
-numeric_cols<- sapply(bm2, is.numeric) # separate all the num col
-cor1<-bm2[,numeric_cols] #keeps just the numeric
+# 2. Remove zero-variance columns
+numeric_data <- numeric_data %>% select(where(~sd(., na.rm = TRUE) > 0))
 
-c1<- cor(cor1,use="pairwise.complete.obs")
-corrplot(c1, order= 'AOE')
+# 3. Compute correlation matrix
+cor_mat <- cor(numeric_data, use = "pairwise.complete.obs")
 
-# from the plot it seems like the tmp and wind speed, twilight, total illumination, moon phase and moonlight are correlated not to be included in the model at the same time. Insect variables like total lepidoptera and and total insects are also correlated with moon phase and light but less than 0.4
+# 4. Visualize correlation matrix
+corrplot(cor_mat, order = 'AOE')
+# from the plot it seems like the tmp and wind speed, twilight, total illumination, moon phase and moonlight are correlated not to be included in the model at the same time. Insect variables like total lepidoptera and and total insects are also correlated with moon phase and light but less than 0.4. Spectral measurments are corre
 
 # standardize predictors ---------------------------------------------
 # calculate jday
@@ -209,7 +218,9 @@ variables_to_scale <- c(
   "tillum",
   "jday",
   "t.insect",
-  "t.lepidoptera"
+  "t.lepidoptera",
+  "lux",
+  "mwatts"
 )
 
  
@@ -447,6 +458,28 @@ per1<-compare_performance(m1.5nb, m1.4nb, m1.3nb, m1.2nb, m1.1nb)
 plot_model(m1.5nb)
 
 
+# model with light spectra instead of binomial 
+
+m1.6nb <- glmmTMB(
+  #fixed effects
+  n ~ lux_s + jday_s + I(jday_s^2) + moonlight_s +
+    nit_avg_wspm.s_s + yr_s  + t.lepidoptera_s +
+    #random effects
+    (1 | site) + (1 + lux_s + jday_s + I(jday_s^2) | sp) +
+    #interactions
+    jday_s * lux_s + I(jday_s^2) * lux_s + yr_s * lux_s + lux_s*t.lepidoptera_s + lux_s*moonlight_s,
+  data = bm2,
+  family = nbinom2(link = "log")
+)
+summary(m1.6nb)
+check_zeroinflation(m1.6nb)
+check_overdispersion(m1.6nb)
+check_singularity(m1.6nb)
+r2(m1.6nb)
+DHARMa::simulateResiduals(m1.6nb, plot = TRUE, quantreg = TRUE)
+anova(m1.6nb) # the model with light spectra is not better than the model with the insects and ear/arm ratio.) 
+
+
 # acoustic activity index models ------------------------------------
 
 # now instead of using the bat call counts we are going to use the activity index from the bm2 dataset (activity_min).
@@ -642,7 +675,7 @@ write.csv(preds, "data_for_analysis/glmm_v2/preds.csv")
 
 
 
-# Marginal effect plots m1.2nb --------------------------------------------
+# Marginal effect plots m1.4nb --------------------------------------------
 
 # Below is marginal effect plot for moon illumination. 
 
@@ -878,6 +911,159 @@ p1.5.1 <- ggplot(pred1.5, aes(x = trmt, y = estimate, color = sp, group = sp)) +
 
 p1.5.1
 
+# Marginal effect plots m1.6nb
+
+
+
+
+
+# marginal effect plots m1.6nb --------------------------------------------
+
+plot_model(m1.6nb)
+plot_model(m1.6nb, type = "re")
+
+
+# community response to treatment. 
+
+pred1 <- predictions(m1.6nb,
+                     newdata = datagrid(sp  = NA, 
+                                        lux_s = seq( min(bm2$lux_s), max(bm2$lux_s), length.out = 100),
+                                        site = unique(bm2$site)
+                                        ),
+                     re.form = NA)
+
+# Calculate non-standardized lux for graphics
+mean_lux <- mean(bm2$lux, na.rm = TRUE)
+
+sd_lux   <- sd(bm2$lux, na.rm = TRUE)
+
+# add to the pred1 data frame
+pred1 <- pred1 %>%
+  mutate(lux = (lux_s * sd_lux) + mean_lux)
+
+# ad lit vs dark sites to plot two lines
+
+lit<-c("long01", "long03", "iron05", "iron01", "iron03")
+pred1 <- pred1 %>%
+  mutate(trmt = ifelse(site %in% lit, "lit", "dark")) # add dark and lit labels to sites
+
+# add treatment. 
+
+p1<-ggplot(pred1, aes(x = lux, y = estimate)) +
+  geom_line()+
+  geom_ribbon(aes(ymin = conf.low, ymax = conf.high), alpha = 0.2) +
+  labs(
+    x = "Light (lux)",
+    y = "Predicted Bat Calls") +
+  theme_minimal()+
+  theme(
+    panel.grid.major = element_blank(),   # remove major grid lines
+    panel.grid.minor = element_blank())
+p1
+
+
+# species response to treatment. 
+
+pred2 <- predictions(m1.6nb,,
+                     newdata = datagrid(
+                     sp = (bm2$sp),
+                     lux_s = seq( min(bm2$lux_s), max(bm2$lux_s), length.out = 100)
+                     )
+)
+
+pred2$sp <- factor(pred2$species,  # order species 
+                        levels = pred2 %>% 
+                          group_by(species) %>% 
+                          summarise(mean_est = mean(estimate)) %>%
+                          arrange(desc(mean_est)) %>% 
+                          pull(species))
+
+#simplify species names so the labels are just the initial of genus and the species like C.brachyrhynchos
+pred2 <- pred2 %>%
+  mutate(species_short = str_replace(species, 
+                                     "^([A-Za-z])[a-z]+\\s+", 
+                                     "\\1. "))
+
+#as data set 
+
+pred2<-as_tibble(pred2)
+
+p2<-ggplot(pred2, aes(x = lux_s, y = estimate )) +
+  geom_line(alpha = 0.5, color = "black") +
+  geom_ribbon(aes(ymin = conf.low, ymax = conf.high), alpha = 0.2) +
+  scale_fill_manual(values = c("black", "white")) +
+  facet_wrap(~ sp, scales = "free_y") +
+  theme_minimal()
+p2
+
+ggplot(pred2, aes(x = species_short, y = estimate, color = factor(trmt_bin))) +
+  geom_point(position = position_dodge(width = 0.5), size = 3) +
+  geom_errorbar(aes(ymin = conf.low, ymax = conf.high),
+                width = 0.2,
+                position = position_dodge(width = 0.5)) +
+  scale_color_manual(values = c("black", "grey")) +
+  labs(x = "Species", y = "Predicted Bird Calls", color = "Treatment") +
+  theme_minimal() +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "grey40")+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+
+
+ggplot(pred2, aes(x = factor(trmt_bin), y = estimate, group = species)) +
+  geom_point(aes(color = factor(trmt_bin)), size = 3) +
+  geom_line(aes(group = species)) +
+  facet_wrap(~ species, scales= "free_y") +
+  labs(x = "Treatment", y = "Predicted Bird Calls", color = "Treatment") +
+  theme_minimal()
+
+
+
+p2<-ggplot(pred2, aes(x = species_short, y = estimate, 
+                      color = factor(trmt_bin), 
+                      shape = factor(trmt_bin))) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "grey40") +
+  geom_point(position = position_dodge(width = 0.5), size = 3) +
+  geom_errorbar(aes(ymin = conf.low, ymax = conf.high),
+                width = 0.2,
+                position = position_dodge(width = 0.5)) +
+  scale_color_manual(values = c("darkblue", "orange"), 
+                     labels = c("Dark", "Lit")) +
+  scale_shape_manual(values = c(16, 17),
+                     labels = c("Dark", "Lit")) +
+  labs(x = "Species", y = "Predicted Bird Calls", 
+       color = "Treatment", shape = "Treatment") +
+  theme_minimal(base_size = 14) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, face = "italic"),
+        legend.position = "top",
+        panel.grid.major.x = element_blank(),
+        panel.grid.minor = element_blank())
+
+p2
+ggsave(p2, file = "images/glmm_birdnet_v2/species_treatment_effects.png", width = 10, height = 6)
+
+# summary to describe the results. 
+species_means <- pred2 %>%
+  group_by(species) %>%
+  summarise(
+    mean_dark = estimate[trmt_bin == -1],
+    mean_lit  = estimate[trmt_bin == 1]
+  ) %>%
+  arrange(desc(mean_dark))
+
+
+diff_data <- pred2 %>%
+  select(species, trmt_bin, estimate) %>%
+  pivot_wider(names_from = trmt_bin, values_from = estimate) %>%
+  mutate(Difference = `1` - `-1`)
+
+ggplot(diff_data, aes(x = species, y = Difference)) +
+  geom_col(fill = "blue") +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  labs(x = "Species", y = "Treatment Effect (Light - Dark)") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+
 # effect sizes plots -------------------------------------------------------------------
 
 plot_model(m1.5nb, type = "est", show.values = TRUE, value.offset = 0.3)
@@ -889,7 +1075,7 @@ plot_model(m1.5nb, type = "re", terms = "trmt_bin", show.values = TRUE, value.of
 #save image 
 save.image(file = "working_env/glmm_v2.RData")
 
-save(m1.2nb, file = "models/m1.2nb.RData") # best model up to 2/19/2025
+save(m1.5nb, file = "models/m1.5nb.RData") # best model up to 8/1/2025
 
 load("models/my_models.RData")
 
