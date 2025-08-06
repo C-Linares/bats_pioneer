@@ -33,6 +33,7 @@
 library(tidyverse)
 library(beepr)
 library(lubridate)
+library(data.table)
 
 
 # kpro_data --------------------------------------------------------------
@@ -44,9 +45,9 @@ load("working_env/prep_for_glm.RData")
 
 
 
-kpro_2021_bat<- read.csv(file = 'data_for_analysis/2021_kpro_raw/bats2021_kpro_v1.csv',header = T)
-kpro_2022_bat<-read.csv(file = 'data_for_analysis/2022_kpro_raw/bat2022_kpr.csv',header = T)
-kpro_2023_bat<-read.csv(file = 'data_for_analysis/2023_kpro_raw/bat2023_kpr.csv',header = T)
+kpro_2021_bat <- fread(file = 'data_for_analysis/2021_kpro_raw/bats2021_kpro_v1.csv', header = T)
+kpro_2022_bat <- fread(file = 'data_for_analysis/2022_kpro_raw/bat2022_kpr.csv', header = T)
+kpro_2023_bat <- fread(file = 'data_for_analysis/2023_kpro_raw/bat2023_kpr.csv', header = T)
 
 
 
@@ -62,7 +63,7 @@ bat_combined <- bat_combined %>% select(all_of(keep)) # keeps variables of inter
 
 bat_combined$site<-str_extract(bat_combined$OUTDIR, "[A-Za-z]{3,4}\\d{2}")
 
-unique(bat_combined$site) # site labels
+unique(bat_combined$site) # site labels need correction
 
 # here we fix some problems with the sites misspellings
 
@@ -81,7 +82,7 @@ bat_combined$DATE<-lubridate::ymd(bat_combined$DATE)
 sum(is.na(bat_combined$DATE)) # check for NAs. 
 
 # noche/night
-# this variable assigns the same date to calls that belong to a single night. If a call happened in the July 6 at 3 am it assigns it to July 5 
+# this variable assigns the same date to calls that belong to a single night. If a call happened on July 6 at 3 am it assigns it to July 5 
 
 bat_combined$noche <-
   if_else(bat_combined$HOUR < 9, # if it is less than 9 put the date of the previous day
@@ -182,12 +183,16 @@ summary(bat_combined)
 # daily counts
 
 bm <- bat_combined %>% # 
-  group_by(noche, sp, site,yr, trmt_bin, treatmt) %>% 
+  group_by(noche, sp, site,yr, treatmt, trmt_bin, eff.hrs) %>% 
   summarise(n = n(), .groups = 'drop') 
 
 summary(bm)
 head(bm)
-
+# here we calculate the total calls per species to report in the results 
+bm_summary <- bm %>%
+  group_by(sp) %>%
+  summarise(total_calls = sum(n)) %>%
+  arrange(desc(total_calls))
 # miller matrix -----------------------------------------------------------
 
 

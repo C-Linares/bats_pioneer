@@ -10,7 +10,7 @@
 # 
 # ---------------------------
 #   
-#   Notes: early in the analysis we calculated moon illumination using suncal and lunar. 11/21/2024 as recomended by Kayba we will use the moonlit. package 
+#   Notes: early in the analysis we calculated moon illumination using suncal and lunar. 11/21/2024 but as recomended by Cris Kayba we will use the moonlit. package 
 
 
 # inputs ------------------------------------------------------------------
@@ -33,6 +33,7 @@
 if (!require("pacman")) install.packages("pacman")
 
 pacman::p_load(suncalc, sf, ggplot2, lunar, tidyverse, moonlit, beepr, data.table, parallel, future)
+library(data.table)
 
 # moonlit  recommended by Kayba to Jesse Barber.
 
@@ -141,8 +142,8 @@ write.csv(moon_pred,file = 'data_for_analysis/moon_pred.csv', row.names = F) # r
 # install_github("msmielak/moonlit")
 
 #load the moonlit library
-
-#calculateMoonlightIntensity(lat, lon, date, e) Function requires dates and lat long data. 
+#
+library(moonlit)
 
 #site coordinates
 sts<-read.csv("data_for_analysis/sites_coordinates.csv")
@@ -156,7 +157,7 @@ bat_combined<-read_csv(file = 'data_for_analysis/prep_for_glmm/bat_combined.csv'
 bat_combined<- bat_combined %>% filter(sp !="Noise")
 
 #--- 1pm times -----
-  # here we are exploring if there are any wrong dates in the original data set because there are wrong dates in the moon intensity. For some reason there are recordings made at 1 pm at one site but these are all noise and will be filter out at the end. 
+  # here we are exploring if there are any wrong dates in the original data set because there are wrong dates in the moon intensity. For some reason there are recordings made at 1 pm at one site but these most likely is an error while setting the clock of the sm3 and these calls will be left out of the analysis. 
   
 rows_13pm <- bat_combined %>%
   filter(format(as.POSIXct(date_time, tz = "UTC"), "%H") == "13")
@@ -169,17 +170,14 @@ site.date<- bat_combined %>% select(site, date_time)
 
 sidalo<-left_join(site.date, sts, by="site")
 
-# sidalo$date_time_prsed<- ymd_hms(sidalo$date_time, tz="UTC") #keep it UTC.
-
-# failed_rows <- which(is.na(sidalo$date_time_prsed))
-# failed_dates <- sidalo[failed_rows, ]
-
 sidalo$date_time<- force_tz(sidalo$date_time, tzone = "America/Denver")
 
 summary(sidalo)
+str(sidalo)
 
-# check all years are present. 
-unique(lubridate::year(sidalo$date_time))
+# check 
+unique(lubridate::year(sidalo$date_time)) # all years present
+sum(is.na(sidalo$date_time)) # no NAs in date time
 
 
 # write site and dates. 
@@ -190,16 +188,21 @@ fwrite(sidalo, file = "data_for_analysis/moon_pred/sidalo.csv", row.names = FALS
 
 # below is the non-reproducible way to get the results I need. 
 sidalo<-fread("data_for_analysis/moon_pred/sidalo.csv") # read the file to check it is ok.
-# extract date time for bm2
-nightsummary<-bm2 %>% select(site, noche) # get dates for summarized bat data from glmm_v2
 
-# merge with the coordinates
+# Not suere i need the code here until line 201
+# # extract date time for bm2
+# nightsummary<-bm %>% select(site, noche) # get dates for summarized bat data from glmm_v2
+# 
+# # merge with the coordinates
+# 
+# sidalo<-left_join(nightsummary, sts, by="site") # merge with the coordinates
+# str(sidalo) # check the data set.)
+# sidalo$date_time<- as.POSIXct(sidalo$noche) # convert to date time 
+# summary(sidalo)
 
-sidalo<-left_join(nightsummary, sts, by="site") # merge with the coordinates
-str(sidalo) # check the data set.)
-sidalo$date_time<- as.POSIXct(sidalo$noche) # convert to date time
+
 # code suggestions by Kyle Shanon ---------------------------------------------------
-
+library(future)
 #
 print(nrow(sidalo))
 
@@ -208,7 +211,7 @@ system.time(moon.int <- calculateMoonlightIntensity(
   sidalo$lat,
   sidalo$lon,
   sidalo$date_time ,
-  e = 0.16
+  e = 0.16,
 ))
 
 
@@ -230,9 +233,12 @@ metadata_dt <- as.data.table(t(metadata), keep.rownames = "Variable")
 setnames(metadata_dt, "V1", "Description")
 
 # Combine the metadata and moon.int data frames
+
+t <- left_join(moon.int, sidalo, by = c("date" = "date_time", "lat" = "lat", "lon" = "lon"))
+
 combined <- rbindlist(list(metadata_dt, moon.int), use.names = FALSE, fill = TRUE)
 
-# There are during the day. I will filter out any observation that are not at night. 
+# There are some observations where the moon was below the horizon and the sun was barely out or out
 
 moon.int.night<-moon.int %>% filter(night==TRUE)
 
@@ -311,9 +317,10 @@ summary(moon.df)
 # outputs -----------------------------------------------------------------
 fwrite(combined_data, file = "data_for_analysis/moon_pred/moon.stat.csv", row.names = FALSE)
 
-fwrite(combined, file = "data_for_analysis/moon_pred/moon.int.csv", row.names = FALSE)
+fwrite(moon.int, file = "data_for_analysis/moon_pred/moon.int.csv", row.names = FALSE)
 
 fwrite(moon.int.night, file = "data_for_analysis/moon_pred/moon.int.night.csv", row.names = FALSE)
+
 # 
 
 # Create a README  to explain the moon.stat and moon.int data sets.

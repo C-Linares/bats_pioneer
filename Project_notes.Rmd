@@ -789,7 +789,7 @@ the light data has some errors, long 02 has no data for one of the years.
 
 7/31/2025
 
--   I was looking at the moon data and it seems we are missing data for the early period of sampling 21-22 06 2021 and for
+-   I was looking at the moon data and it seems we are missing data for the early period of sampling 21-22 06 2021 and for 2023-09-05
 
     |            |     |
     |------------|-----|
@@ -798,3 +798,27 @@ the light data has some errors, long 02 has no data for one of the years.
     I might need to recheck the moon script to produce the estimates.
 
 -   updated the glmm_v2 and found included light data from the spectral measurements. Now I am testing model m1.6nb to see if it does a better job.
+
+------------------------------------------------------------------------
+
+8/5/2025
+
+It seems we need to fix the moon prediction scrip to be able to get the 110 na rows we are missing.
+
+-   I have to check how many calls we actually have. It seems we might be missing some calls. the bat combine data has the following
+
+    ![](images/clipboard-2755547527.png){width="781"}
+
+    but the bm2 file that I am using for modeling has a lot less. WHY? in the paper I am reporting 17 000 ish calls but M.lucifugus has 241 thousand by itself. Something does not match.
+
+-   R has been crashing and I think I know why now. ti seems like one of the packages might be giving trouble.
+
+------------------------------------------------------------------------
+
+8/6/2025
+
+R keeps crashing and I suspect is the glmm_v2 package. I will start a new glmm_v3 package and we will review the bat call data base that might have a few calls missing. I will recalculate the moon intensity because it seems it's missing some dates.
+
+-   when mergin the moon variable with the bat calls using date, I will make sure to have them both in the same time zone. that might be making things fail.
+
+-   I also need to check the bat bm.csv data file. I am suspecting we are missing a bunch of calls for each sepecies. Update: the error came from reporting the total number of lines for each species instead of the total number of counts for each species.

@@ -52,33 +52,43 @@ pacman::p_load(
   "performance",
   "viridis",
   "data.table",
-  "janitor" # to clean names
+  "janitor", # to clean names
+  "patchwork"
 )
+
+
 
 #load environment 
 load(file = "working_env/glmm_v2.RData") 
 
 #load data ---------------------------------------------------------------
 
-bm <- read_csv('data_for_analysis/prep_for_glmm/bm.csv') %>% 
-  clean_names() # load bat data.
+bm <- read_csv("data_for_analysis/prep_for_glmm/bm.csv") %>%
+  clean_names()
+
+bm_summary <- bm %>%  # this is for describing in the results section of the manuscript. 
+  group_by(auto_id) %>%
+  summarise(total_calls = sum(n)) %>%
+  arrange(desc(total_calls))
 
 filtered_bm <- bm %>%
-  filter(!auto_id %in% c("Noise", "NoID")) %>% # remove calls mark as Noise and NoID
+  filter(!auto_id %in% c("Noise", "NoID")) %>% # remove calls marked as Noise and No ID
   rename(sp = auto_id) # safe rename
 
 #load activity index
 
-bm.ai<- read_csv('data_for_analysis/prep_for_glmm/bm.miller.day.csv') # activity index for the bat species.
-filtered_bm.ai<-bm.ai[!(bm.ai$sp %in% c("Noise", "NoID")), ] # Noise needs to be filter out before analysis
-colnames(filtered_bm.ai)
-filtered_bm.ai$...1<-NULL # remove unnecessary variable. 
+bm_ai <- read_csv("data_for_analysis/prep_for_glmm/bm.miller.day.csv") %>% 
+  clean_names() %>%
+  filter(!sp %in% c("Noise", "NoID"))
+
+
+
 # predictors --------------------------------------------------------------
 
 
 # bat traits arm/ear ratio
 
-btrait<-read.csv('data_for_analysis/bat_traits/bat_eararm_v2.csv') # load bat traits')
+btrait<-read_csv("data_for_analysis/bat_traits/bat_eararm_v2.csv") # load bat traits')
 
 # Creaters weather (night).
 
@@ -87,36 +97,37 @@ crmo.wet.night<-read_csv("data_for_analysis/weather/craters_weater/craters_night
 
 # Moon
 
-moon.int.night<-fread("data_for_analysis/moon_pred/moon.int.night.csv")
+moon.int.night<-read_csv("data_for_analysis/moon_pred/moon.int.night.csv")
 moon.int.night$date<-as_date(moon.int.night$date)
+moon.int<- read_csv('data_for_analysis/moon_pred/moon.int.csv') %>%
+  clean_names()
+summary()
 
 # insects 
 
-c_bugs<-read_csv("data_for_analysis/insect_wranglin/c_bugs.csv") # load insect data.
-colnames(c_bugs)[3]<-"yr" # rename site
+c_bugs <- read_csv("data_for_analysis/insect_wranglin/c_bugs.csv") %>%  # load insect data.
+  clean_names() %>%
+  rename(yr = yrs) # safe rename
+
 
 # light
 
-light<-read_csv("data_for_analysis/lights/lightspectra_pioneer.csv") %>% 
-  clean_names()# load light data.
-
-# filter col V/H and keep all horizontal 
-
-light<-light %>%
-  filter(vert_horiz == "Horizontal") # keep only horizontal light
-
-# calculate the mean light for m1-m3 
-light$mwatts <- rowMeans(light[, c("watts_m1", "watts_m2", "watts_m3")], na.rm = TRUE) # calculate the mean of the three columns mwat_1, mwat_2, mwat_3
-
-# keep necessary columns
-light <- light %>%
-  select(c("site", "lux", "yr", "mwatts")) # keep only the columns we need
+light <- read_csv("data_for_analysis/lights/lightspectra_pioneer.csv") %>%
+  clean_names() %>%
+  filter(vert_horiz == "Horizontal") %>%                          # Keep only horizontal measures.
+  mutate(mwatts = rowMeans(across(c(watts_m1, watts_m2, watts_m3)), na.rm = TRUE)) %>%  # Mean of watts
+  select(site, lux, yr, mwatts)    # Select relevant columns
 
 # merge -------------------------------------------------------------------
 
 # activity index with bat data. 
-bm2 <- left_join(filtered_bm, filtered_bm.ai[, c("sp", "site", "noche", "activity_min")], by = c("sp", "site", "noche"))
-nrow(bm2)
+bm2 <- filtered_bm %>%
+  left_join(
+    bm_ai %>% select(sp, site, noche, activity_min),
+    by = c("sp", "site", "noche")
+  )
+
+summary(bm2)
 
 # merge with traits
 bm2<- left_join(bm2, select(btrait, six_sp, ear.arm), by = c("sp" = "six_sp"))
@@ -127,6 +138,7 @@ nrow(bm2) # 17772 rows
 
 bm2<- left_join(bm2, crmo.wet.night, by=c("noche"="date"))
 
+summary(bm2) # check for NAs
 
 # merge with moon
 # summarize moon.int.night by date.
@@ -147,6 +159,9 @@ bm2<- left_join(bm2, m.moon.int, by=c("noche"="date")) # merge with moon data
 
 # Identify rows with NA values
 rows_with_na <- bm2[rowSums(is.na(bm2)) > 0, ] # some wind and temp have NAs because we are missing august 2021 weather data.
+
+
+
 
 # make the rows with NAs to 0 
 bm2<- bm2 %>%
@@ -292,6 +307,30 @@ ggplot(bm2, aes(x=jday, y=n, col=treatmt))+
        x = "Julian Day",
        y = "n calls",
        color = "Treatment")
+
+# table with species counts 
+species_counts <- as.data.frame(table(bm2$sp)) %>%
+  rename(sp = Var1, total_calls = Freq) %>%
+  arrange(desc(total_calls)) %>%
+  bind_rows(
+    summarise(., sp = "TOTAL", total_calls = sum(total_calls))
+  )
+species_lookup <- data.frame(
+  sp = c("ANTPAL", "CORTOW", "EPTFUS", "EUDMAC", "LASCIN", "LASNOC",
+         "MYOCAL", "MYOCIL", "MYOEVO", "MYOLUC", "MYOTHY", "MYOVOL",
+         "MYOYUM", "PARHES"),
+  species_name = c("Antrozous pallidus", "Corynorhinus townsendii", "Eptesicus fuscus", "Euderma maculatum",
+                   "Lasiurus cinereus", "Lasiurus noctivagans", "Myotis californicus", "Myotis ciliolabrum",
+                   "Myotis evotis", "Myotis lucifugus", "Myotis thysanodes", "Myotis volans",
+                   "Myotis yumanensis", "Parastrellus hesperus")
+)
+
+species_lookup <- species_lookup %>%
+  mutate(
+    genus = word(species_name, 1),
+    species = word(species_name, 2),
+    sp_label = paste0(substr(genus, 1, 1), ".", species)
+  )
 
 
 # models ------------------------------------------------------------------
@@ -962,7 +1001,7 @@ p1<-ggplot(pred1, aes(x = lux, y = estimate)) +
 p1
 
 
-# species response to treatment. 
+# species specific response to treatment. 
 
 pred2 <- predictions(m1.6nb,,
                      newdata = datagrid(
@@ -971,105 +1010,172 @@ pred2 <- predictions(m1.6nb,,
                      )
 )
 
-pred2$sp <- factor(pred2$species,  # order species 
+pred2$sp <- factor(pred2$sp,  # order species 
                         levels = pred2 %>% 
-                          group_by(species) %>% 
+                          group_by(sp) %>% 
                           summarise(mean_est = mean(estimate)) %>%
                           arrange(desc(mean_est)) %>% 
-                          pull(species))
+                          pull(sp))
 
-#simplify species names so the labels are just the initial of genus and the species like C.brachyrhynchos
+# Calculate non-standardized lux for graphics
+mean_lux <- mean(bm2$lux, na.rm = TRUE)
+
+sd_lux   <- sd(bm2$lux, na.rm = TRUE)
+
+# add to the pred1 data frame
 pred2 <- pred2 %>%
-  mutate(species_short = str_replace(species, 
-                                     "^([A-Za-z])[a-z]+\\s+", 
-                                     "\\1. "))
+  mutate(lux = (lux_s * sd_lux) + mean_lux)
+
+# add species names 
+
+pred2 <- pred2 %>%
+  left_join(species_lookup %>% select(sp, sp_label), by = "sp")
+
+
+# organize 
+slopes <- pred2 %>%
+  group_by(sp_label) %>%
+  do(mod = lm(estimate ~ lux_s, data = .)) %>%
+  summarise(sp_label = first(sp_label), slope = coef(mod)[2]) %>%
+  arrange(desc(slope))
+
+# Set factor levels accordingly
+pred2$sp_label <- factor(pred2$sp_label, levels = slopes$sp_label)
 
 #as data set 
 
 pred2<-as_tibble(pred2)
 
-p2<-ggplot(pred2, aes(x = lux_s, y = estimate )) +
+p2<-ggplot(pred2, aes(x = lux, y = estimate )) +
   geom_line(alpha = 0.5, color = "black") +
   geom_ribbon(aes(ymin = conf.low, ymax = conf.high), alpha = 0.2) +
   scale_fill_manual(values = c("black", "white")) +
-  facet_wrap(~ sp, scales = "free_y") +
+  facet_wrap(~ sp_label, scales = "free_y") +
   theme_minimal()
 p2
 
-ggplot(pred2, aes(x = species_short, y = estimate, color = factor(trmt_bin))) +
-  geom_point(position = position_dodge(width = 0.5), size = 3) +
-  geom_errorbar(aes(ymin = conf.low, ymax = conf.high),
-                width = 0.2,
-                position = position_dodge(width = 0.5)) +
-  scale_color_manual(values = c("black", "grey")) +
-  labs(x = "Species", y = "Predicted Bird Calls", color = "Treatment") +
-  theme_minimal() +
-  geom_hline(yintercept = 0, linetype = "dashed", color = "grey40")+
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
-
-
-
-ggplot(pred2, aes(x = factor(trmt_bin), y = estimate, group = species)) +
-  geom_point(aes(color = factor(trmt_bin)), size = 3) +
-  geom_line(aes(group = species)) +
-  facet_wrap(~ species, scales= "free_y") +
-  labs(x = "Treatment", y = "Predicted Bird Calls", color = "Treatment") +
-  theme_minimal()
-
-
-
-p2<-ggplot(pred2, aes(x = species_short, y = estimate, 
-                      color = factor(trmt_bin), 
-                      shape = factor(trmt_bin))) +
-  geom_hline(yintercept = 0, linetype = "dashed", color = "grey40") +
-  geom_point(position = position_dodge(width = 0.5), size = 3) +
-  geom_errorbar(aes(ymin = conf.low, ymax = conf.high),
-                width = 0.2,
-                position = position_dodge(width = 0.5)) +
-  scale_color_manual(values = c("darkblue", "orange"), 
-                     labels = c("Dark", "Lit")) +
-  scale_shape_manual(values = c(16, 17),
-                     labels = c("Dark", "Lit")) +
-  labs(x = "Species", y = "Predicted Bird Calls", 
-       color = "Treatment", shape = "Treatment") +
-  theme_minimal(base_size = 14) +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1, face = "italic"),
-        legend.position = "top",
-        panel.grid.major.x = element_blank(),
+p2<-ggplot(pred2, aes(x = lux, y = estimate)) +
+  geom_ribbon(aes(ymin = conf.low, ymax = conf.high), alpha = 0.2) +
+  geom_line(linewidth = .5, color = "black") +
+  facet_wrap(~ sp_label, scales = "free_y") +
+  labs(
+    x = "Light Intensity (lux)",
+    y = "Predicted Bat Activity (call count)",
+    title = ""
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(strip.text = element_text(face = "bold"),
+        panel.grid.major = element_blank(),   # remove major grid lines
         panel.grid.minor = element_blank())
 
 p2
-ggsave(p2, file = "images/glmm_birdnet_v2/species_treatment_effects.png", width = 10, height = 6)
 
-# summary to describe the results. 
-species_means <- pred2 %>%
-  group_by(species) %>%
-  summarise(
-    mean_dark = estimate[trmt_bin == -1],
-    mean_lit  = estimate[trmt_bin == 1]
-  ) %>%
-  arrange(desc(mean_dark))
+ggplot(pred2, aes(x = lux_s, y = estimate, color = sp)) +
+  geom_line(size = 1) +
+  labs(
+    x = "Standardized Light Intensity (lux_s)",
+    y = "Predicted Activity",
+    color = "Species"
+  ) +
+  theme_minimal()
+
+p1p2<-p1+p2
+
+# Save the marginal effect plots
+ggsave(
+  filename = "figures/glmm_V2/light_effects.tiff",
+  plot = p1p2,
+  width = 12,
+  height = 6,
+  dpi = 600,
+  device = "tiff"
+)
 
 
-diff_data <- pred2 %>%
-  select(species, trmt_bin, estimate) %>%
-  pivot_wider(names_from = trmt_bin, values_from = estimate) %>%
-  mutate(Difference = `1` - `-1`)
+# community effect moonlight. 
 
-ggplot(diff_data, aes(x = species, y = Difference)) +
-  geom_col(fill = "blue") +
-  geom_hline(yintercept = 0, linetype = "dashed") +
-  labs(x = "Species", y = "Treatment Effect (Light - Dark)") +
+pred2<- predictions(m1.6nb,
+                    newdata = datagrid(
+                      sp = NA,
+                      moonlight_s = seq(min(bm2$moonlight_s), max(bm2$moonlight_s), length.out = 100)
+                    )
+)
+pred2$moonlight <- pred2$moonlight_s * (2 * sd(bm2$moonlight)) + mean(bm2$moonlight) # recalculate the non-standardized moonlight for graphics.
+
+# graph predictions
+
+p3 <- ggplot(pred2, aes(x = moonlight, y = estimate)) +
+  geom_line() +
+  geom_ribbon(aes(ymin = conf.low, ymax = conf.high), alpha = 0.2) +
+  labs(
+    x = "Moonlight (lux)",
+    y = "Predicted Bat Calls",
+    title = "Community Response to Moonlight"
+  ) +
   theme_minimal() +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  theme(
+    panel.grid.major = element_blank(),   # remove major grid lines
+    panel.grid.minor = element_blank()
+  )
+p3
 
 
-# effect sizes plots -------------------------------------------------------------------
+# effect of night average wind speed on community response.
 
-plot_model(m1.5nb, type = "est", show.values = TRUE, value.offset = 0.3)
+pred3 <- predictions(m1.6nb,
+                     newdata = datagrid(
+                       sp= NA,
+                       nit_avg_wspm.s_s = seq(min(bm2$nit_avg_wspm.s_s), max(bm2$nit_avg_wspm.s_s), length.out = 100)
+                     )
+)
 
-plot_model(m1.5nb, type = "re", terms = "trmt_bin", show.values = TRUE, value.offset = 0.3)
+pred3$nit_avg_wspm.s <- pred3$nit_avg_wspm.s_s * (2 * sd(bm2$nit_avg_wspm.s)) + mean(bm2$nit_avg_wspm.s) # recalculate the non-standardized wind speed for graphics.
 
+p4 <- ggplot(pred3, aes(x = nit_avg_wspm.s, y = estimate)) +
+  geom_line() +
+  geom_ribbon(aes(ymin = conf.low, ymax = conf.high), alpha = 0.2) +
+  labs(
+    x = "Night Average Wind Speed (m/s)",
+    y = "Predicted Bat Calls",
+    title = "Community Response to Night Average Wind Speed"
+  ) +
+  theme_minimal() +
+  theme(
+    panel.grid.major = element_blank(),   # remove major grid lines
+    panel.grid.minor = element_blank()
+  )
+
+p4
+
+# community effect year
+
+pred5 <- predictions(m1.6nb, 
+                       newdata = datagrid(yr_s = unique(bm2$yr_s),
+                                          lux_s = seq( min(bm2$lux_s), max(bm2$lux_s), length.out = 100),
+                                          sp=NA),
+                       # re.form = NA,
+                       conf_level = 0.95) 
+
+pred5
+
+# calculate non-standardized year for graphics
+pred5 <- pred5 %>%
+  mutate(yr = case_when(
+    yr_s == -1 ~ 2021,
+    yr_s == 0 ~ 2022,
+    TRUE ~ 2023
+  ))
+
+
+# Create the plot using ggplot2
+p6 <- ggplot(pred5, aes(x = factor(yr), y = estimate), ) +
+ 
+  geom_violin() +
+  geom_jitter() +
+  labs(x = "Year", y = "Predicted bat calls", color = "Treatment") +
+  theme_bw()
+
+p6
 # save models -------------------------------------------------------------
 
 #save image 
@@ -1083,191 +1189,191 @@ load("models/my_models.RData")
 
 
 # trash -------------------------------------------------------------------
-
-
-# the function below is not working. 
-plot_marginal_effects <- function(model, x_var, group_var = NULL, title = NULL) {
-  pred <- predictions(model, newdata = datagrid(!!x_var := unique(bm2[[x_var]]),
-                                                sp = unique(bm2$sp)))
-  
-  p <- ggplot(pred, aes_string(x = x_var, y = "estimate", color = "sp")) +
-    geom_line() +
-    labs(y = "Bat calls", x = x_var, title = title) +
-    scale_color_viridis(discrete = TRUE, option = "D") +
-    theme_minimal()
-  
-  if (!is.null(group_var)) {
-    p <- p + facet_wrap(as.formula(paste("~", group_var)), scales = "free_y")
-  }
-  return(p)
-}
-
-
-p2 <- plot_marginal_effects(m1.1nb, "jday_s", "sp", "Marginal effect of jday_s by species")
-
-
-
-
-# the plot below takes long to run and does not display the data well.
-# # Adjusted code to create a violin plot
-# ggplot(bm2, aes(x = factor(jday), y = n, fill = treatmt)) +
-#   geom_violin(trim = FALSE) +  # Violin plot to show data distribution
-#   geom_jitter(position = position_jitter(width = 0.2), alpha = 0.5) +  # Adding jitter for better visibility of individual points
-#   facet_wrap(~ sp, scales = "free_y") +  # Facet by species with free y scales
-#   theme_minimal() +  # Use a minimal theme for better aesthetics
-#   scale_fill_manual(values = c("#0033A0", "#D64309")) +  # Custom color for treatments
-#   labs(title = "Bat Acoustic Activity 2021-2023",
-#        x = "Julian Day",
-#        y = "Number of Calls",
-#        fill = "Treatment") +  # Label adjustments
-#   theme(axis.text.x = element_text(angle = 45, hjust = 1))  # Rotate x-axis labels for better readability
-
-
-
-
-
-# # marginal effect for trmt_bin by sp 
-# plot_predictions(m1.9nb,
-#                  type = "response",
-#                  conf_level = 0.95,
-#                  condition = c("sp", "trmt_bin"),
-#                  vcov = TRUE)
-
-
-# m1.7
-# we run this one with the model we neede 
-
-m1.7nb <- glmmTMB(
-  n ~ Sum_Distance_s + jday_s + I(jday_s ^ 2)  + l.illum_s +
-    avg_wind_speed_s + avg_temperature_s + yr_s +
-    (1 | site) + (1 + trmt_bin + jday_s + I(jday_s ^ 2)+ | sp),
-  data = bm2,
-  nbinom2(link = "log")
-)
-
-summary(m1.7nb)
-
-# Calculate residual deviance and residual degrees of freedom
-residual_deviance <- deviance(m1.7nb)
-residual_df <- df.residual(m1.7nb)
-
-# Calculate c-hat using residual deviance
-c_hat_deviance <- residual_deviance / residual_df
-print(c_hat_deviance)
-
-AIC(m1.5nb,m1.7nb)
-
-
-# model m1.5nb plots
-
-emmeans::emmeans(m1.5nb, "percent_s",type="response")
-
-plot(ggeffects::ggpredict(m1.5nb, "percent_s [all]"))
-plot(ggeffects::ggpredict(m1.5nb, "l.illum_s [all]"))
-plot(ggeffects::ggpredict(m1.5nb, "avg_wind_speed_s [all]"))
-plot(ggeffects::ggpredict(m1.5nb, "avg_temperature_s [all]"))
-
-
-# rstan_models ------------------------------------------------------------
-
-
-# Define the formula
-formula <- n ~ trmt_bin + jday_s + I(jday_s^2)  + percent_s + l.illum_s +
-  avg_wind_speed_s + avg_temperature_s + (1 | site) + (1 + trmt_bin + jday_s + I(jday_s^2) | sp)
-
-# Fit the negative binomial model using rstanarm
-m1.4_off <- stan_glmer(
-  formula,
-  family = neg_binomial_2(),  # Negative binomial family with log-link
-  data = bm2,
-  chains = 4,                 # Number of Markov chains
-  cores = 4                    # Number of cores to use (adjust as needed)
-)
-
-
-loo_m1.4_off <- loo(m1.4_off)
-print(loo_m1.4_off)
-
-plot_model(m1.4_off)
-
-
-# plot model m1.5nb --------------------------------------------------------
-
-plot_model(m1.5nb, type = "est", show.values = TRUE, value.offset = 0.3)
-
-plot_model(m1.5nb, type = "est", show.values = TRUE, value.offset = 0.3,
-           ci.lvl = 0.95, dot.size = 3, line.size = 1) +
-  theme_minimal() +
-  labs(title = "Bat Vocal Activity 2021-2023",
-       x = "Coefficient Estimate",
-       y = "") +
-  scale_color_manual(values = c("orange", "purple")) +
-  theme(axis.text.y = element_text(size = 10),
-        axis.title.x = element_text(size = 12),
-        legend.position = "bottom")
-
-ff_jday <- Effect(c("jday_s", "I(jday_s^2)"), m1.5nb) # this does not work!
-
-
-jday_coefficients <- summary_m1.5nb$coefficients$cond[, c("Estimate", "Std. Error", "Pr(>|z|)")]
-
-# Plot the effects
-plot(eff_jday, rug = TRUE, main = "Partial Predictor Plot for jday_s and I(jday_s^2)")
-
-
-
-# plotting partial predictors manually
-
-
-
-# values to use
-n <- 100
-int <- rep(1, n)
-
-# obs. values
-jday_s_values <- seq(from = min(bm2$jday), to = max(bm2$jday), length.out = 100)
-
-
-
-# extraer el jday sqr 
-#std pred
-jday.s <- scale(jday_s_values)
-jday.sqr<- scale(jday_s_values^2)
-
-#extract fixed coef jday
-
-t<-coef(m1.5nb) # ?????????????????????????????????????? what do we multiply in the step below????
-t$cond$sp
-
-c_inf<-confint(m1.5nb)
-
-fix_eff<- c_inf[c(1,3,4), ]
-# # intm<- summary_m1.5nb$coefficients$cond[1,1]
-# # jday_coef <- summary_m1.5nb$coefficients$cond[3,1 ]
-# # jday.sqr<- summary_m1.5nb$coefficients$cond[4,1]
 # 
-# fix_eff<-c(intm, jday_coef, jday.sqr)
-# #predicted ab
-
-predabund <- exp(t(fix_eff) %*% t(cbind( int, jday.s, jday.sqr)))
-t(predabund)
-
-
-
-#Data
-
-abunddf <- data.frame( t(predabund), jday_s_values) # make a df with all the above
-
-colnames(abunddf)[1:3] <- c( "lowCI", "highCI", "Mean")
-
-ggplot(abunddf, aes(x = jday_s_values, y = Mean)) +
-  theme_classic(base_size = 17) +
-  ylab("bat calls") +
-  xlab("jday") +
-  geom_line(size = 1.5) +
-  geom_ribbon(alpha = 0.3, aes(ymin = lowCI, ymax = highCI))
-
-
+# 
+# # the function below is not working. 
+# plot_marginal_effects <- function(model, x_var, group_var = NULL, title = NULL) {
+#   pred <- predictions(model, newdata = datagrid(!!x_var := unique(bm2[[x_var]]),
+#                                                 sp = unique(bm2$sp)))
+#   
+#   p <- ggplot(pred, aes_string(x = x_var, y = "estimate", color = "sp")) +
+#     geom_line() +
+#     labs(y = "Bat calls", x = x_var, title = title) +
+#     scale_color_viridis(discrete = TRUE, option = "D") +
+#     theme_minimal()
+#   
+#   if (!is.null(group_var)) {
+#     p <- p + facet_wrap(as.formula(paste("~", group_var)), scales = "free_y")
+#   }
+#   return(p)
+# }
+# 
+# 
+# p2 <- plot_marginal_effects(m1.1nb, "jday_s", "sp", "Marginal effect of jday_s by species")
+# 
+# 
+# 
+# 
+# # the plot below takes long to run and does not display the data well.
+# # # Adjusted code to create a violin plot
+# # ggplot(bm2, aes(x = factor(jday), y = n, fill = treatmt)) +
+# #   geom_violin(trim = FALSE) +  # Violin plot to show data distribution
+# #   geom_jitter(position = position_jitter(width = 0.2), alpha = 0.5) +  # Adding jitter for better visibility of individual points
+# #   facet_wrap(~ sp, scales = "free_y") +  # Facet by species with free y scales
+# #   theme_minimal() +  # Use a minimal theme for better aesthetics
+# #   scale_fill_manual(values = c("#0033A0", "#D64309")) +  # Custom color for treatments
+# #   labs(title = "Bat Acoustic Activity 2021-2023",
+# #        x = "Julian Day",
+# #        y = "Number of Calls",
+# #        fill = "Treatment") +  # Label adjustments
+# #   theme(axis.text.x = element_text(angle = 45, hjust = 1))  # Rotate x-axis labels for better readability
+# 
+# 
+# 
+# 
+# 
+# # # marginal effect for trmt_bin by sp 
+# # plot_predictions(m1.9nb,
+# #                  type = "response",
+# #                  conf_level = 0.95,
+# #                  condition = c("sp", "trmt_bin"),
+# #                  vcov = TRUE)
+# 
+# 
+# # m1.7
+# # we run this one with the model we neede 
+# 
+# m1.7nb <- glmmTMB(
+#   n ~ Sum_Distance_s + jday_s + I(jday_s ^ 2)  + l.illum_s +
+#     avg_wind_speed_s + avg_temperature_s + yr_s +
+#     (1 | site) + (1 + trmt_bin + jday_s + I(jday_s ^ 2)+ | sp),
+#   data = bm2,
+#   nbinom2(link = "log")
+# )
+# 
+# summary(m1.7nb)
+# 
+# # Calculate residual deviance and residual degrees of freedom
+# residual_deviance <- deviance(m1.7nb)
+# residual_df <- df.residual(m1.7nb)
+# 
+# # Calculate c-hat using residual deviance
+# c_hat_deviance <- residual_deviance / residual_df
+# print(c_hat_deviance)
+# 
+# AIC(m1.5nb,m1.7nb)
+# 
+# 
+# # model m1.5nb plots
+# 
+# emmeans::emmeans(m1.5nb, "percent_s",type="response")
+# 
+# plot(ggeffects::ggpredict(m1.5nb, "percent_s [all]"))
+# plot(ggeffects::ggpredict(m1.5nb, "l.illum_s [all]"))
+# plot(ggeffects::ggpredict(m1.5nb, "avg_wind_speed_s [all]"))
+# plot(ggeffects::ggpredict(m1.5nb, "avg_temperature_s [all]"))
+# 
+# 
+# # rstan_models ------------------------------------------------------------
+# 
+# 
+# # Define the formula
+# formula <- n ~ trmt_bin + jday_s + I(jday_s^2)  + percent_s + l.illum_s +
+#   avg_wind_speed_s + avg_temperature_s + (1 | site) + (1 + trmt_bin + jday_s + I(jday_s^2) | sp)
+# 
+# # Fit the negative binomial model using rstanarm
+# m1.4_off <- stan_glmer(
+#   formula,
+#   family = neg_binomial_2(),  # Negative binomial family with log-link
+#   data = bm2,
+#   chains = 4,                 # Number of Markov chains
+#   cores = 4                    # Number of cores to use (adjust as needed)
+# )
+# 
+# 
+# loo_m1.4_off <- loo(m1.4_off)
+# print(loo_m1.4_off)
+# 
+# plot_model(m1.4_off)
+# 
+# 
+# # plot model m1.5nb --------------------------------------------------------
+# 
+# plot_model(m1.5nb, type = "est", show.values = TRUE, value.offset = 0.3)
+# 
+# plot_model(m1.5nb, type = "est", show.values = TRUE, value.offset = 0.3,
+#            ci.lvl = 0.95, dot.size = 3, line.size = 1) +
+#   theme_minimal() +
+#   labs(title = "Bat Vocal Activity 2021-2023",
+#        x = "Coefficient Estimate",
+#        y = "") +
+#   scale_color_manual(values = c("orange", "purple")) +
+#   theme(axis.text.y = element_text(size = 10),
+#         axis.title.x = element_text(size = 12),
+#         legend.position = "bottom")
+# 
+# ff_jday <- Effect(c("jday_s", "I(jday_s^2)"), m1.5nb) # this does not work!
+# 
+# 
+# jday_coefficients <- summary_m1.5nb$coefficients$cond[, c("Estimate", "Std. Error", "Pr(>|z|)")]
+# 
+# # Plot the effects
+# plot(eff_jday, rug = TRUE, main = "Partial Predictor Plot for jday_s and I(jday_s^2)")
+# 
+# 
+# 
+# # plotting partial predictors manually
+# 
+# 
+# 
+# # values to use
+# n <- 100
+# int <- rep(1, n)
+# 
+# # obs. values
+# jday_s_values <- seq(from = min(bm2$jday), to = max(bm2$jday), length.out = 100)
+# 
+# 
+# 
+# # extraer el jday sqr 
+# #std pred
+# jday.s <- scale(jday_s_values)
+# jday.sqr<- scale(jday_s_values^2)
+# 
+# #extract fixed coef jday
+# 
+# t<-coef(m1.5nb) # ?????????????????????????????????????? what do we multiply in the step below????
+# t$cond$sp
+# 
+# c_inf<-confint(m1.5nb)
+# 
+# fix_eff<- c_inf[c(1,3,4), ]
+# # # intm<- summary_m1.5nb$coefficients$cond[1,1]
+# # # jday_coef <- summary_m1.5nb$coefficients$cond[3,1 ]
+# # # jday.sqr<- summary_m1.5nb$coefficients$cond[4,1]
+# # 
+# # fix_eff<-c(intm, jday_coef, jday.sqr)
+# # #predicted ab
+# 
+# predabund <- exp(t(fix_eff) %*% t(cbind( int, jday.s, jday.sqr)))
+# t(predabund)
+# 
+# 
+# 
+# #Data
+# 
+# abunddf <- data.frame( t(predabund), jday_s_values) # make a df with all the above
+# 
+# colnames(abunddf)[1:3] <- c( "lowCI", "highCI", "Mean")
+# 
+# ggplot(abunddf, aes(x = jday_s_values, y = Mean)) +
+#   theme_classic(base_size = 17) +
+#   ylab("bat calls") +
+#   xlab("jday") +
+#   geom_line(size = 1.5) +
+#   geom_ribbon(alpha = 0.3, aes(ymin = lowCI, ymax = highCI))
+# 
+# 
 
 
 
