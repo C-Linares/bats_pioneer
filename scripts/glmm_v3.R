@@ -107,7 +107,8 @@
 
   moon.int$denver_time <- with_tz(moon.int$date, tzone = "America/Denver") # Convert to Denver time zone
 
-  attr(moon.int$denver_time, "tzone") # check the timezomne is correct
+  attr(moon.int$denver_time, "tzone") # check the timezone is correct
+
   
   # summarize moonlight by date but conditional moon_alt_degrees>0
 
@@ -115,7 +116,7 @@
   moon_filtered <- moon.int %>%
     filter(moon_alt_degrees > 0)
   
-  # Step 2: Create a new 'noche' variable (just the date part of the timestamp) but also makes nights any time stamps that are less than 9 am.
+  # Step 2: Create a new 'noche' variable (just the date part of the time stamp) but also makes nights any time stamps that are less than 9 am.
   moon_filtered <- moon_filtered %>%
     mutate(
       hour = hour(denver_time),  # Extract hour from datetime
@@ -152,8 +153,15 @@
   
 # Merge datasets ------------------------------------------------------------
 
+# merge weather
+  # Merge crmo.wet.night into filtered_bm by matching dates
+  bm2 <- filtered_bm %>%
+    left_join(crmo.wet.night, by = c("noche" = "date"))
   
-  
-  
+  # merge moonlight
 
-    
+  # Create noche variable for merging
+  
+  bm2 <- bm2 %>%
+    left_join(moon_daily_avg, by = "noche")
+  
