@@ -817,8 +817,18 @@ It seems we need to fix the moon prediction scrip to be able to get the 110 na r
 
 8/6/2025
 
-R keeps crashing and I suspect is the glmm_v2 package. I will start a new glmm_v3 package and we will review the bat call data base that might have a few calls missing. I will recalculate the moon intensity because it seems it's missing some dates.
+R keeps crashing and I suspect is the glmm_v2 script. I will start a new glmm_v3 script and we will review the bat call data base that might have a few calls missing. I will recalculate the moon intensity because it seems it's missing some dates.
 
 -   when mergin the moon variable with the bat calls using date, I will make sure to have them both in the same time zone. that might be making things fail.
 
--   I also need to check the bat bm.csv data file. I am suspecting we are missing a bunch of calls for each sepecies. Update: the error came from reporting the total number of lines for each species instead of the total number of counts for each species.
+-   I also need to check the bat bm.csv data file. I am suspecting we are missing a bunch of calls for each sepecies. Solved : the error came from reporting the total number of lines for each species instead of the total number of counts for each species. we are not missing calls.
+
+-   Update: I think I found the problem with the moon and the bat data. When I calculate the noche column a date disapear becuase it gets converted all to the same date, but there's still calls on that other date. I think the solution might be to calculate the moon intensity with a buffer around the dates of bat calls.\
+
+    ------------------------------------------------------------------------
+
+8/07/2025
+
+I will recalculate the moon variable but using one date around the min and max date of recordings for bats. That way we will have enough data.\
+\
+- I think I realized that if there is a unproperly done merge R crashes.
