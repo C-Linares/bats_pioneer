@@ -346,12 +346,8 @@ r2(m1.3)
 # marginal effects --------------------------------------------------------
 
 # ------------------------------
-# Marginal Effects of Light (Watts) on Bat Calls
+# Marginal Effects of Light (Watts) on Bat Calls ------
 # ------------------------------
-
-library(marginaleffects)
-library(ggplot2)
-library(dplyr)
 
 # Standardization parameters (Gelman style: x / (2 * sd))
 sdwatts <- sd(bm2$mwatts, na.rm = TRUE)
@@ -419,18 +415,55 @@ p_species <- ggplot(pred_species, aes(x = mwatts, y = estimate)) +
 # ------------------------------
 # 3. Display both plots
 # ------------------------------
-library(patchwork)
 p_comm / p_species
 
 
 # ------------------------------
-# Standardization parameters for Jday
+# Marginal effect mwatts and year---------------------
+# ------------------------------
+pred_w.y <- predictions(
+  m1.2nb,
+  newdata = datagrid(
+    yr_s = c(-1, 0, 1),  # standardized values for 2021, 2022, 2023
+    mwatts_s = seq(
+      min(bm2$mwatts_s, na.rm = TRUE),
+      max(bm2$mwatts_s, na.rm = TRUE),
+      length.out = 100
+    )
+  ),
+  re.form = NA  # community-level predictions
+) %>%
+  mutate(
+    year = case_when(
+      yr_s == -1 ~ 2021,
+      yr_s == 0  ~ 2022,
+      yr_s == 1  ~ 2023
+    )
+  )
+
+# Plot
+ggplot(pred_w.y, aes(x = mwatts_s, y = estimate, color = factor(year))) +
+  geom_line(size = 1) +
+  geom_ribbon(aes(ymin = conf.low, ymax = conf.high, fill = factor(year)),
+              alpha = 0.2, color = NA) +
+  labs(
+    x = "Standardized watts",
+    y = "Predicted bat calls (n)",
+    color = "Year",
+    fill  = "Year",
+    title = "Interaction effect: watts × year"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+
+# ------------------------------
+# Marginal effect Jday-----
 # ------------------------------
 sdjday <- sd(bm2$jday, na.rm = TRUE)
 jday_mean <- mean(bm2$jday, na.rm = TRUE)
 
 # ------------------------------
-# COMMUNITY-LEVEL PREDICTIONS for Jday
+# COMMUNITY-LEVEL PREDICTIONS for Jday ----------------------
 # ------------------------------
 pred_jday <- predictions(
   m1.2nb,
@@ -469,7 +502,7 @@ ggplot(pred_jday, aes(x = jday, y = estimate)) +
 
 
 # ------------------------------
-# SPECIES-SPECIFIC PREDICTIONS for Jday
+# SPECIES-SPECIFIC PREDICTIONS for Jday ---------------------
 # ------------------------------
 pred_jday_sp <- predictions(
   m1.2nb,
@@ -523,10 +556,82 @@ ggplot(pred_jday_sp, aes(x = jday, y = estimate, color = sp, fill = sp)) +
   )
 
 
+# ------------------------------
+# Marginal effect for moonlight-------------------------
+# ------------------------------
+sdmoonlight <- sd(bm2$jday, na.rm = TRUE)
+moonlight_mean <- mean(bm2$jday, na.rm = TRUE)
+
+# ------------------------------
+# COMMUNITY-LEVEL PREDICTIONS for moonlight---------------------------
+# ------------------------------
+
+pred_moon<- predictions(
+  m1.2nb,
+  newdata = datagrid(
+    sp=NA,
+    site= NA, 
+    avg_moonlight_s = seq(
+      min(bm2$avg_moonlight_s, na.rm=T),
+      max(bm2$avg_moonlight_s, na.rm=T),
+      length.out= 200
+    )
+    ),
+    re.form= NA # this specify population=community of sp level predictions
+  ) %>% 
+    mutate(
+      moon= avg_moonlight_s * (2*sdmoonlight) + moonlight_mean
+    )
+
+# Plot
+ggplot(pred_moon, aes(x = moon, y = estimate)) +
+  geom_line() +
+  geom_ribbon(aes(ymin = conf.low, ymax = conf.high), alpha = 0.2) +
+  labs(
+    x = "Average moonlight",
+    y = "Predicted bat calls (n)",
+    title = "Community-level effect of moonlight"
+  ) +
+  theme_minimal()
 
 
+# ------------------------------
+# Marginal effect for nit_avg_wspm_s_s-------------------------
+# ------------------------------
+
+sdwind <- sd(bm2$nit_avg_wspm_s, na.rm = TRUE)
+wind_mean <- mean(bm2$nit_avg_wspm_s, na.rm = TRUE)
 
 
+# COMMUNITY-LEVEL PREDICTIONS for moonlight---------------------------
+
+pred_wind<-predictions(
+  m1.2nb,
+  newdata = datagrid(
+    nit_avg_wspm_s_s = seq(
+      min(bm2$nit_avg_wspm_s_s, na.rm=T),
+      max(bm2$nit_avg_wspm_s_s, na.rm = T),
+      length.out= 200
+    )
+  ),
+  re.form=NA
+) %>% 
+  mutate(
+    wind= nit_avg_wspm_s_s * (2*sdwind) + wind_mean
+
+  )
+
+
+ggplot(pred_wind, aes(x = wind, y = estimate)) +
+  geom_ribbon(aes(ymin = conf.low, ymax = conf.high),
+              alpha = .5, fill = "skyblue", color = NA) +
+  geom_line(color = "blue", linewidth = 1) +
+  labs(
+    x = "Wind speed (m/s)",
+    y = "Predicted bat calls (n)",
+    title = "Community-level effect of wind speed"
+  ) +
+  theme_minimal()
 
 
 # save working environment ------------------------------------------------
