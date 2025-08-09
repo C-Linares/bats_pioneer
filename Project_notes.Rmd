@@ -831,4 +831,10 @@ R keeps crashing and I suspect is the glmm_v2 script. I will start a new glmm_v3
 
 I will recalculate the moon variable but using one date around the min and max date of recordings for bats. That way we will have enough data.\
 \
-- I think I realized that if there is a unproperly done merge R crashes.
+- I think I realized that if there is a unproperly done merge R crashes.\
+
+------------------------------------------------------------------------
+
+08/08/2025
+
+I started preparing for working on the overlap analysis for bats. to see if their activity patters change between sites. I created the bat_delta_sunset.R
