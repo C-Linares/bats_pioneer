@@ -81,112 +81,217 @@ sunset_data <- sunset_data %>%
 
 # Join bat data with sunset times
 bat_with_sunset <- bat_combine %>%
-  left_join(sunset_data, by = c("site", "date_time"="date"))
+  left_join(sunset_data, by = c("noche"="date"))
 
 missing_sunset_data <- bat_combine %>%
-  anti_join(sunset_data, by = c("site", "noche" = "date"))
+  anti_join(sunset_data, by = c("noche" = "date"))
 
 # Calculate time to sunset ------------------------------------------------
 
-cat("Calculating time differences from sunset...\n")
-
 bat_with_sunset <- bat_with_sunset %>%
   mutate(
-    # Ensure date_time is POSIXct
-    date_time = as.POSIXct(date_time, tz = "UTC"),
+    # Ensure date_time is POSIXct in Denver time
+    date_time = as.POSIXct(date_time, tz = "America/Denver"),
     
-    # Ensure sunset is POSIXct  
-    sunset = as.POSIXct(sunset, tz = "UTC"),
+    # Ensure sunset is POSIXct in Denver time
+    sunset = as.POSIXct(sunset, tz = "America/Denver"),
     
     # Calculate time difference from sunset in minutes
-    # Negative values = before sunset, positive = after sunset
-    time_to_sunset = as.numeric(difftime(date_time, sunset, units = "mins"))
+    time_to_sunset = as.numeric(difftime(date_time, sunset, units = "mins")),
+    deltasunset = as.numeric(difftime(date_time, sunset, units = "hours"))
   )
 
-# Data quality checks -----------------------------------------------------
 
-cat("Performing data quality checks...\n")
+# transfomr to radians
 
-# Summary statistics
-sunset_summary <- bat_with_sunset %>%
-  filter(!is.na(time_to_sunset)) %>%
-  summarise(
-    n_records = n(),
-    min_time = min(time_to_sunset),
-    max_time = max(time_to_sunset),
-    mean_time = mean(time_to_sunset),
-    median_time = median(time_to_sunset),
-    records_before_sunset = sum(time_to_sunset < 0),
-    records_after_sunset = sum(time_to_sunset > 0)
-  )
+bat_with_sunset$deltasunset_rad <-
+  ifelse(
+    bat_with_sunset$deltasunset < 0,
+    (24 + bat_with_sunset$deltasunset) / 24,
+    bat_with_sunset$deltasunset / 24
+  ) * 2 * pi
 
-print(sunset_summary)
 
-# Check for extreme values (might indicate data issues)
-extreme_values <- bat_with_sunset %>%
-  filter(!is.na(time_to_sunset)) %>%
-  filter(abs(time_to_sunset) > 12 * 60) %>%  # More than 12 hours from sunset
-  nrow()
 
-if (extreme_values > 0) {
-  warning("Found ", extreme_values, " records more than 12 hours from sunset. Check data quality.")
-}
+# see how many records there are by species.
 
-# Create final dataset ----------------------------------------------------
+bats<-read_csv('data_for_analysis/Species_bats.csv') %>% 
+  clean_names()
 
-# Select final columns (modify as needed)
-bat_final <- bat_with_sunset %>%
-  select(
-    sp, PULSES, site, noche, date_time, yr, treatmt, trmt_bin, 
-    jday, eff.hrs, sunset, time_to_sunset
-  ) %>%
-  # Optional: filter out records with missing sunset data
-  filter(!is.na(time_to_sunset))
+bat_with_sunset<-left_join(bat_with_sunset, bats, by=c("sp"="six_letter_species_code"))
 
-cat("Final dataset contains", nrow(bat_final), "records with sunset calculations.\n")
+sp_site_treat <- table(bat_with_sunset$sp, bat_with_sunset$treatmt)
+sp_site_treat
 
-# Visualization -----------------------------------------------------------
+# species labels for plots
 
-# Quick visualization to check the data
-p1 <- bat_final %>%
-  filter(abs(time_to_sunset) <= 480) %>%  # Focus on ±8 hours from sunset
-  ggplot(aes(x = time_to_sunset)) +
-  geom_histogram(bins = 50, alpha = 0.7, fill = "steelblue") +
-  geom_vline(xintercept = 0, linetype = "dashed", color = "red", size = 1) +
-  labs(
-    title = "Distribution of Bat Calls Relative to Sunset",
-    x = "Time to Sunset (minutes)",
-    y = "Number of Calls",
-    subtitle = "Red line = sunset time"
-  ) +
-  theme_minimal()
 
-print(p1)
+spp<-unique(bat_with_sunset$sp)
+spplabs<-unique(bat_with_sunset$common_name)
 
-# By treatment if available
-if ("treatmt" %in% names(bat_final)) {
-  p2 <- bat_final %>%
-    filter(abs(time_to_sunset) <= 480) %>%
-    ggplot(aes(x = time_to_sunset, fill = treatmt)) +
-    geom_histogram(bins = 50, alpha = 0.7, position = "identity") +
-    geom_vline(xintercept = 0, linetype = "dashed", color = "red", size = 1) +
-    labs(
-      title = "Bat Calls Relative to Sunset by Treatment",
-      x = "Time to Sunset (minutes)",
-      y = "Number of Calls"
-    ) +
-    theme_minimal() +
-    facet_wrap(~treatmt)
+
+for(i in seq_along(spp)) {
+  sub_bm <- bat_with_sunset %>% filter(sp == spp[i])
+  a_lit <- bat_with_sunset %>% filter(treatmt == "lit") %>% pull(deltasunset_rad)
+  a_dark <- bat_with_sunset %>% filter(treatmt == "dark") %>% pull(deltasunset_rad)
   
-  print(p2)
+  # Only plot if at least one group has more than 1 point
+  if(sum(!is.na(a_lit)) > 1 & sum(!is.na(a_dark)) > 1) {
+    ylim_max <- max(
+      density(a_lit, na.rm = TRUE)$y,
+      density(a_dark, na.rm = TRUE)$y
+    )
+    plot(density(a_lit, na.rm = TRUE), 
+         main = spplabs[i], 
+         xlab = "Time after sunrise (radians)",
+         col = "orange", lwd = 2, ylim = c(0, ylim_max))
+    rug(a_lit, col = "orange")
+    lines(density(a_dark, na.rm = TRUE), col = "blue", lwd = 2)
+    rug(a_dark, col = "blue")
+    legend("topright", legend = c("Lit", "Dark"), col = c("orange", "blue"), lwd = 1)
+  } else if(sum(!is.na(a_lit)) > 1) {
+    plot(density(a_lit, na.rm = TRUE), 
+         main = paste0(spplabs[i], " (Lit only)"), 
+         xlab = "Time after sunrise (radians)",
+         col = "orange", lwd = 2)
+    rug(a_lit, col = "orange")
+    legend("topright", legend = c("Lit"), col = c("orange"), lwd = 2)
+  } else if(sum(!is.na(a_dark)) > 1) {
+    plot(density(a_dark, na.rm = TRUE), 
+         main = paste0(spplabs[i], " (Dark only)"), 
+         xlab = "Time after sunrise (radians)",
+         col = "blue", lwd = 2)
+    rug(a_dark, col = "blue")
+    legend("topright", legend = c("Dark"), col = c("blue"), lwd = 2)
+  } else {
+    plot.new()
+    title(main = paste0(spplabs[i], "\nNot enough data for density"))
+  }
 }
 
-# Export results ----------------------------------------------------------
 
-# Optional: save the processed dataset
-# write_csv(bat_final, "data/processed/bat_combine_with_sunset.csv")
 
-cat("Analysis complete! The 'bat_final' dataset now contains the 'time_to_sunset' column.\n")
+# Density Plots ----------------------------------------------------------
 
-# Return the final dataset
-bat_final
+
+bat_with_sunset %>%
+  filter(sp %in% spp, !is.na(deltasunset_rad)) %>%
+  ggplot(aes(x = deltasunset_rad, color = treatmt, fill = treatmt)) +
+  geom_density(alpha = 0.3, adjust = 1.2) +
+  geom_rug(aes(color = treatmt), sides = "b") +
+  facet_wrap(~ sp, labeller = labeller(sp = setNames(spplabs, spp))) +
+  labs(
+    x = "Time after sunrise (radians)",
+    y = "Density",
+    color = "Treatment",
+    fill = "Treatment"
+  ) +
+  scale_color_manual(values = c("lit" = "orange", "dark" = "blue")) +
+  scale_fill_manual(values = c("lit" = "orange", "dark" = "blue")) +
+  theme_minimal(base_size = 12) +
+  theme(
+    strip.text = element_text(face = "bold"),
+    legend.position = "top"
+  )
+
+# in the graph below 
+bat_with_sunset %>%
+  filter(sp %in% spp, !is.na(deltasunset_rad)) %>%
+  ggplot(aes(x = deltasunset_rad, color = treatmt, fill = treatmt)) +
+  geom_density(alpha = 0.3, adjust = 1.2) +
+  geom_rug(aes(color = treatmt), sides = "b") +
+  facet_wrap(~ sp, labeller = labeller(sp = setNames(spplabs, spp))) +
+  labs(
+    x = "Delta sunset",
+    y = "Density",
+    color = "Treatment",
+    fill = "Treatment"
+  ) +
+  scale_color_manual(values = c("lit" = "orange", "dark" = "blue")) +
+  scale_fill_manual(values = c("lit" = "orange", "dark" = "blue")) +
+  theme_minimal(base_size = 12) +
+  theme(
+    strip.text = element_text(face = "bold"),
+    legend.position = "top"
+  )
+
+# Overlap -----------------------------------------------------------------
+
+
+# lets separate the same species calls in to vectors one for lit and one for dark sites
+# then we use the function overlapEst to estimate the overlap. 
+
+# Antrozous pallidus
+
+ap_lit <- bat_with_sunset %>%
+  filter(scientific_name == "Antrozous pallidus", treatmt == "lit") %>% pull(deltasunset_rad)
+
+ap_dark <- bat_with_sunset %>%
+  filter(scientific_name == "Antrozous pallidus", treatmt == "dark") %>% pull(deltasunset_rad)
+
+
+
+# Overlap Estimation ------------------------------------------------------
+
+# overlap for cinclus mexicanus is Daht1 =.93 
+
+par( mfrow = c(1,1), cex = 1.7, lwd = 2, bty = "l", pty = "m" )
+overlapPlot( ap_lit, ap_dark, main = " Antrozous pallidus overlap", lty =c(1,20),
+             col = c(1,4),xlab = "Time after sunset", rug =T )
+overlapEst(ap_lit, ap_dark)
+
+
+library(dplyr)
+library(purrr)
+library(overlap)
+
+# Function to compute overlap for a given species
+compute_overlap <- function(df, sp_name) {
+  lit <- df %>%
+    filter(scientific_name == sp_name, treatmt == "lit") %>%
+    pull(deltasunset_rad)
+  
+  dark <- df %>%
+    filter(scientific_name == sp_name, treatmt == "dark") %>%
+    pull(deltasunset_rad)
+  
+  # only compute if both have data
+  if (length(lit) > 5 & length(dark) > 5) {
+    est <- overlapEst(lit, dark)
+    return(est)
+  } else {
+    return(NA_real_)
+  }
+}
+
+# Apply to all species
+overlap_results <- bat_with_sunset %>%
+  distinct(scientific_name) %>%
+  pull(scientific_name) %>%
+  set_names() %>% 
+  map(~ compute_overlap(bat_with_sunset, .x)) %>%
+  bind_rows(.id = "species")
+
+overlap_results
+
+\
+# Example: pivot longer for plotting
+overlap_long <- overlap_results %>%
+  pivot_longer(
+    cols = everything(),
+    names_to = "species",
+    values_to = "overlap"
+  ) %>%
+  mutate(species = factor(species))
+
+# Plot as barplot with error bars if multiple rows per species
+ggplot(overlap_long, aes(x = species, y = overlap)) +
+  geom_boxplot(fill = "skyblue", alpha = 0.6) +   # summarizes the 3 rows per species
+  geom_jitter(width = 0.2, alpha = 0.7, size = 2) + # shows individual values
+  coord_flip() +
+  labs(
+    title = "Activity Overlap between Lit and Dark Treatments",
+    y = "Overlap Index (Δ)",
+    x = "Species"
+  ) +
+  theme_minimal(base_size = 14)
