@@ -34,7 +34,9 @@ pacman::p_load(
   "tidyverse",
   "lubridate",
   "here",# for reproducible file paths
-  "janitor"
+  "janitor",
+  "ovelap",
+  "purrr"
   )
 
 
@@ -215,8 +217,14 @@ bat_with_sunset %>%
     legend.position = "top"
   )
 
+
+
+
 # Overlap -----------------------------------------------------------------
 
+library(dplyr)
+library(purrr)
+library(overlap)
 
 # lets separate the same species calls in to vectors one for lit and one for dark sites
 # then we use the function overlapEst to estimate the overlap. 
@@ -233,17 +241,12 @@ ap_dark <- bat_with_sunset %>%
 
 # Overlap Estimation ------------------------------------------------------
 
-# overlap for cinclus mexicanus is Daht1 =.93 
 
 par( mfrow = c(1,1), cex = 1.7, lwd = 2, bty = "l", pty = "m" )
 overlapPlot( ap_lit, ap_dark, main = " Antrozous pallidus overlap", lty =c(1,20),
              col = c(1,4),xlab = "Time after sunset", rug =T )
 overlapEst(ap_lit, ap_dark)
 
-
-library(dplyr)
-library(purrr)
-library(overlap)
 
 # Function to compute overlap for a given species
 compute_overlap <- function(df, sp_name) {
@@ -257,7 +260,7 @@ compute_overlap <- function(df, sp_name) {
   
   # only compute if both have data
   if (length(lit) > 5 & length(dark) > 5) {
-    est <- overlapEst(lit, dark)
+    est <- overlap::overlapEst(lit, dark, type = "all")
     return(est)
   } else {
     return(NA_real_)
@@ -274,7 +277,7 @@ overlap_results <- bat_with_sunset %>%
 
 overlap_results
 
-\
+
 # Example: pivot longer for plotting
 overlap_long <- overlap_results %>%
   pivot_longer(
@@ -285,9 +288,11 @@ overlap_long <- overlap_results %>%
   mutate(species = factor(species))
 
 # Plot as barplot with error bars if multiple rows per species
-ggplot(overlap_long, aes(x = species, y = overlap)) +
-  geom_boxplot(fill = "skyblue", alpha = 0.6) +   # summarizes the 3 rows per species
-  geom_jitter(width = 0.2, alpha = 0.7, size = 2) + # shows individual values
+p1<-ggplot(overlap_long, aes(x = species, y = overlap)) +
+  geom_point()+
+  # geom_violin()+
+  # geom_boxplot(fill = "skyblue", alpha = 0.6) +   # summarizes the 3 rows per species
+  # geom_jitter(width = 0.2, alpha = 0.7, size = 2) + # shows individual values
   coord_flip() +
   labs(
     title = "Activity Overlap between Lit and Dark Treatments",
@@ -295,3 +300,6 @@ ggplot(overlap_long, aes(x = species, y = overlap)) +
     x = "Species"
   ) +
   theme_minimal(base_size = 14)
+p1
+
+ggsave(p1, file = "figures/bat_delta_sunset/overlap_v1.tiff", width = 10, height = 6)
