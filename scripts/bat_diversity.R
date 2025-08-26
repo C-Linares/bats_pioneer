@@ -24,14 +24,17 @@ library(ggplot2)
 library(iNEXT)
 library(tidyverse)
 library(lubridate)
+library(janitor)
+library(faux)
 
 
 # load data ---------------------------------------------------------------
 
 # load kpro data. 
 
-bm<-read.csv('data_for_analysis/data_glmm/bat_counts.csv', header = T) # bat counts by jday  
-
+t<-read.csv('data_for_analysis/data_glmm/bat_counts.csv', header = T) # bat counts by jday  
+bm<- read_csv('data_for_analysis/prep_for_glmm/bm.csv') %>% clean_names()
+  
 
 # bat2021<-read.csv('data_analysis/bat2021_v2.csv',check.names = T)
 # bat2021$datetime<-ymd_hms(bat2021$datetime) # makes dates as dates 

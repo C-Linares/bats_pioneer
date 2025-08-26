@@ -36,7 +36,8 @@ pacman::p_load(
   "here",# for reproducible file paths
   "janitor",
   "ovelap",
-  "purrr"
+  "purrr",
+  "patchwork"
   )
 
 
@@ -197,7 +198,7 @@ bat_with_sunset %>%
   )
 
 # in the graph below 
-bat_with_sunset %>%
+density_graph<-bat_with_sunset %>%
   filter(sp %in% spp, !is.na(deltasunset_rad)) %>%
   ggplot(aes(x = deltasunset_rad, color = treatmt, fill = treatmt)) +
   geom_density(alpha = 0.3, adjust = 1.2) +
@@ -217,8 +218,9 @@ bat_with_sunset %>%
     legend.position = "top"
   )
 
+density_graph
 
-
+ggsave(density_graph, file="figures/bat_delta_sunset/desnity_graph_v1.tiff", width = 10, height = 9)
 
 # Overlap -----------------------------------------------------------------
 
@@ -303,3 +305,6 @@ p1<-ggplot(overlap_long, aes(x = species, y = overlap)) +
 p1
 
 ggsave(p1, file = "figures/bat_delta_sunset/overlap_v1.tiff", width = 10, height = 6)
+
+
+density_graph+p1

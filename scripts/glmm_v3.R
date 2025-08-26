@@ -441,13 +441,21 @@ pred_w.y <- predictions(
     )
   )
 
+# Get mean and sd of original mwatts
+mean_mwatts <- mean(bm2$mwatts, na.rm = TRUE)
+sd_mwatts   <- sd(bm2$mwatts, na.rm = TRUE)
+
+# Unstandardize the main prediction grid too
+pred_w.y <- pred_w.y %>%
+  mutate(mwatts = (mwatts_s * sd_mwatts) + mean_mwatts)
+
 # Plot
-ggplot(pred_w.y, aes(x = mwatts_s, y = estimate, color = factor(year))) +
+ggplot(pred_w.y, aes(x = mwatts, y = estimate, color = factor(year))) +
   geom_line(size = 1) +
   geom_ribbon(aes(ymin = conf.low, ymax = conf.high, fill = factor(year)),
               alpha = 0.2, color = NA) +
   labs(
-    x = "Standardized watts",
+    x = "watts",
     y = "Predicted bat calls (n)",
     color = "Year",
     fill  = "Year",
@@ -456,6 +464,78 @@ ggplot(pred_w.y, aes(x = mwatts_s, y = estimate, color = factor(year))) +
   theme_minimal() +
   theme(legend.position = "bottom")
 
+
+# code suggested by chatgpt for depicting year effect. 
+
+# Predictions at mean mwatts (0 after standardization)
+pred_year <- predictions(
+  m1.2nb,
+  newdata = datagrid(
+    yr_s = c(-1, 0, 1),
+    mwatts_s = 0
+  ),
+  re.form = NA
+) %>%
+  mutate(
+    year = case_when(
+      yr_s == -1 ~ 2021,
+      yr_s == 0  ~ 2022,
+      yr_s == 1  ~ 2023
+    )
+  )
+
+# Add to your interaction plot
+ggplot(pred_w.y, aes(x = mwatts_s, y = estimate, color = factor(year))) +
+  geom_line(size = 1) +
+  geom_ribbon(aes(ymin = conf.low, ymax = conf.high, fill = factor(year)),
+              alpha = 0.2, color = NA) +
+  geom_point(data = pred_year, aes(x = 0, y = estimate, color = factor(year)),
+             size = 3, shape = 21, fill = "white") +  # highlights year differences at mean treatment
+  geom_errorbar(data = pred_year,
+                aes(x = 0, ymin = conf.low, ymax = conf.high, color = factor(year)),
+                width = 0.1) +
+  labs(
+    x = "Standardized watts",
+    y = "Predicted bat calls (n)",
+    color = "Year",
+    fill  = "Year",
+    title = "Effect of year across treatments (interaction: watts × year)"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+
+
+library(patchwork)
+
+# Plot 1: Year effect at mean mwatts
+p1 <- ggplot(pred_year, aes(x = factor(year), y = estimate, color = factor(year), fill = factor(year))) +
+  geom_col(alpha = 0.4) +
+  geom_errorbar(aes(ymin = conf.low, ymax = conf.high), width = 0.2) +
+  labs(x = "Year", y = "Predicted bat calls (n)", title = "Effect of year (at mean watts)") +
+  theme_minimal() +
+  theme(legend.position = "none")
+p1
+# Plot 2: Interaction effect
+p2 <- ggplot(pred_w.y, aes(x = mwatts_s, y = estimate, color = factor(year))) +
+  geom_line(size = 1) +
+  geom_ribbon(aes(ymin = conf.low, ymax = conf.high, fill = factor(year)),
+              alpha = 0.2, color = NA) +
+  labs(x = "Standardized watts", y = "Predicted bat calls (n)", 
+       color = "Year", fill = "Year", 
+       title = "Interaction: watts × year") +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+
+# Combine
+p1 + p2
+
+ggsave(
+  filename = "figures/glmm_v3/year_v1.tiff", 
+  plot = p1 + p2,   # combined plot goes here
+  width = 20, 
+  height = 10, 
+  dpi = 300  # optional, good for publication-quality
+)
 # ------------------------------
 # Marginal effect Jday-----
 # ------------------------------
@@ -488,7 +568,7 @@ pred_jday <- predictions(
 # ------------------------------
 # Plot
 # ------------------------------
-ggplot(pred_jday, aes(x = jday, y = estimate)) +
+p_jday<-ggplot(pred_jday, aes(x = jday, y = estimate)) +
   geom_line(linewidth = 1, color = "black") +
   geom_ribbon(aes(ymin = conf.low, ymax = conf.high),
               fill = "grey70", alpha = 0.3) +
@@ -527,7 +607,7 @@ pred_jday_sp <- predictions(
 # ------------------------------
 # Plot
 # ------------------------------
-ggplot(pred_jday_sp, aes(x = jday, y = estimate, color = sp, fill = sp)) +
+p_sp_jday<-ggplot(pred_jday_sp, aes(x = jday, y = estimate, color = sp, fill = sp)) +
   geom_line(linewidth = 1) +
   geom_ribbon(aes(ymin = conf.low, ymax = conf.high),
               alpha = 0.2, color = NA) +
@@ -539,7 +619,7 @@ ggplot(pred_jday_sp, aes(x = jday, y = estimate, color = sp, fill = sp)) +
   theme_minimal() +
   theme(legend.position = "bottom")
 
-ggplot(pred_jday_sp, aes(x = jday, y = estimate, color = sp, fill = sp)) +
+p_sp_jday<-ggplot(pred_jday_sp, aes(x = jday, y = estimate, color = sp, fill = sp)) +
   geom_line(linewidth = 1) +
   geom_ribbon(aes(ymin = conf.low, ymax = conf.high),
               alpha = 0.2, color = NA) +
@@ -555,7 +635,15 @@ ggplot(pred_jday_sp, aes(x = jday, y = estimate, color = sp, fill = sp)) +
     strip.text.x = element_text(size = 8) # smaller labels if many species
   )
 
+p_sp_jday+p_jday
 
+ggsave(
+  filename = "figures/glmm_v3/jday_v1.tiff", 
+  plot = p_sp_jday + p_jday,   # combined plot goes here
+  width = 20, 
+  height = 10, 
+  dpi = 300  # optional, good for publication-quality
+)
 # ------------------------------
 # Marginal effect for moonlight-------------------------
 # ------------------------------
@@ -584,7 +672,7 @@ pred_moon<- predictions(
     )
 
 # Plot
-ggplot(pred_moon, aes(x = moon, y = estimate)) +
+p_moon<-ggplot(pred_moon, aes(x = moon, y = estimate)) +
   geom_line() +
   geom_ribbon(aes(ymin = conf.low, ymax = conf.high), alpha = 0.2) +
   labs(
@@ -593,7 +681,7 @@ ggplot(pred_moon, aes(x = moon, y = estimate)) +
     title = "Community-level effect of moonlight"
   ) +
   theme_minimal()
-
+p_moon
 
 # ------------------------------
 # Marginal effect for nit_avg_wspm_s_s-------------------------
@@ -622,7 +710,7 @@ pred_wind<-predictions(
   )
 
 
-ggplot(pred_wind, aes(x = wind, y = estimate)) +
+p_wind<-ggplot(pred_wind, aes(x = wind, y = estimate)) +
   geom_ribbon(aes(ymin = conf.low, ymax = conf.high),
               alpha = .5, fill = "skyblue", color = NA) +
   geom_line(color = "blue", linewidth = 1) +
@@ -632,6 +720,17 @@ ggplot(pred_wind, aes(x = wind, y = estimate)) +
     title = "Community-level effect of wind speed"
   ) +
   theme_minimal()
+
+
+p_wind+p_moon
+
+ggsave(
+  filename = "figures/glmm_v3/wind_moon_v1.tiff", 
+  plot = p_wind+p_moon,   # combined plot goes here
+  width = 20, 
+  height = 10, 
+  dpi = 300  # optional, good for publication-quality
+)
 
 
 # save working environment ------------------------------------------------
