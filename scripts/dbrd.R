@@ -35,9 +35,9 @@ pacman::p_load(
   "lubridate",
   "here",# for reproducible file paths
   "janitor",
-  "ovelap",
   "purrr",
-  "patchwork"
+  "patchwork",
+  "vegan"
 )
 
 
@@ -65,6 +65,9 @@ total_effort <- effort_days %>%
   summarise(total_effort = sum(eff.days, na.rm = TRUE))
 
 
+# predictors --------------------------------------------------------------
+
+
 # light data 
 
 light<- read_csv("data_for_analysis/lights/lightspectra_pioneer.csv") %>% 
@@ -78,6 +81,31 @@ light<- read_csv("data_for_analysis/lights/lightspectra_pioneer.csv") %>%
 mlight <- light %>%
   group_by(site) %>%
   summarise(mean_mwatts = mean(mwatts, na.rm = TRUE))
+
+
+# elevation
+
+elev<-read_csv('data_for_analysis/elev/elevation.csv', name_repair = "universal")
+elev<-rename(elev, site=name)
+
+# insects
+
+insect<-read_csv('data_for_analysis/insect_wranglin/c_bugs.csv', name_repair = "universal")
+
+# we need to summarize total lepidoptera by site 
+
+insect<-insect %>% 
+  group_by(site) %>% 
+  summarise(t.leps= sum(t.lepidoptera))
+
+# check predictors for colinearity
+
+cor(pred_matrix %>% select(mean_mwatts, t.leps, elev_mean), use = "pairwise.complete.obs")
+
+
+
+# matrix build ------------------------------------------------------------
+
 
 
 # We need a site × species matrix with abundances.
@@ -111,20 +139,98 @@ comm_matrix_std
 bray_dist <- vegdist(comm_matrix_std, method = "bray")
 
 
+
+# predictor matrix
+
+pred_matrix<-left_join(mlight,insect, by="site")
+pred_matrix<-left_join(pred_matrix, elev, by="site")
+pred_matrix<-pred_matrix %>% select(-c(time, buff_area))
+
+# standardize predictors
+
+pred_matrix_std <- pred_matrix %>%
+  mutate(across(
+    c(mean_mwatts, t.leps, elev_mean),
+    ~ (.-mean(. , na.rm = TRUE)) / (2*sd(. , na.rm = TRUE))
+  ))
+
 # Run partial dbRDA---------------------------------------------------
-# Example: test effect of treatment + year while controlling for site clusters
+
+# # just light predictor
+# dbrda_full <- dbrda(bray_dist ~ mean_mwatts, data = pred_matrix)
+# 
+# # full dbRDA 
+# dbrda_partial <- dbrda(bray_dist ~ mean_mwatts + t.leps + elev_mean , data = pred_matrix_std)
+
+dbrda_full<- dbrda(comm_matrix_std ~ mean_mwatts + t.leps + elev_mean, pred_matrix_std,dist="bray")
+# add species scores 
+
+sppscores(dbrda_full)<-wisconsin(bray_dist)
 
 
-# Full model with predictors
-dbrda_full <- dbrda(bray_dist ~ mean_mwatts, data = mlight)
-
-# Partial dbRDA (controlling for site, if that’s a nuisance variable)
-dbrda_partial <- dbrda(bray_dist ~ mean_mwatts + Condition(site), data = mlight)
 
 
 #Assess model significance ---------------------------------------------------
-anova(dbrda_full, by = "margin", permutations = 9999)     # marginal effects
-anova(dbrda_full, permutations = 9999)                    # overall test
 
-plot(dbrda_full, display = c("sites", "species"))
-ordihull(dbrda_full, mlight$mean_mwatts, col = c("blue", "orange"), lwd = 2)
+# Test marginal (type III) effects of each predictor
+anova_marginal <- anova.cca(dbrda_full, by = "margin", permutations = 999)
+anova_marginal
+
+
+plot(dbrda_full, display = c("sites", "bp"), scaling = 2)
+
+library(ggvegan)
+
+autoplot(dbrda_full, scaling = 2) +
+  theme_minimal() +
+  labs(title = "dbRDA of bat communities",
+       subtitle = "Constrained by mean_mwatts, t.leps, and elev_mean")
+
+
+# Get site, species, and environmental scores
+site_scores <- scores(dbrda_full, display = "sites", scaling = 2)
+site_scores_df <- as.data.frame(site_scores)
+site_scores_df$site <- rownames(site_scores)
+
+species_scores <- scores(dbrda_full, display = "species", scaling = 2)
+species_scores_df <- as.data.frame(species_scores)
+species_scores_df$species <- rownames(species_scores)
+
+env_scores <- scores(dbrda_full, display = "bp", scaling = 2)
+env_scores_df <- as.data.frame(env_scores)
+env_scores_df$variable <- rownames(env_scores)
+
+# Plot
+p1<-ggplot() +
+  # Sites (small, light gray)
+  geom_point(data = site_scores_df, 
+             aes(x = dbRDA1, y = dbRDA2), 
+             color = "gray60", size = 2, alpha = 0.6, shape = 16) +
+  geom_text_repel(data = site_scores_df, 
+                  aes(x = dbRDA1, y = dbRDA2, label = site),
+                  size = 3, color = "gray60",
+                  max.overlaps = 30) +
+  
+  # Species (blue, bigger font)
+  geom_text_repel(data = species_scores_df, 
+                  aes(x = dbRDA1, y = dbRDA2, label = species),
+                  size = 4, fontface = "bold", color = "black",
+                  max.overlaps = 30) +
+  
+  # Environmental vectors (arrows, red)
+  geom_segment(data = env_scores_df,
+               aes(x = 0, y = 0, xend = dbRDA1, yend = dbRDA2),
+               arrow = arrow(length = unit(0.25, "cm")), 
+               color = "#D55E00", size = 1.2) +
+  geom_text_repel(data = env_scores_df, 
+                  aes(x = dbRDA1, y = dbRDA2, label = variable),
+                  size = 4, color = "#D55E00",
+                  max.overlaps = 30) +
+  
+  labs(title = "dbRDA of bat communities",
+       x = "dbRDA1", y = "dbRDA2") +
+  theme_minimal(base_size = 14) +
+  theme(legend.position = "none")
+p1
+
+ggsave("figures/dbrd/dbRDA_v1.tiff", p1, width = 10, height = 8)
