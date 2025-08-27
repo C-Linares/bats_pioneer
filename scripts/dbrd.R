@@ -138,7 +138,7 @@ comm_matrix_std
 # Create Bray-Curtis distance matrix
 bray_dist <- vegdist(comm_matrix_std, method = "bray")
 
-
+head(bray_dist)
 
 # predictor matrix
 
@@ -153,6 +153,9 @@ pred_matrix_std <- pred_matrix %>%
     c(mean_mwatts, t.leps, elev_mean),
     ~ (.-mean(. , na.rm = TRUE)) / (2*sd(. , na.rm = TRUE))
   ))
+
+
+head(pred_matrix)
 
 # Run partial dbRDA---------------------------------------------------
 
@@ -234,3 +237,56 @@ p1<-ggplot() +
 p1
 
 ggsave("figures/dbrd/dbRDA_v1.tiff", p1, width = 10, height = 8)
+
+
+
+
+
+# mvGLM -----------------------------------------------------------------
+
+# Prepare data -------------------------------------------------------------
+# Response = bat community abundance matrix (species × sites)
+# Convert comm_matrix_std into an mvabund object
+Y <- mvabund(comm_matrix)
+
+# Predictors = environmental variables
+X <- pred_matrix %>%
+  column_to_rownames("site") %>%
+  mutate(across(everything(), scale))   # center & scale predictors
+
+# Ensure matching row order
+X <- X[rownames(comm_matrix_std), ]
+
+# Build mvGLM --------------------------------------------------------------
+# Negative binomial family is often best for overdispersed count data
+fit <- manyglm(Y ~ mean_mwatts + t.leps + elev_mean,
+               data = X,
+               family = "negative.binomial")
+
+# Model diagnostics --------------------------------------------------------
+# Residual checks (optional but recommended)
+plot(fit)   # residual vs fitted, QQ plot etc.
+
+# Hypothesis tests ---------------------------------------------------------
+# Overall test: does the full predictor set explain variation in the community?
+anova_full <- anova.manyglm(fit, resamp = "pit.trap", nBoot = 9999)
+anova_full
+
+# Marginal tests: importance of each predictor individually (Type III)
+anova_marginal <- anova.manyglm(fit, p.uni = "adjusted", resamp = "pit.trap", nBoot = 9999)
+anova_marginal
+
+# Visualize effects --------------------------------------------------------
+# Turn fitted values into long format for plotting
+fitted_vals <- fitted(fit)
+fitted_df <- as.data.frame(fitted_vals)
+fitted_df$site <- rownames(comm_matrix)
+fitted_long <- pivot_longer(fitted_df, -site, names_to = "species", values_to = "fit")
+
+ggplot(fitted_long, aes(x = species, y = fit)) +
+  geom_boxplot() +
+  theme_minimal() +
+  labs(title = "Fitted bat abundances across species",
+       y = "Fitted abundance (calls)", x = "Species")
+
+
