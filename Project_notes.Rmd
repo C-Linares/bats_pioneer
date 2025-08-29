@@ -838,3 +838,9 @@ I will recalculate the moon variable but using one date around the min and max d
 08/08/2025
 
 I started preparing for working on the overlap analysis for bats. to see if their activity patters change between sites. I created the bat_delta_sunset.R
+
+------------------------------------------------------------------------
+
+8/28/2025
+
+I managed to figure out how to run a mvGLM and dbrd now I am trying to run rank abundance curves.

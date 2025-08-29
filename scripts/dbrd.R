@@ -98,10 +98,6 @@ insect<-insect %>%
   group_by(site) %>% 
   summarise(t.leps= sum(t.lepidoptera))
 
-# check predictors for colinearity
-
-cor(pred_matrix %>% select(mean_mwatts, t.leps, elev_mean), use = "pairwise.complete.obs")
-
 
 
 # matrix build ------------------------------------------------------------
@@ -156,6 +152,12 @@ pred_matrix_std <- pred_matrix %>%
 
 
 head(pred_matrix)
+
+# check predictors for colinearity
+
+cor(pred_matrix %>% select(mean_mwatts, t.leps, elev_mean), use = "pairwise.complete.obs")
+
+
 
 # Run partial dbRDA---------------------------------------------------
 
@@ -249,17 +251,20 @@ ggsave("figures/dbrd/dbRDA_v1.tiff", p1, width = 10, height = 8)
 # Convert comm_matrix_std into an mvabund object
 Y <- mvabund(comm_matrix)
 
-# Predictors = environmental variables
+# Predictors = environmental variables and offset oftotal effort. 
+pred_matrix<- pred_matrix %>% left_join(total_effort) %>% 
+  mutate(log_nights= log(total_effort))
+
 X <- pred_matrix %>%
   column_to_rownames("site") %>%
   mutate(across(everything(), scale))   # center & scale predictors
 
 # Ensure matching row order
-X <- X[rownames(comm_matrix_std), ]
+X <- X[rownames(comm_matrix), ]
 
 # Build mvGLM --------------------------------------------------------------
 # Negative binomial family is often best for overdispersed count data
-fit <- manyglm(Y ~ mean_mwatts + t.leps + elev_mean,
+fit <- manyglm(Y ~ mean_mwatts + t.leps + elev_mean, offset("log_nights"),
                data = X,
                family = "negative.binomial")
 
@@ -269,11 +274,11 @@ plot(fit)   # residual vs fitted, QQ plot etc.
 
 # Hypothesis tests ---------------------------------------------------------
 # Overall test: does the full predictor set explain variation in the community?
-anova_full <- anova.manyglm(fit, resamp = "pit.trap", nBoot = 9999)
+anova_full <- anova.manyglm(fit, resamp = "pit.trap", nBoot = 999)
 anova_full
 
 # Marginal tests: importance of each predictor individually (Type III)
-anova_marginal <- anova.manyglm(fit, p.uni = "adjusted", resamp = "pit.trap", nBoot = 9999)
+anova_marginal <- anova.manyglm(fit, p.uni = "adjusted", resamp = "pit.trap", nBoot = 999)
 anova_marginal
 
 # Visualize effects --------------------------------------------------------
@@ -289,4 +294,110 @@ ggplot(fitted_long, aes(x = species, y = fit)) +
   labs(title = "Fitted bat abundances across species",
        y = "Fitted abundance (calls)", x = "Species")
 
+
+
+
+
+# rank abundance curves ---------------------------------------------------
+
+
+
+# Calculate sampling effort per site and year
+effort <- bm %>%
+  group_by(site, yr) %>%
+  summarise(nights = n_distinct(noche), .groups = "drop")
+
+
+bm_sub <- bm 
+
+# drop Noise and NoID
+
+bm_sub<- bm_sub %>%
+  filter(!auto_id %in% c("Noise", "NoID"))
+
+bm_std <- bm_sub %>%
+  group_by(site, yr, auto_id) %>%
+  summarise(n = sum(n), .groups = "drop") %>%
+  left_join(
+    bm_sub %>% group_by(site, yr) %>% summarise(nights = n_distinct(noche), .groups = "drop"),
+    by = c("site", "yr")
+  ) %>%
+  mutate(activity = n / nights)
+
+# Convert to long format for codyn
+bm_long <- bm_std %>%
+  select(site, yr, auto_id, activity)
+
+# Calculate RAC change per site (compare reference year 2021 to others)
+rac_change <- RAC_change(
+  df = bm_long,
+  time.var = "yr",
+  species.var = "auto_id",
+  abundance.var = "activity",
+  replicate.var = "site",
+  reference.time = 2021)
+
+# Get treatment info per site
+trmt_info <- bm_sub %>% select(site, treatmt) %>% distinct()
+rac_change <- left_join(rac_change, trmt_info, by = "site")
+
+
+# add light
+
+rac_change<-left_join(rac_change, mlight, by= "site")
+
+# add moths
+
+rac_change<- left_join(rac_change, insect, by= "site")
+
+# add elev
+
+rac_change<- left_join(rac_change, elev, by= "site")
+
+
+# Example model for evenness change
+library(lme4)
+m1 <- lmer(richness_change ~ treatmt+  yr2+ (1|site), data = rac_change)
+summary(m1)
+
+
+library(ggeffects)
+pred <- ggpredict(m1, terms = c("treatmt"))
+plot(pred)
+
+
+m1 <- lmer(richness_change ~ treatmt+ yr2 + + (1|site), data = rac_change)
+summary(m1)
+
+
+library(ggeffects)
+
+pred <- ggpredict(m1, terms = c("treatmt", "yr2"))
+
+ggplot(pred, aes(x = x, y = predicted, color = group)) +
+  geom_point(position = position_dodge(0.3)) +
+  geom_errorbar(aes(ymin = conf.low, ymax = conf.high),
+                width = 0.2, position = position_dodge(0.3)) +
+  labs(x = "Treatment", y = "Change in richness",
+       title = "Effect of lighting on bat community change") +
+  theme_minimal()
+
+
+m1 <- lmer(richness_change ~ mean_mwatts + t.leps + yr2 +elev_mean+ (1|site), data = rac_change)
+summary(m1)
+
+
+
+# trash -------------------------------------------------------------------
+
+
+# Example for 2021 and 2022
+plot_data <- bm_long %>%
+  left_join(trmt_info, by = "site") 
+
+ggplot(plot_data, aes(x = reorder(auto_id, -activity), y = activity, fill = treatmt)) +
+  geom_bar(stat = "identity") +
+  facet_grid(yr ~ treatmt) +
+  labs(x = "Species", y = "Standardized Activity per Night") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
 
