@@ -50,7 +50,7 @@ path_2023 <- "F:/pioneer_2023/robomoth_2023_all"             # folder
 # lets list the files inside the paths. 
 
 
-# funtion -----------------------------------------------------------------
+# function -----------------------------------------------------------------
 
 
 #function to read files 
@@ -159,7 +159,7 @@ buzz_all.1 <- buzz_all.1 %>%
 
 # we use the monitoring night for the date_s (standardize date column)
 
-# after cheching the difference I realize that my method creates some observations where the date is not corrected properly speciallly if close or around 12 am. So I will just use the monitoring night column as the date column for the analysis
+# after checking the difference I realize that my method creates some observations where the date is not corrected properly specially if close or around 12 am. So I will just use the monitoring night column as the date column for the analysis
 
 buzz_all.1 <- buzz_all.1 %>%
   rename(noche = monitoring_night)
@@ -170,6 +170,26 @@ buzz_all.1 <- buzz_all.1 %>%
   mutate(
     time = format(date_time, "%H:%M:%S")
   )
+
+# checking for NAs in the auto buzz. this would indicate that that file has not been analyzed with the buzz tools from Sonobat. 
+
+missing_auto <- buzz_all.1 %>%
+  filter(
+    is.na(auto_buzz_count) |
+      auto_buzz_count == "" |
+      auto_buzz_count == "NA"
+  ) %>%
+  select(filename, auto_buzz_count)
+
+
+missing_files <- missing_auto %>%
+  mutate(
+    site = str_to_lower(str_extract(filename, "^[A-Za-z]{3,4}[0-9]{2}")),
+    date = ymd(str_extract(filename, "\\d{8}"))
+  )
+
+files_to_check <- missing_files %>% # there are some files that need to be analyzed with Sonobat yet
+  distinct(site, date)
 
 # I want to see what columns don't have a species ID so I go back and check those. 
 
@@ -204,9 +224,10 @@ buzz_all.1 <- buzz_all.1 %>%
 
 str(buzz_all.1)
 
-# lets remove rows where with NAs for auto buzz count and sp column because these are not meaningful biologically. 
 
-# lets see firts what we would be removing in auto buzz 
+# I realized I should not remove rows with NAs in the autobuzz counts. these are files that need to be analyzed with sonobat. 
+
+# lets see first what we would be removing in auto buzz 
 
 buzz_all.1 %>%
   summarise(
@@ -215,9 +236,13 @@ buzz_all.1 %>%
     n_na_zero = sum(is.na(sp) & auto_buzz_count == 0, na.rm = TRUE)
   )
 
-# i will remove the nas and zeros for sp and autobuzzcouts about 135 rows that are not useful. 
+# i will remove the nas and zeros for sp and autobuzzcouts.
 buzz_all.1 <- buzz_all.1 %>%
     filter(!(is.na(sp) & auto_buzz_count == 0))
+
+# now we remove the instances where sp is na and autobuzz is na. 
+buzz_all.1 <- buzz_all.1 %>%
+  filter(!(is.na(sp) & is.na(auto_buzz_count)))
 
 
 # rules for simplifying multi IDs -----------------------------------------
@@ -258,7 +283,7 @@ buzz_all.1 %>%
 
 str(buzz_all.1)
 
-unique(buzz_all.1$sp)
+unique(buzz_all.1$sp_clean)
 
 ## i looks like the rules for multi species work so we replace sp with sp_clean
 buzz_all.1 <- buzz_all.1 %>%
@@ -324,16 +349,18 @@ buzz_all.1 <- buzz_all.1 %>%
   select(all_of(keep))
 
 # clean the manual buzz counts
-# some buzz counts are zeros and I did not manually chechk all of those. So if there is a zero in the auto_buzz_count column and a species id in the sp column then the manual buzz counts should get a zero. 
+# some buzz counts are zeros and I did not manually check all of those. So if there is a zero in the auto_buzz_count column and a species id in the sp column then the manual buzz counts should get a zero. 
 
 buzz_all.1 <- buzz_all.1 %>%
   mutate(
     manual_buzz_count = if_else(
-      auto_buzz_count == "0" & !is.na(sp),
-      "0",
+      auto_buzz_count == 0 & !is.na(sp) & is.na(manual_buzz_count),
+      0,
       manual_buzz_count
     )
   )
+
+
 
 
 # Now lets work with the speaker data. We only have 2022 and 2023.
@@ -560,6 +587,18 @@ sum(is.na(spkr_all$noche))
 # final checks. 
 
 summary(spkr_all)
+
+# keep just necessary columns
+
+keep<- c("date_time", "time", "sp", "site", "treatmt", "trmt_bin", "auto_buzz_count", "manual_buzz_count", "year", "noche", "hi_f", "lo_f")
+
+spkr_all <- spkr_all %>%
+  select(all_of(keep))
+
+
+unique(spkr_all$site)
+
+
 
 # explore data ------------------------------------------------------------
 

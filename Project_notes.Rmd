@@ -844,3 +844,19 @@ I started preparing for working on the overlap analysis for bats. to see if thei
 8/28/2025
 
 I managed to figure out how to run a mvGLM and dbrd now I am trying to run rank abundance curves.
+
+------------------------------------------------------------------------
+
+3/18/2025
+
+I am building the data base for the robomoth and speakes to analyse the data.
+
+there are some files for 2021 and 22 that seems like they need to be ran through sonobat.
+
+```{r}
+files_to_check
+```
+
+I also have to remove noise tags.
+
+I need to clean by time stamp too. any even detected after 8 am should be taken out too.
