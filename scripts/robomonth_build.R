@@ -73,9 +73,6 @@ read_buzz_file <- function(file, year) {
 
 robomoth_2021 <- read_buzz_file(path_2021, 2021)
 
-# needs some fixes first create a new column for sp that inputs the spp_accp but if missing puts the species_manual_id or the spp column 
-# we will do this at the end when we have all the files together and I am cleaning data. 
-
 
 
 # read 2022 and 2023
@@ -102,19 +99,21 @@ buzz_all <- bind_rows(robomoth_2021, robomoth_2022, robomoth_2023)
 
 
 # create sp column
-# we create this column because some observations have buzz count but not manual id we want to recover those IDs to not losse data. We build a new one combining the spp_accp, the manual id and the spp column and the 1st, 2nd, 3nd columns 
+# we create this column because some observations have buzz count but not manual id we want to recover those IDs to not loss data. We build a new one combining the spp_accp, the manual id and the spp column and the 1st, 2nd, 3nd columns 
 
 
 
 buzz_all.1 <- buzz_all %>%
   mutate(
     sp = case_when(
-      !is.na(spp_accp) ~ spp_accp,
-      is.na(spp_accp) & !is.na(species_manual_id) ~ species_manual_id,
-      is.na(spp_accp) & is.na(species_manual_id) & !is.na(spp) ~ spp,
+      !is.na(species_manual_id) ~ species_manual_id, # this gives priority to manual ID.
+      is.na(species_manual_id) & !is.na(spp_accp) ~ spp_accp,
+      is.na(species_manual_id) & is.na(spp_accp) & !is.na(spp) ~ spp,
       TRUE ~ NA_character_
     )
   )
+
+sum(is.na(buzz_all.1$sp)) # we have 167 422 
 
 # site column 
 
@@ -124,6 +123,7 @@ buzz_all.1 <- buzz_all.1 %>%
   mutate(
     site = str_to_lower(str_extract(filename, "^[A-Za-z]{3,4}[0-9]{2}"))
   )
+
 
 # check sites 
 unique(buzz_all.1$site)
@@ -164,6 +164,8 @@ buzz_all.1 <- buzz_all.1 %>%
 buzz_all.1 <- buzz_all.1 %>%
   rename(noche = monitoring_night)
 
+sum(is.na(buzz_all.1$noche)) # we have 3132 missing monitoring nights. many have no data so I will recheck after clean up 
+
 # time column 
 
 buzz_all.1 <- buzz_all.1 %>%
@@ -171,7 +173,9 @@ buzz_all.1 <- buzz_all.1 %>%
     time = format(date_time, "%H:%M:%S")
   )
 
-# checking for NAs in the auto buzz. this would indicate that that file has not been analyzed with the buzz tools from Sonobat. 
+sum(is.na(buzz_all.1$date_time)) # check if we have any NAs in the date_time column. We have 0 so we are good.
+
+# checking for NAs in the auto buzz. this would indicate that that file has not been analyzed with the buzz tools from Sonobat. therw are some missing might be from the old table. checking 
 
 missing_auto <- buzz_all.1 %>%
   filter(

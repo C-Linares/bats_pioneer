@@ -860,3 +860,9 @@ files_to_check
 I also have to remove noise tags.
 
 I need to clean by time stamp too. any even detected after 8 am should be taken out too.
+
+------------------------------------------------------------------------
+
+3/21/2024\
+\
+still working on the missing vetted files.
