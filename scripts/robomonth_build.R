@@ -416,11 +416,12 @@ names(spkr_all)
 spkr_all <- spkr_all %>%
   mutate(
     site = str_remove(source_file, "\\.txt$"),
-    site = str_replace(site, "^viz", "vizc")
+    site = str_replace(site, "^viz(?!c)", "vizc")
   )
 
 sum(is.na(spkr_all$site)) # check if we have any NAs in the site column. We have 0 so we are good.)
 
+unique(spkr_all$site) # check sites
 
 
 # # create the date column
