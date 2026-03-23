@@ -43,7 +43,7 @@ pacman::p_load(
 
 # first robomoth data paths
 
-path_2021 <- "F:/pioneer_2021/sm4/sb_buzz_2021_vetted.txt"   # single file
+path_2021 <- "F:/pioneer_2021/sm4/sb_buzz_2021_vetted_v4.txt.txt"   # single file
 path_2022 <- "G:/PioneerLights_2022/part2/robomoth/buzz_out" # folder
 path_2023 <- "F:/pioneer_2023/robomoth_2023_all"             # folder
 
@@ -93,7 +93,7 @@ robomoth_2023 <- map_dfr(files_2023, read_buzz_file, year = 2023)
 # combine all years into one data frame
 buzz_all <- bind_rows(robomoth_2021, robomoth_2022, robomoth_2023)
 
-
+str(buzz_all)
 
 # sp column ---------------------------------------------------------------
 
@@ -157,6 +157,8 @@ buzz_all.1 <- buzz_all.1 %>%
     date_time = ymd_hms(str_extract(filename, "\\d{8}_\\d{6}"), tz = "America/Denver")
   )
 
+sum(is.na(buzz_all.1$date_time)) # check if we have any NAs in the date_time column. We have 0 so we are good.)
+
 # we use the monitoring night for the date_s (standardize date column)
 
 # after checking the difference I realize that my method creates some observations where the date is not corrected properly specially if close or around 12 am. So I will just use the monitoring night column as the date column for the analysis
@@ -202,7 +204,7 @@ files_to_check <- missing_files %>% # there are some files that need to be analy
 missing_sp <- buzz_all.1 %>%
   filter(is.na(sp))
 
-# the majority are zeros for buzz counts meaning there was nothing to ID. We might eliminate these
+# the majority are zeros for buzz counts meaning there was nothing to ID. We might eliminate these. In addition it seems these also have inf for call/sec colum possibly indicating they are noise. se we might remove all inf rows for call/sec and NAs for sp. 
 
 # check species column. 
 
@@ -240,14 +242,28 @@ buzz_all.1 %>%
     n_na_zero = sum(is.na(sp) & auto_buzz_count == 0, na.rm = TRUE)
   )
 
-# i will remove the nas and zeros for sp and autobuzzcouts.
-buzz_all.1 <- buzz_all.1 %>%
-    filter(!(is.na(sp) & auto_buzz_count == 0))
+# # i will remove the nas and zeros for sp and autobuzzcouts.
+# buzz_all.1 <- buzz_all.1 %>%
+#     filter(!(is.na(sp) & auto_buzz_count == 0))
+# 
+# # now we remove the instances where sp is na and autobuzz is na. 
+# buzz_all.1 <- buzz_all.1 %>%
+#   filter(!(is.na(sp) & is.na(auto_buzz_count)))
 
-# now we remove the instances where sp is na and autobuzz is na. 
-buzz_all.1 <- buzz_all.1 %>%
-  filter(!(is.na(sp) & is.na(auto_buzz_count)))
+# remove rows with noise, noid and inf for the call/sec column  
 
+buzz_all.1 <- buzz_all.1 %>%
+  filter(
+    !(is.na(sp) & calls_sec == "Inf"),
+    !str_to_lower(sp) %in% c("noise", "noid") 
+  )
+
+# we are going to remove NAs for sp about 324 rows 
+
+sum(is.na(buzz_all.1$sp))
+
+buzz_all.1 <- buzz_all.1 %>%
+  filter(!is.na(sp))
 
 # rules for simplifying multi IDs -----------------------------------------
 
@@ -281,6 +297,7 @@ buzz_all.1 <- buzz_all.1 %>%
     )
   )
 
+sum(is.na(buzz_all.1$sp_clean)) # we have 0 NAs in the sp clean column so we are good.)
 
 buzz_all.1 %>%
   count(sp, sp_clean, sort = TRUE)
@@ -320,7 +337,7 @@ sp_key <- c(
 
 buzz_all.1 <- buzz_all.1 %>%
   mutate(
-    sp_clean = recode(sp, !!!sp_key)
+    sp = recode(sp, !!!sp_key)
   )
 
 
@@ -329,6 +346,21 @@ buzz_all.1 %>%
   count(sp, sp_clean, sort = TRUE)
 
 unique(buzz_all.1$sp)
+
+
+
+# now we correct the counts by giving priority to the manual buzz counts but if these are missing then we input the auto buzz counts. 
+
+buzz_all.1 <- buzz_all.1 %>%
+  mutate(
+    c_buzz = if_else( # corrected buzz counts 
+      is.na(manual_buzz_count) & !is.na(auto_buzz_count),
+      auto_buzz_count,
+      manual_buzz_count
+    )
+  )
+
+
 # now we create a treatment column based on the site
 
 
@@ -347,24 +379,12 @@ glimpse(buzz_all.1)
 
 # keep certain cols date, time, sp, date_time, site, treatmt, trmt_bin, auto_buzz_count, manual_buzz_count, year, noche, hi_f, lo_f. 
 
-keep<- c("date_time", "time", "sp", "site", "treatmt", "trmt_bin", "auto_buzz_count", "manual_buzz_count", "year", "noche", "hi_f", "lo_f")
+keep<- c("date_time", "time", "sp", "site", "treatmt", "trmt_bin", "auto_buzz_count", "manual_buzz_count","c_buzz", "year", "noche", "hi_f", "lo_f")
 
 buzz_all.1 <- buzz_all.1 %>%
   select(all_of(keep))
 
-# clean the manual buzz counts
-# some buzz counts are zeros and I did not manually check all of those. So if there is a zero in the auto_buzz_count column and a species id in the sp column then the manual buzz counts should get a zero. 
-
-buzz_all.1 <- buzz_all.1 %>%
-  mutate(
-    manual_buzz_count = if_else(
-      auto_buzz_count == 0 & !is.na(sp) & is.na(manual_buzz_count),
-      0,
-      manual_buzz_count
-    )
-  )
-
-
+glimpse(buzz_all.1)
 
 
 # Now lets work with the speaker data. We only have 2022 and 2023.
@@ -428,24 +448,27 @@ spkr_all <- spkr_all %>%
   )
 
 sum(is.na(spkr_all$date_time)) # check if we have any NAs in the date_time column. We have 0 so we are good.
+
+
+# sp column ---------------------------------------------------------------
+
 # create the sp column 
 
 spkr_all <- spkr_all %>%
   mutate(
     sp = case_when(
-      !is.na(spp_accp) ~ spp_accp,
-      is.na(spp_accp) & !is.na(species_manual_id) ~ species_manual_id,
-      is.na(spp_accp) & is.na(species_manual_id) & !is.na(spp) ~ spp,
+      !is.na(species_manual_id) ~ species_manual_id, # this gives priority to manual ID.
+      is.na(species_manual_id) & !is.na(spp_accp) ~ spp_accp,
+      is.na(species_manual_id) & is.na(spp_accp) & !is.na(spp) ~ spp,
       TRUE ~ NA_character_
     )
   )
 
+sum(is.na(spkr_all$sp)) # we have 91192 NAs
+
+
 
 # rule for multi species --------------------------------------------------
-
-
-
-# I think I created a rule to eliminate unecessary zeros. We remove rows where the buzz is zero but there was no species ID suggested in our sp columm.
 
 # I want to see what columns don't have a species ID so I go back and check those. 
 
@@ -525,19 +548,9 @@ spkr_all <- spkr_all %>%
   )
 summary(spkr_all)
 
-# clean the manual buzz counts
-# some buzz counts are zeros and I did not manually chechk all of those. So if there is a zero in the auto_buzz_count column and a species id in the sp column then the manual buzz counts should get a zero. 
-
-spkr_all <- spkr_all %>%
-  mutate(
-    manual_buzz_count = if_else(
-      auto_buzz_count == "0" & !is.na(sp_clean),
-      "0",
-      manual_buzz_count
-    )
-  )
 
 
+# -------------------------------------------------------------------------
 
 # make buzz counts numeric
 
@@ -549,8 +562,6 @@ spkr_all <- spkr_all %>%
 
 str(spkr_all)
 
-# lets remove rows where with NAs for auto buzz count and sp column because these are not meaningful biologically. 
-
 # lets see first what we would be removing in auto buzz 
 
 spkr_all %>%
@@ -560,24 +571,46 @@ spkr_all %>%
     n_na_zero = sum(is.na(sp) & auto_buzz_count == 0, na.rm = TRUE)
   )
 
-# i will remove the nas and zeros for sp and autobuzzcouts about 
-spkr_all <- spkr_all %>%
-  filter(!(is.na(sp) & auto_buzz_count == 0))
-
-
-# # now we filter out those rows that have NAs in manual buzz count.NO! we want to filter where there is a zero in auto buzz count and no sp id in the sp column. 
-# 
-# spkr_all.1 <- spkr_all %>%
-#   filter(!is.na(manual_buzz_count))
-
-
-# now there are still some rows where noche is NA.
-sum(is.na(spkr_all$noche)) 
-
-# several of those have inf in call_sec column. I would say we need to remove those becasue it indicates some kind of error with the recording. so we remove rows where both calls_sec is inf and noche is NA. 
+# remove rows with noise, noid and inf for the call/sec column  
 
 spkr_all <- spkr_all %>%
-  filter(!(calls_sec == "Inf" & is.na(noche)))
+  filter(
+    !(is.na(sp) & calls_sec == "Inf"),
+    !str_to_lower(sp) %in% c("noise", "noid") 
+  )
+
+# we are going to remove NAs for sp about 381 rows 
+
+sum(is.na(spkr_all$sp))
+
+spkr_all <- spkr_all %>%
+  filter(!is.na(sp))
+
+
+# clean the manual buzz counts
+# some buzz counts are zeros and I did not manually check all of those. So if there is a zero in the auto_buzz_count column and a species id in the sp column then the manual buzz counts should get a zero. 
+
+spkr_all <- spkr_all %>%
+  mutate(
+    manual_buzz_count = if_else(
+      auto_buzz_count == "0" & !is.na(sp_clean),
+      "0",
+      manual_buzz_count
+    )
+  )
+
+spkr_all <- spkr_all %>%
+  mutate(
+    c_buzz = if_else( # corrected buzz counts 
+      is.na(manual_buzz_count) & !is.na(auto_buzz_count),
+      auto_buzz_count,
+      manual_buzz_count
+    )
+  )
+
+summary(spkr_all)
+
+
 
 
 # noche as date
@@ -588,13 +621,13 @@ spkr_all <- spkr_all %>%
 
 sum(is.na(spkr_all$noche)) 
  
-# final checks. 
+# checks. 
 
 summary(spkr_all)
 
 # keep just necessary columns
 
-keep<- c("date_time", "time", "sp", "site", "treatmt", "trmt_bin", "auto_buzz_count", "manual_buzz_count", "year", "noche", "hi_f", "lo_f")
+keep<- c("date_time", "time", "sp", "site", "treatmt", "trmt_bin", "auto_buzz_count", "manual_buzz_count", "c_buzz","year", "noche", "hi_f", "lo_f")
 
 spkr_all <- spkr_all %>%
   select(all_of(keep))
@@ -610,22 +643,19 @@ unique(spkr_all$site)
 # I want a bar graph of species in the x axis and buzz counts by treatment in the y axis.
 # first we need to make the manual buzz count numeric.
 
-spkr_all <- spkr_all %>%
-  mutate(
-    manual_buzz_count = as.integer(manual_buzz_count)
-  )
 
 # now ggplot to graph it 
 
 sp_summary <- spkr_all %>%
-  group_by(sp, treatmt) %>%
+  group_by(sp, treatmt,year) %>%
   summarise(
-    total_buzz = sum(as.numeric(manual_buzz_count), na.rm = TRUE),
+    total_buzz = sum(as.numeric(c_buzz), na.rm = TRUE),
     .groups = "drop"
   )
 
 ggplot(sp_summary, aes(x = sp, y = total_buzz, fill = treatmt)) +
   geom_bar(stat = "identity", position = "dodge") +
+  facet_grid(~ year) +
   labs(x = "Species", y = "Total Manual Buzz Count spkrs", fill = "Treatment") +
   theme_minimal() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
@@ -635,14 +665,9 @@ ggplot(sp_summary, aes(x = sp, y = total_buzz, fill = treatmt)) +
 
 # first we need to make the manual buzz count numeric.
 
-buzz_all.1 <- buzz_all.1 %>%
-  mutate(
-    manual_buzz_count = as.integer(manual_buzz_count)
-  )
-
 
 sp_summary <- buzz_all.1 %>%
-  group_by(sp, treatmt) %>%
+  group_by(sp, treatmt, year) %>%
   summarise(
     total_buzz = sum(as.numeric(manual_buzz_count), na.rm = TRUE),
     .groups = "drop"
@@ -650,6 +675,7 @@ sp_summary <- buzz_all.1 %>%
 
 ggplot(sp_summary, aes(x = sp, y = total_buzz, fill = treatmt)) +
   geom_bar(stat = "identity", position = "dodge") +
+  facet_grid(~ year) +
   labs(x = "Species", y = "Total Manual Buzz Count spkrs", fill = "Treatment") +
   theme_minimal() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
@@ -657,16 +683,102 @@ ggplot(sp_summary, aes(x = sp, y = total_buzz, fill = treatmt)) +
 
 
 
+# after looking at the graphs I chose to analyse both 2021 and 2022 for robomoth and speakers as the data is consisten
+
+# What about the zeros? is there more calls with no buzz in lit vs dark sites?
+
+
+
+buzz_all.1 <- buzz_all.1 %>%
+  mutate(
+    zero_buzz = c_buzz == 0
+  )
+
+prop_zero <- buzz_all.1 %>%
+  group_by(treatmt) %>%
+  summarise(
+    prop_zero = mean(zero_buzz, na.rm = TRUE),
+    n = n(),
+    .groups = "drop"
+  )
+
+ggplot(prop_zero, aes(x = treatmt, y = prop_zero, fill = treatmt)) +
+  geom_col() +
+  labs(
+    x = "Treatment",
+    y = "Proportion of zero feeding events",
+    title = "Zero feeding events (c_buzz = 0) by treatment"
+  ) +
+  theme_minimal()
 
 
 
 
+count_zero <- buzz_all.1 %>%
+  filter(zero_buzz) %>%
+  count(treatmt)
+
+ggplot(count_zero, aes(x = treatmt, y = n, fill = treatmt)) +
+  geom_col() +
+  labs(
+    x = "Treatment",
+    y = "Number of zero feeding events"
+  ) +
+  theme_minimal()
 
 
+buzz_all.1 %>%
+  count(treatmt, zero_buzz) %>%
+  ggplot(aes(x = treatmt, y = n, fill = zero_buzz)) +
+  geom_col(position = "fill") +
+  labs(
+    x = "Treatment",
+    y = "Proportion",
+    fill = "Zero buzz",
+    title = "Proportion of zero vs non-zero feeding events"
+  ) +
+  theme_minimal()
 
 
+# I am a little counfuse about how to analyze this section. should I model the proportions of zeros too? in the model 
 
 
+# dir.create("data_for_analysis/prep_for_glm", showWarnings = FALSE) # just run if the dir is abscent
+
+write.csv(buzz_all.1, file = 'data_for_analysis/robomoth_build/bat_robomoth.csv', row.names = F) # raw combine data 
+write.csv(spkr_all, file = 'data_for_analysis/robomoth_build/spkr_all.csv', row.names = F) # raw combine data
+
+
+# Create a README file with information about the script
+readme_content <- "Carlos Linares 3/22/2026 
+this folde contains the raw combined data for the robomoth and speaker data. The data is cleaned and ready for analysis The data are as follows:
+
+buzz_all.1: this is the combined data frame for the robomoth data. It contains data from 2021, 2022 and 2023. The data has been cleaned and ready for analysis. 
+
+the columns are as follows
+date_time: the date and time of the recording
+time: the time of the recording
+noche: the monitoring night of the recording
+sp: the species ID of the recording composed of sp_accp, manual id and spp columns. We created this column to recover as much species ID as possible.
+site: the site of the recording
+treatmt: the treatment of the site (lit or dark)
+c_buzz: the corrected buzz count. We give priority to the manual buzz count but if this is missing then we use the auto buzz count
+zero_buzz: created for graph the zero proportion probably unneccessary for analysis.
+
+spkr_all: this is the combined data frame for the speaker data. It contains data from 2022 and 2023. The data has been cleaned and ready for analysis.
+
+the columns are as follows:
+date_time: the date and time of the recording
+time: the time of the recording
+noche: the monitoring night of the recording
+sp: the species ID of the recording composed of sp_accp, manual id and spp columns
+site: the site of the recording
+treatmt: the treatment of the site (lit or dark)
+c_buzz: the corrected buzz count. We give priority to the manual, same as robomoth, if this is missing then we use the auto buzz count
+
+"
+# Write the README content to a file
+writeLines(readme_content, "data_for_analysis/robomoth_build/README.txt")
 
 
 
