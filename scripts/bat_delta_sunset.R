@@ -222,6 +222,49 @@ density_graph
 
 ggsave(density_graph, file="figures/bat_delta_sunset/desnity_graph_v1.tiff", width = 10, height = 9)
 
+
+
+# improved graph just looking at certain hours after sunset
+density_graph <- bat_with_sunset %>%
+  filter(sp %in% spp, !is.na(deltasunset_rad)) %>%
+  ggplot(aes(x = deltasunset_rad, color = treatmt, fill = treatmt)) +
+  geom_density(alpha = 0.3, adjust = 1.2) +
+  # Added jitter and transparency so the rug lines don't completely overlap
+  # geom_rug(aes(color = treatmt), sides = "b", alpha = 0.5, position = "jitter") +
+  # Added scales = "free_y" to let each bat species scale its own density height
+  facet_wrap(~ sp, labeller = labeller(sp = setNames(spplabs, spp)), scales = "free_y") +
+  # Zoom in on the 0-4 range without recalculating/chopping the density curves
+  coord_cartesian(xlim = c(0, 4)) +
+  labs(
+    x = "Delta sunset",
+    y = "Density",
+    color = "Treatment",
+    fill = "Treatment"
+  ) +
+  scale_color_manual(values = c("lit" = "orange", "dark" = "blue")) +
+  scale_fill_manual(values = c("lit" = "orange", "dark" = "blue")) +
+  theme_minimal(base_size = 12) +
+  theme(
+    strip.text = element_text(face = "bold"),
+    legend.position = "top",
+    # Optional: removes the y-axis text since density values are relative and vary by facet now
+    axis.text.y = element_blank(), 
+    axis.ticks.y = element_blank()
+  )
+
+density_graph
+
+
+ggsave(
+  filename = "figures/bat_delta_sunset/delta_sunset_density.png",
+  plot = density_graph,
+  width = 10,
+  height = 6,
+  dpi = 300,
+  bg = "white"
+)
+
+
 # Overlap -----------------------------------------------------------------
 
 library(dplyr)

@@ -866,3 +866,7 @@ I need to clean by time stamp too. any even detected after 8 am should be taken 
 3/21/2024\
 \
 still working on the missing vetted files.
+=======
+1/23/2025
+
+I revisit the effort calculation in the prepr_for_glmm.R for days and hours. It seems like I can't reliably calculate effort by day in hours because I am getting some zeros. I need to correct this issue but I am unsure on how to achieve this. to calculate it I need to take in consideration all the recorded files from the very first to the very last by site and day. I was just using the correctly ID ones and that is wrong. The idea was to calculate a nightly call rate. I think I will use the total bat calls

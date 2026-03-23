@@ -107,9 +107,9 @@ insect<-insect %>%
 # We need a site × species matrix with abundances.
 
 bat_comm <- bm %>%
-  group_by(site, auto_id) %>%     # site = sampling unit, auto_id = species
+  group_by(site, sp) %>%     # site = sampling unit, auto_id = species
   summarise(abundance = sum(n), .groups = "drop") %>%
-  pivot_wider(names_from = auto_id, values_from = abundance, values_fill = 0) %>% 
+  pivot_wider(names_from = sp, values_from = abundance, values_fill = 0) %>% 
   select(-c(NoID, Noise)) # remove Noise and NoID
 
 # Check matrix
@@ -205,6 +205,8 @@ env_scores <- scores(dbrda_full, display = "bp", scaling = 2)
 env_scores_df <- as.data.frame(env_scores)
 env_scores_df$variable <- rownames(env_scores)
 
+library(ggrepel)
+
 # Plot
 p1<-ggplot() +
   # Sites (small, light gray)
@@ -238,7 +240,13 @@ p1<-ggplot() +
   theme(legend.position = "none")
 p1
 
-ggsave("figures/dbrd/dbRDA_v1.tiff", p1, width = 10, height = 8)
+ggsave("figures/dbrd/dbRDA_v1.tiff",
+       p1,
+       dev = "tiff",
+       dpi = 600,
+       width = 10,
+       height = 8,
+       bg = "white",)
 
 
 
