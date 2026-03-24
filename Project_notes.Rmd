@@ -873,4 +873,12 @@ I revisit the effort calculation in the prepr_for_glmm.R for days and hours. It 
 
 3/23/2026
 
-I had an issue with github and was giving me trouble after I did some work on desktop computer. I lost the notes I did in the desktop computer. I should be careful now about pulling and pushing the notes file.
+I had an issue with github and was giving me trouble after I did some work on desktop computer. I lost the notes I did in the desktop computer. I should be careful now about pulling and pushing the notes file. \
+\
+I will start working on the robomoth_speakr_models.R script to analyze the data for the robomoth and speakers.
+
+-issue: I discovered an issue in the speaker data. the site vizc04 has a bunch of NAs probably because it has a misspelled tag vizcc04 instead of vizc 04
+
+I will fix this but this data will have to wait.
+
+I created the rob_db.csv, this is ready for analysis with predictors standardized. However, the spkr data still needs fix.
