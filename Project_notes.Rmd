@@ -873,7 +873,7 @@ I revisit the effort calculation in the prepr_for_glmm.R for days and hours. It 
 
 3/23/2026
 
-I had an issue with github and was giving me trouble after I did some work on desktop computer. I lost the notes I did in the desktop computer. I should be careful now about pulling and pushing the notes file. \
+I had an issue with github and was giving me trouble after I did some work on desktop computer. I lost the notes I did in the desktop computer. I should be careful now about pulling and pushing the notes file.\
 \
 I will start working on the robomoth_speakr_models.R script to analyze the data for the robomoth and speakers.
 
@@ -882,3 +882,14 @@ I will start working on the robomoth_speakr_models.R script to analyze the data 
 I will fix this but this data will have to wait.
 
 I created the rob_db.csv, this is ready for analysis with predictors standardized. However, the spkr data still needs fix.
+
+------------------------------------------------------------------------
+
+3/24/2026
+
+I have been running models for the robomoth data, but I realized that I need to change one of the predictors. The temp and wind are correlated (0.73) so I will try one. \
+![](images/clipboard-3012166694.png)
+
+one paper Li et al 2024 indicates that both wind and temperature affect bat activity like us they found these are correlated. I think we should keep just wind as it might mess with predation more than temperature. \
+\
+I produced several marginal effects plots for the robomoth data.
