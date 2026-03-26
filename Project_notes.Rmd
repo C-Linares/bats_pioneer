@@ -887,9 +887,17 @@ I created the rob_db.csv, this is ready for analysis with predictors standardize
 
 3/24/2026
 
-I have been running models for the robomoth data, but I realized that I need to change one of the predictors. The temp and wind are correlated (0.73) so I will try one. \
+I have been running models for the robomoth data, but I realized that I need to change one of the predictors. The temp and wind are correlated (0.73) so I will try one.\
 ![](images/clipboard-3012166694.png)
 
-one paper Li et al 2024 indicates that both wind and temperature affect bat activity like us they found these are correlated. I think we should keep just wind as it might mess with predation more than temperature. \
+one paper Li et al 2024 indicates that both wind and temperature affect bat activity like us they found these are correlated. I think we should keep just wind as it might mess with predation more than temperature.\
 \
 I produced several marginal effects plots for the robomoth data.
+
+------------------------------------------------------------------------
+
+3/25/2026
+
+I updated the insect predictor from c_bugs to ins_bm, and I have reworked the speakr_all data as it was missing some manual vetting. \
+\
+I am updating the models for the robomoth data today. I also updated the treatment so it is dark= -1 and lit = 1

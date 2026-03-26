@@ -98,13 +98,15 @@ robomoth <- read_csv("data_for_analysis/robomoth_build/bat_robomoth.csv") %>%
 str(robomoth)
 colSums(is.na(robomoth)) # no missing data in robomoth
 
-speakr <- read_csv("data_for_analysis/robomoth_build/spkr_all.csv") %>% 
-  clean_names()
+# remove 2021 data 
 
-str(speakr)
-colSums(is.na(speakr)) # some missing data in speakr, but not many.
+# filter out 2021 from rob_db because we don't have speaker data for that year
 
-unique(speakr$site) # check the unique sites in speakr
+robomoth <- robomoth %>% # we will do this in the prep script 
+  filter(year != 2021)
+
+
+
 # predictors --------------------------------------------------------------
 
 # Craters weather (night)
@@ -146,24 +148,35 @@ moon_daily_avg <- moon_filtered %>%
   )
 
 # insects 
-c_bugs <- read_csv("data_for_analysis/insect_wranglin/c_bugs.csv") %>%  # load insect data
-  clean_names() %>%
-  rename(yr = yrs) # safe rename
-# add treatment. 
+# I am not using c_bugs anymore, I switched to ins_bm that is just lepidoptera
+# c_bugs <- read_csv("data_for_analysis/insect_wranglin/c_bugs.csv") %>%  # load insect data
+#   clean_names() %>%
+#   rename(yr = yrs) # safe rename
+# # add treatment. 
+# 
+# litsites<-c("iron01","iron03","iron05","long01","long03")
+# 
+# 
+# c_bugs$treatmt<-ifelse(c_bugs$site %in% litsites , "lit", "dark") # this makes a treatment variable.
 
-litsites<-c("iron01","iron03","iron05","long01","long03")
+ins_bm<-read.csv("data_for_analysis/insect_wranglin/ins_bm.csv") %>% 
+  clean_names() %>% 
+  rename(yr = yrs) # load insect biomass data and rename year column
 
+# calculate mean by yr and site. I will use this to substitute the NA valeus from tha appeared when merging the bat data. 
+# 
+# c_bugs_mean <- c_bugs %>%
+#   group_by(yr, site) %>%
+#   summarise(
+#     t_insect = mean(t_insect, na.rm = TRUE),
+#     t_lepidoptera = mean(t_lepidoptera, na.rm = TRUE)
+#   ) %>%
+#   ungroup()
 
-c_bugs$treatmt<-ifelse(c_bugs$site %in% litsites , "lit", "dark") # this makes a treatment variable.
-
-
-# calculate mean by yr, trmt and site. I will use this to substitute the NA valeus from tha appeared when merging the bat data. 
-
-c_bugs_mean <- c_bugs %>%
-  group_by(yr,treatmt, site) %>%
+ins_bm_mean <- ins_bm %>%
+  group_by(yr, site) %>%
   summarise(
-    t_insect = mean(t_insect, na.rm = TRUE),
-    t_lepidoptera = mean(t_lepidoptera, na.rm = TRUE)
+    t_leps_mean = mean(t_leps, na.rm = TRUE)
   ) %>%
   ungroup()
 
@@ -198,26 +211,23 @@ rob_db<- rob_db %>%
   mutate(wk = week(noche)) # add week and year to rob_db for merging
 
 rob_db <- rob_db %>%
-  left_join(c_bugs, by = c("site", "wk", "year"= "yr")) # merge
+  left_join(ins_bm, by = c("site", "wk", "year"= "yr")) # merge
 
 # check for NAs
-summary(rob_db)  #lots of NAs in t.insect and t.lepidoptera.
+summary(rob_db)  #lots of NAs 6240 fro the t_leps column. 
 
-# I might need to check the insect data to see if the c_bugs is the best predictor to use for this analysis. 
-
-# we remove the nas from insects by adding the average year insect count by site 
+# we remove the some of the nas from insects by adding the average year insect count by site 
 
 rob_db <- rob_db %>%
-  left_join(c_bugs_mean, 
+  left_join(ins_bm_mean, 
             by = c("year"="yr", "site"),
             suffix = c("", "_mean")) %>%  # rename mean columns directly
   mutate(
-    t_insect = coalesce(t_insect, t_insect_mean),
-    t_lepidoptera = coalesce(t_lepidoptera, t_lepidoptera_mean)
+    t_leps = coalesce(t_leps, t_leps_mean)
   ) %>%
-  select(-t_insect_mean, -t_lepidoptera_mean)
+  select( -t_leps_mean)
 
-summary(rob_db) # now there are no NAs in t.insect and t.lepidoptera.
+summary(rob_db) # 
 
 # merge with elevation
 
@@ -246,11 +256,11 @@ cor.rob<-run_correlation_analysis(rob_db, plot = T)
 
 names(rob_db)
 
-# there's 3 diff treatment col keep just one.
-
-rob_db <- rob_db %>%
-  select( -treatmt, -treatmt.y) %>% 
-  rename( trmt = treatmt.x) # rename the treatment column to be consistent with the speakr data.
+# # there's 3 diff treatment col keep just one.
+# 
+# rob_db <- rob_db %>%
+#   select( -treatmt, -treatmt.y) %>% 
+#   rename( trmt = treatmt.x) # rename the treatment column to be consistent with the speakr data.
 
 summary(rob_db)
 
@@ -274,9 +284,9 @@ variables_to_scale <- c(
   "avg_illumination",
   "nit_avg_temp_c",
   "nit_avg_wspm_s",
-  "t_lepidoptera",
-  "t_insect",
-  "jday"
+  "t_leps",
+  "jday",
+  "elev_max"
 )
 
 rob_db <- rob_db %>%
@@ -293,6 +303,7 @@ rob_db <- rob_db %>%
     year == 2023 ~ 1
   ))
 
+summary(rob_db$yr_s)
 
 # species names for graphs
 
@@ -340,6 +351,15 @@ glimpse(rob_db)
 
 # there's an error in the tags for sites on vizcaine. this needs to be fixed on robomoth_build.R script. (fixed)
 
+
+speakr <- read_csv("data_for_analysis/robomoth_build/spkr_all.csv") %>% 
+  clean_names()
+
+str(speakr)
+colSums(is.na(speakr)) # some missing data in speakr, but not many.
+
+unique(speakr$site) # check the unique sites in speakr
+
 # merge -------------------------------------------------------------------
 
 # 1. merge weather
@@ -360,24 +380,22 @@ spkr_db <- spkr_db %>%
 
 # 4. merge insect data
 spkr_db <- spkr_db %>%
-  left_join(c_bugs, by = c("site", "wk", "year" = "yr"))
+  left_join(ins_bm, by = c("site", "wk", "year" = "yr"))
 
 summary(spkr_db)
 
 # 5. fill missing insect values with annual site mean
 spkr_db <- spkr_db %>%
-  left_join(
-    c_bugs_mean,
-    by = c("year" = "yr", "site"),
-    suffix = c("", "_mean")
-  ) %>%
+  left_join(ins_bm_mean, 
+            by = c("year"="yr", "site"),
+            suffix = c("", "_mean")) %>%  # rename mean columns directly
   mutate(
-    t_insect = coalesce(t_insect, t_insect_mean),
-    t_lepidoptera = coalesce(t_lepidoptera, t_lepidoptera_mean)
+    t_leps = coalesce(t_leps, t_leps_mean)
   ) %>%
-  select(-t_insect_mean, -t_lepidoptera_mean)
+  select( -t_leps_mean)
 
-summary(spkr_db)
+summary(spkr_db) # 
+
 
 # 6. merge elevation
 spkr_db <- spkr_db %>%
@@ -400,18 +418,10 @@ cor.spkr <- run_correlation_analysis(spkr_db, plot = TRUE)
 
 # last check and cleanup
 
-# remove unnecessary columns
 
-names(spkr_db)
-
-# there's 3 diff treatment col keep just one.
-
-spkr_db <- spkr_db %>%
-  select( -treatmt, -treatmt.y) %>% 
-  rename( trmt = treatmt.x) # rename the treatment column to be consistent with the speakr data.
 
 summary(spkr_db)
-
+str(spkr_db)
 
 
 # standardize -------------------------------------------------------------
@@ -428,9 +438,9 @@ variables_to_scale <- c(
   "avg_illumination",
   "nit_avg_temp_c",
   "nit_avg_wspm_s",
-  "t_lepidoptera",
-  "t_insect",
-  "jday"
+  "t_leps",
+  "jday",
+  "elev_max"
 )
 
 spkr_db <- spkr_db %>%
@@ -476,7 +486,7 @@ summary(spkr_db)
 
 # Create a README file with information about the script
 readme_content <- "Carlos Linares 3/23/2026 
-this folde contains the database with predictors ready to run models with. 
+this folde contains the database for robomoth and speaker with predictors ready to run models with. 
 the columns are as follow:
 
 noche: date of the night

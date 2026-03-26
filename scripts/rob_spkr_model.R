@@ -68,12 +68,15 @@ spkr_db <- fread('data_for_analysis/rob_spkr_prep/spkr_db') %>%
 glimpse(rob_db)
 glimpse(spkr_db)
 
-# filter out 2021 from rob_db because we don't have speaker data for that year
 
-rob_db <- rob_db %>% 
-  filter(year != 2021)
+# correct treatment binomial form 0,1 tro -1 = dark, 1 = lit
 
+rob_db <- rob_db %>%
+  mutate(
+    trmt_bin = if_else(treatmt == "dark", -1, 1)
+  )
 
+glimpse(rob_db)
 # models -------------------------------------------------------------------------
 
 # possible model: occurrence of feeding using a binomial variable for those events where there is feeding and when there is no feedin. asks Does light changes the probability of feeding?
@@ -123,7 +126,7 @@ DHARMa::simulateResiduals(m0, n = 1000, plot = TRUE)
 
 summary(m0)
 
-# given the c_hat is 1.2 we might see overdisperssion. let's try negative binomial. 
+# given the c_hat is 1.2 it indicates overdisperssion. let's try negative binomial. 
 
 m1 <- glmmTMB(
   c_buzz ~ trmt_bin + (1 | site),
@@ -134,8 +137,10 @@ m1 <- glmmTMB(
 # check model
 
 check_singularity(m1)
+m1$sdr$pdHess
+m1$fit$message
 check_zeroinflation(m1)
-calculate_c_hat(m1)  # indicates the is overdispersion we need to try negative binomial.  
+calculate_c_hat(m1)    
 performance_mae(m1)
 range(rob_db$c_buzz)
 hist(rob_db$c_buzz, breaks = 100 )
@@ -155,8 +160,10 @@ m2 <- glmmTMB(
 # check model
 
 check_singularity(m2)
+m2$sdr$pdHess
+m2$fit$message
 check_zeroinflation(m2)
-calculate_c_hat(m2)  # indicates the is overdispersion we need to try negative binomial.  
+calculate_c_hat(m2)    
 performance_mae(m2)
 range(rob_db$c_buzz)
 hist(rob_db$c_buzz, breaks = 100 )
@@ -169,7 +176,7 @@ summary(m2)
 # now we add environmental variables. 
 
 m3 <- glmmTMB(
-  c_buzz ~ trmt_bin + jday_s + I(jday_s^2) + nit_avg_wspm_s + nit_avg_temp_c_s + avg_moonlight_s + elev_max + yr_s +
+  c_buzz ~ trmt_bin + jday_s + I(jday_s^2) + nit_avg_wspm_s_s + nit_avg_temp_c_s + avg_moonlight_s + elev_max_s + yr_s +
     (1 | site),
   family = nbinom2,
   data = rob_db
@@ -178,6 +185,8 @@ m3 <- glmmTMB(
 # check model
 
 check_singularity(m3)
+m3$sdr$pdHess
+m3$fit$message
 check_zeroinflation(m3)
 calculate_c_hat(m3)  # indicates the is overdispersion we need to try negative binomial.  
 performance_mae(m3)
@@ -190,14 +199,16 @@ summary(m3)
 # phase 4 we add the insect data 
 
 m4 <- glmmTMB(
-  c_buzz ~ trmt_bin + jday_s + I(jday_s^2) + nit_avg_wspm_s + nit_avg_temp_c_s + avg_moonlight_s + elev_max + yr_s +
-     + t_lepidoptera_s +
+  c_buzz ~ trmt_bin + jday_s + I(jday_s^2) + nit_avg_wspm_s_s + nit_avg_temp_c_s + avg_moonlight_s + elev_max + yr_s +
+     + t_leps_s +
     (1 | site),
   family = nbinom2,
   data = rob_db
 )
 
 check_singularity(m4)
+m4$sdr$pdHess
+m4$fit$message
 check_zeroinflation(m4)
 calculate_c_hat(m4)  # indicates the is overdispersion we need to try negative binomial.  
 performance_mae(m4)
@@ -210,21 +221,23 @@ summary(m4)
 anova(m0, m1, m2, m3, m4)
 
 
-# Phase 5 interactions
+# Phase 5 interactions aleps and treatment 
 # 
 
 m5 <- glmmTMB(
-  c_buzz ~ trmt_bin + jday_s + I(jday_s^2) + nit_avg_wspm_s + nit_avg_temp_c_s + avg_moonlight_s + elev_max + yr_s +
-    + t_lepidoptera_s +
+  c_buzz ~ trmt_bin + jday_s + I(jday_s^2) + nit_avg_wspm_s_s + nit_avg_temp_c_s + avg_moonlight_s + elev_max_s + yr_s +
+    + t_leps_s +
     (1 | site)+
   #interactions
-  trmt_bin*t_lepidoptera_s,
+  trmt_bin*t_leps_s,
   family = nbinom2,
   data = rob_db
 )
 check_singularity(m5)
+m5$sdr$pdHess
+m5$fit$message
 check_zeroinflation(m5)
-calculate_c_hat(m5)  # indicates the is overdispersion we need to try negative binomial.  
+calculate_c_hat(m5)  #  
 performance_mae(m5)
 range(rob_db$c_buzz)
 hist(rob_db$c_buzz, breaks = 100 )
@@ -238,18 +251,20 @@ anova(m0, m1, m2, m3, m4, m5)
 # Phase 6 lets add random slopes by species
 
 m6 <- glmmTMB(
-  c_buzz ~ trmt_bin + jday_s + I(jday_s^2) + nit_avg_wspm_s + nit_avg_temp_c_s + avg_moonlight_s + elev_max + yr_s +
-    + t_lepidoptera_s +
+  c_buzz ~ trmt_bin + jday_s + I(jday_s^2) + nit_avg_wspm_s_s + nit_avg_temp_c_s + avg_moonlight_s + elev_max_s + yr_s +
+    + t_leps_s +
     (1 | site)+ (1 | sp) +
     #interactions
-    trmt_bin*t_lepidoptera_s,
+    trmt_bin*t_leps_s,
   family = nbinom2,
   data = rob_db
 )
 
 check_singularity(m6)
+m6$sdr$pdHess
+m6$fit$message
 check_zeroinflation(m6)
-calculate_c_hat(m6)  # indicates the is overdispersion we need to try negative binomial.  
+calculate_c_hat(m6)  #  
 performance_mae(m6)
 range(rob_db$c_buzz)
 hist(rob_db$c_buzz, breaks = 100 )
@@ -262,11 +277,11 @@ anova(m0, m1, m2, m3, m4, m5, m6)
 
 # phase 7 lets add random slopes by species and site
 m7 <- glmmTMB(
-  c_buzz ~ trmt_bin + jday_s + I(jday_s^2) + nit_avg_wspm_s + nit_avg_temp_c_s + avg_moonlight_s + elev_max + yr_s +
-    + t_lepidoptera_s +
+  c_buzz ~ trmt_bin + jday_s + I(jday_s^2) + nit_avg_wspm_s_s + nit_avg_temp_c_s + avg_moonlight_s + elev_max_s + yr_s +
+    + t_leps_s +
     (1 | site)+ (1 + trmt_bin | sp) +
     #interactions
-    trmt_bin*t_lepidoptera_s,
+    trmt_bin*t_leps_s,
   family = nbinom2,
   data = rob_db
 )
@@ -291,37 +306,39 @@ anova(m0, m1, m2, m3, m4, m5, m6, m7)
 
 # seasonality inside the random slope 
 # the model breaks if we add seasonality inside the random slopes this.
-
+# 
 # m8<- glmmTMB(
-#   c_buzz ~ trmt_bin + jday_s + I(jday_s^2) + nit_avg_wspm_s + nit_avg_temp_c_s + avg_moonlight_s + elev_max + yr_s +
-#     + t_lepidoptera_s +
+#   c_buzz ~ trmt_bin + jday_s + I(jday_s^2) + nit_avg_wspm_s_s + nit_avg_temp_c_s + avg_moonlight_s + elev_max_s + yr_s +
+#     + t_leps_s +
 #     (1 | site)+ (1 + trmt_bin + jday_s + I(jday_s^2)| sp) +
 #     #interactions
-#     trmt_bin*t_lepidoptera_s,
+#     trmt_bin*t_leps_s,
 #   family = nbinom2,
 #   data = rob_db
 # )
-# 
+# #
 # check_singularity(m8)
+# m8$sdr$pdHess
+# m8$fit$message
 # check_zeroinflation(m8)
-# calculate_c_hat(m8)   
+# calculate_c_hat(m8)
 # performance_mae(m8)
 # range(rob_db$c_buzz)
 # hist(rob_db$c_buzz, breaks = 100 )
 # performance::r2(m8)
 # DHARMa::simulateResiduals(m8, n = 1000, plot = TRUE)
 # summary(m8)
-
-# anova(m0, m1, m2, m3, m4, m5, m6, m7, )
+# 
+# anova(m0, m1, m2, m3, m4, m5, m6, m7, m8)
 
 # let's check what happens if we check for interaction between treatment and seasonality
 
 m9 <- glmmTMB(
-  c_buzz ~ trmt_bin + jday_s + I(jday_s^2) + nit_avg_wspm_s + nit_avg_temp_c_s + avg_moonlight_s + elev_max + yr_s +
-    + t_lepidoptera_s +
+  c_buzz ~ trmt_bin + jday_s + I(jday_s^2) + nit_avg_wspm_s_s + nit_avg_temp_c_s + avg_moonlight_s + elev_max_s + yr_s +
+    + t_leps_s +
     (1 | site)+ (1 + trmt_bin | sp) +
     #interactions
-    trmt_bin*t_lepidoptera_s + trmt_bin*jday_s + trmt_bin*I(jday_s^2),
+    trmt_bin*t_leps_s + trmt_bin*jday_s + trmt_bin*I(jday_s^2),
   family = nbinom2,
   data = rob_db
 )
@@ -346,11 +363,11 @@ anova( m1, m2, m3, m4, m5, m6, m7, m9)
 #now we add the moon interaction with treatment 
 
 m10<- glmmTMB(
-  c_buzz ~ trmt_bin + jday_s + I(jday_s^2) + nit_avg_wspm_s + nit_avg_temp_c_s + avg_moonlight_s + elev_max + yr_s +
-    + t_lepidoptera_s +
+  c_buzz ~ trmt_bin + jday_s + I(jday_s^2) + nit_avg_wspm_s_s + nit_avg_temp_c_s + avg_moonlight_s + elev_max_s + yr_s +
+    + t_leps_s +
     (1 | site)+ (1 + trmt_bin | sp) +
     #interactions
-    trmt_bin*t_lepidoptera_s + trmt_bin*jday_s + trmt_bin*I(jday_s^2) + trmt_bin*avg_moonlight_s,
+    trmt_bin*t_leps_s + trmt_bin*jday_s + trmt_bin*I(jday_s^2) + trmt_bin*avg_moonlight_s,
   family = nbinom2,
   data = rob_db
 ) 
@@ -375,7 +392,7 @@ anova( m1, m2, m3, m4, m5, m6, m7, m9, m10)
 # 
 
 m11 <- glmmTMB(
-  c_buzz ~ trmt_bin + jday_s + I(jday_s^2) + nit_avg_wspm_s + nit_avg_temp_c_s + avg_moonlight_s + elev_max + yr_s   +t_lepidoptera_s +
+  c_buzz ~ trmt_bin + jday_s + I(jday_s^2) + nit_avg_wspm_s_s + nit_avg_temp_c_s + avg_moonlight_s + elev_max_s + yr_s   + t_leps_s +
     (1 | site) + (1 + trmt_bin | sp) +
     #interactions
     trmt_bin * jday_s + trmt_bin * I(jday_s^2) + trmt_bin * avg_moonlight_s,
@@ -402,55 +419,84 @@ anova( m1, m2, m3, m4, m5, m6, m7, m9, m10, m11) # results indicate that the mod
 # Marginal effects  -------------------------------------------------------
 
 
-# model mm11 --------------------------------------------------------------
+# model m11 --------------------------------------------------------------
 
 
-# Lookup table: species code -> pretty label
+library(dplyr)
+library(ggplot2)
+library(marginaleffects)
+library(tidyr)
+
+# -------------------------
+# 1. Species IDs to exclude
+# -------------------------
+drop_ids <- c("hilo", "hif", "hifrag", "lof", "mysp", "euma", "pahe")
+
+# -------------------------
+# 2. Lookup table
+# rob_db already has sp_label
+# -------------------------
 sp_lookup <- rob_db %>%
-  distinct(sp, sp_label)
+  select(sp, sp_label) %>%
+  distinct()
 
+# keep only species you want
+keep_sp <- sp_lookup %>%
+  filter(!sp %in% drop_ids) %>%
+  pull(sp)
 
+# -------------------------
+# 3. Typical covariate values
+# -------------------------
 typical <- list(
   jday_s = 0,
-  nit_avg_wspm_s = 0,
+  nit_avg_wspm_s_s = 0,
   nit_avg_temp_c_s = 0,
   avg_moonlight_s = 0,
-  t_lepidoptera_s = 0,
-  elev_max = mean(rob_db$elev_max, na.rm = TRUE),
+  t_leps_s = 0,
+  elev_max_s = mean(rob_db$elev_max_s, na.rm = TRUE),
   yr_s = mean(rob_db$yr_s, na.rm = TRUE)
 )
 
+# -------------------------
+# 4. Community-level predictions
+# -------------------------
 pred_comm <- predictions(
   m11,
   newdata = datagrid(
-    trmt_bin = c(0, 1),
+    trmt_bin = c(-1, 1),
     jday_s = typical$jday_s,
-    nit_avg_wspm_s = typical$nit_avg_wspm_s,
+    nit_avg_wspm_s_s = typical$nit_avg_wspm_s_s,
     nit_avg_temp_c_s = typical$nit_avg_temp_c_s,
     avg_moonlight_s = typical$avg_moonlight_s,
-    t_lepidoptera_s = typical$t_lepidoptera_s,
-    elev_max = typical$elev_max,
+    t_leps_s = typical$t_leps_s,
+    elev_max_s = typical$elev_max_s,
     yr_s = typical$yr_s
   ),
   type = "response",
   re.form = NA
 ) %>%
   mutate(
-    trmt = factor(trmt_bin, levels = c(0, 1), labels = c("Dark", "Lit")),
+    trmt = factor(trmt_bin, levels = c(-1, 1), labels = c("Dark", "Lit")),
     panel = "Community"
   )
 
+# -------------------------
+# 5. Species-level predictions
+# predictions() returns sp, but not sp_label
+# so join sp_lookup AFTER prediction
+# -------------------------
 pred_sp <- predictions(
   m11,
   newdata = datagrid(
-    sp = sort(unique(rob_db$sp)),
-    trmt_bin = c(0, 1),
+    sp = sort(unique(rob_db$sp[rob_db$sp %in% keep_sp])),
+    trmt_bin = c(-1, 1),
     jday_s = typical$jday_s,
-    nit_avg_wspm_s = typical$nit_avg_wspm_s,
+    nit_avg_wspm_s_s = typical$nit_avg_wspm_s_s,
     nit_avg_temp_c_s = typical$nit_avg_temp_c_s,
     avg_moonlight_s = typical$avg_moonlight_s,
-    t_lepidoptera_s = typical$t_lepidoptera_s,
-    elev_max = typical$elev_max,
+    t_leps_s = typical$t_leps_s,
+    elev_max_s = typical$elev_max_s,
     yr_s = typical$yr_s
   ),
   type = "response",
@@ -458,94 +504,115 @@ pred_sp <- predictions(
 ) %>%
   left_join(sp_lookup, by = "sp") %>%
   mutate(
-    trmt = factor(trmt_bin, levels = c(0, 1), labels = c("Dark", "Lit")),
+    trmt = factor(trmt_bin, levels = c(-1, 1), labels = c("Dark", "Lit")),
     panel = if_else(is.na(sp_label), sp, sp_label)
   )
 
+# -------------------------
+# 6. Order panels by treatment effect
+# -------------------------
+panel_order <- pred_sp %>%
+  select(panel, trmt, estimate) %>%
+  pivot_wider(names_from = trmt, values_from = estimate) %>%
+  mutate(light_effect = Lit - Dark) %>%
+  arrange(desc(light_effect)) %>%
+  pull(panel)
+
+panel_levels <- c("Community", panel_order)
+
+# -------------------------
+# 7. Combine predictions
+# -------------------------
 pred_all <- bind_rows(
   pred_comm %>% select(panel, trmt, estimate, conf.low, conf.high),
-  pred_sp   %>% select(panel, trmt, estimate, conf.low, conf.high)
-)
+  pred_sp %>% select(panel, trmt, estimate, conf.low, conf.high)
+) %>%
+  mutate(panel = factor(panel, levels = panel_levels))
 
+# -------------------------
+# 8. Raw data for plotting
+# rob_db already has sp_label, so DO NOT join again
+# -------------------------
 raw_sp <- rob_db %>%
+  filter(sp %in% keep_sp) %>%
   mutate(
-    trmt = factor(trmt_bin, levels = c(0, 1), labels = c("Dark", "Lit")),
+    trmt = factor(trmt_bin, levels = c(-1, 1), labels = c("Dark", "Lit")),
     panel = if_else(is.na(sp_label), sp, sp_label)
   )
 
 raw_comm <- rob_db %>%
   mutate(
-    trmt = factor(trmt_bin, levels = c(0, 1), labels = c("Dark", "Lit")),
+    trmt = factor(trmt_bin, levels = c(-1, 1), labels = c("Dark", "Lit")),
     panel = "Community"
   )
 
 raw_all <- bind_rows(
   raw_comm %>% select(panel, trmt, c_buzz),
-  raw_sp   %>% select(panel, trmt, c_buzz)
-)
-
-panel_levels <- c("Community", sort(unique(raw_sp$panel)))
-
-pred_all <- pred_all %>%
+  raw_sp %>% select(panel, trmt, c_buzz)
+) %>%
   mutate(panel = factor(panel, levels = panel_levels))
 
-raw_all <- raw_all %>%
-  mutate(panel = factor(panel, levels = panel_levels))
-
-
+# -------------------------
+# 9. Plot
+# -------------------------
 p_trmt_m11 <- ggplot() +
   geom_jitter(
     data = raw_all,
     aes(x = trmt, y = c_buzz),
-    width = 0.12, height = 0,
-    alpha = 0.18, size = 0.9
-  ) +
-  geom_point(
-    data = pred_all,
-    aes(x = trmt, y = estimate),
-    size = 2
-  ) +
-  geom_errorbar(
-    data = pred_all,
-    aes(x = trmt, y = estimate, ymin = conf.low, ymax = conf.high),
-    width = 0.08,
-    linewidth = 0.5
+    width = 0.08, height = 0,
+    alpha = 0.08, size = 0.7
   ) +
   geom_line(
     data = pred_all,
     aes(x = trmt, y = estimate, group = 1),
-    linewidth = 0.6
+    linewidth = 0.5
   ) +
-  facet_wrap(~ panel, scales = "free_y") +
+  geom_point(
+    data = pred_all,
+    aes(x = trmt, y = estimate),
+    size = 1.8
+  ) +
+  geom_errorbar(
+    data = pred_all,
+    aes(x = trmt, ymin = conf.low, ymax = conf.high),
+    width = 0.06,
+    linewidth = 0.4
+  ) +
+  facet_wrap(~ panel, scales = "free_y", ncol = 4) +
   scale_y_continuous(trans = "log1p") +
   labs(
     x = "Treatment",
-    y = "Feeding buzzes",
-    title = "Marginal effect of treatment on feeding buzzes"
+    y = "Predicted feeding buzzes",
+    title = "Effect of artificial light on feeding buzz activity"
   ) +
-  theme_minimal(base_size = 13) +
+  theme_minimal(base_size = 12) +
   theme(
     legend.position = "none",
     axis.text.x = element_text(angle = 45, hjust = 1),
-    strip.text = element_text(size = 10),
+    strip.text = element_text(size = 9),
     plot.title = element_text(hjust = 0.5)
   )
 
 p_trmt_m11
 
-
 ggsave(
-  p_trmt_m11,
-  filename = "figures/rob_spkr_model/marginal_effects_trmt_m11.png",
-  width = 8,
-  height = 6,
-  dpi = 300
+  filename = "figures/rob_spkr_model/robomoth_light.tiff",
+  plot = p_trmt_m11,
+  width = 18,   # adjust width
+  height = 15,   # adjust height
+  dpi = 300,    # publication quality
+  units = "cm", # inches
+  device = "tiff",
+  compression = "lzw"  # smaller file size
 )
 
 
 # marginal effects for the jday
 
-# sequence across observed range
+sdjday<- sd(rob_db$jday, na.rm = TRUE)          # raw SD of temp_c (ignoring NAs)
+meanjday<- mean(rob_db$jday, na.rm = TRUE)  
+
+# sequence across observed scaled range
 j_seq <- seq(
   min(rob_db$jday_s, na.rm = TRUE),
   max(rob_db$jday_s, na.rm = TRUE),
@@ -554,63 +621,106 @@ j_seq <- seq(
 
 # typical values for other predictors
 typical <- list(
-  nit_avg_wspm_s = 0,
+  nit_avg_wspm_s_s = 0,
   nit_avg_temp_c_s = 0,
   avg_moonlight_s = 0,
-  t_lepidoptera_s = 0,
-  elev_max = mean(rob_db$elev_max, na.rm = TRUE),
+  t_leps_s = 0,
+  elev_max_s = mean(rob_db$elev_max_s, na.rm = TRUE),
   yr_s = mean(rob_db$yr_s, na.rm = TRUE)
 )
 
+# marginal predictions
 pred_jday <- predictions(
   m11,
   newdata = datagrid(
     jday_s = j_seq,
-    trmt_bin = c(0, 1),
-    nit_avg_wspm_s = typical$nit_avg_wspm_s,
+    trmt_bin = c(-1, 1),
+    nit_avg_wspm_s_s = typical$nit_avg_wspm_s_s,
     nit_avg_temp_c_s = typical$nit_avg_temp_c_s,
     avg_moonlight_s = typical$avg_moonlight_s,
-    t_lepidoptera_s = typical$t_lepidoptera_s,
-    elev_max = typical$elev_max,
+    t_leps_s = typical$t_leps_s,
+    elev_max_s = typical$elev_max_s,
     yr_s = typical$yr_s
   ),
   type = "response",
-  re.form = NA   # <-- community-level
+  re.form = NA
 ) %>%
   mutate(
-    trmt = factor(trmt_bin, levels = c(0, 1), labels = c("Dark", "Lit"))
+    trmt = factor(trmt_bin, levels = c(-1, 1), labels = c("Dark", "Lit")),
+    jday = jday_s * (2*sdjday) + meanjday  # back-transform to raw Julian day
   )
 
-p_jday <- ggplot(pred_jday, aes(x = jday_s, y = estimate, color = trmt)) +
-  geom_line(linewidth = 1) +
+# raw data for plotting behind the marginal curves
+raw_jday <- rob_db %>%
+  mutate(
+    trmt = factor(trmt_bin, levels = c(-1, 1), labels = c("Dark", "Lit"))
+  )
+
+# plot
+p_jday_raw <- ggplot() +
+  geom_point(
+    data = raw_jday,
+    aes(x = jday, y = c_buzz, color = trmt ),
+    alpha = 0.50,
+    size = 0.9,
+    position = position_jitter(width = 0.3, height = 0)
+  ) +
   geom_ribbon(
-    aes(ymin = conf.low, ymax = conf.high, fill = trmt),
-    alpha = 0.2,
+    data = pred_jday,
+    aes(x = jday, y = estimate, ymin = conf.low, ymax = conf.high, fill = trmt),
+    alpha = 0.25,
     color = NA
   ) +
+  geom_line(
+    data = pred_jday,
+    aes(x = jday, y = estimate, color = trmt),
+    linewidth = 1.2
+  ) +
+  scale_y_continuous(trans = "log1p") +
   labs(
-    x = "Season (scaled Julian day)",
+    x = "Julian day",
     y = "Predicted feeding buzzes",
     color = "Treatment",
     fill = "Treatment",
-    title = "Seasonal effect on feeding buzzes by light treatment"
+    title = "Seasonal effect of artificial light on feeding buzzes"
   ) +
-  theme_minimal(base_size = 13)
+  theme_minimal(base_size = 13) +
+  theme(
+    plot.title = element_text(hjust = 0.5)
+  )
 
-p_jday
-
+p_jday_raw
 
 ggsave(
-  "figures/rob_spkr_model/p_jday.tiff", # this graph needs to be fixed show average increas (misleading),
+  filename = "figures/rob_spkr_model/p_jday_raw.tiff",
+  plot = p_jday_raw,
   width = 22,
-  height = 15, 
+  height = 15,
   dpi = 600,
   compression = "lzw",
   units = "cm"
 )
 
+pred_diff <- pred_jday %>%
+  select(jday_s, trmt, estimate) %>%
+  tidyr::pivot_wider(names_from = trmt, values_from = estimate) %>%
+  mutate(diff_lit_dark = Lit - Dark)
 
-# effect of night average temp
+ggplot(pred_diff, aes(x = jday_s, y = diff_lit_dark)) +
+  geom_line(linewidth = 1) +
+  geom_hline(yintercept = 0, linetype = 2) +
+  labs(
+    x = "Season (scaled Julian day)",
+    y = "Difference in predicted feeding buzzes (Lit - Dark)",
+    title = "Seasonal change in the treatment effect of light"
+  ) +
+  theme_bw(base_size = 13)
+
+
+
+
+# effect of night average wind speed
+
 
 # sequence across observed range
 wspm_seq <- seq(
