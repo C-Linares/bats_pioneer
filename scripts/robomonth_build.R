@@ -69,6 +69,11 @@ read_buzz_file <- function(file, year) {
     )
 }
 
+
+
+# robomoth data -----------------------------------------------------------
+
+
 # read 2021 
 
 robomoth_2021 <- read_buzz_file(path_2021, 2021)
@@ -527,7 +532,7 @@ str(spkr_all)
 
 unique(spkr_all$sp_clean)
 
-## i looks like the rules for multi species work so we replace sp with sp_clean
+## i looks like the rules for multi species work so we replace sp_clean with sp
 spkr_all <- spkr_all %>%
   mutate(sp = sp_clean) %>%
   select(-sp_clean)
@@ -594,8 +599,8 @@ spkr_all <- spkr_all %>%
 spkr_all <- spkr_all %>%
   mutate(
     manual_buzz_count = if_else(
-      auto_buzz_count == "0" & !is.na(sp_clean),
-      "0",
+      auto_buzz_count == 0 & !is.na(sp),
+      0,
       manual_buzz_count
     )
   )
@@ -635,7 +640,7 @@ spkr_all <- spkr_all %>%
 
 
 unique(spkr_all$site)
-
+summary(spkr_all)
 
 
 # explore data ------------------------------------------------------------
