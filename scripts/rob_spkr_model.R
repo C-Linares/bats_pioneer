@@ -392,7 +392,7 @@ anova( m1, m2, m3, m4, m5, m6, m7, m9, m10)
 # 
 
 m11 <- glmmTMB(
-  c_buzz ~ trmt_bin + jday_s + I(jday_s^2) + nit_avg_wspm_s_s + nit_avg_temp_c_s + avg_moonlight_s + elev_max_s + yr_s   + t_leps_s +
+  c_buzz ~ trmt_bin + jday_s + I(jday_s^2) + nit_avg_wspm_s_s  + avg_moonlight_s + elev_max_s + yr_s   + t_leps_s +
     (1 | site) + (1 + trmt_bin | sp) +
     #interactions
     trmt_bin * jday_s + trmt_bin * I(jday_s^2) + trmt_bin * avg_moonlight_s,
@@ -552,12 +552,16 @@ raw_all <- bind_rows(
 ) %>%
   mutate(panel = factor(panel, levels = panel_levels))
 
+# we don't need all the poits we can do a subset 
+
+raw_all_sub <- raw_all %>% sample_frac(0.25)
+
 # -------------------------
 # 9. Plot
 # -------------------------
 p_trmt_m11 <- ggplot() +
   geom_jitter(
-    data = raw_all,
+    data = raw_all_sub,
     aes(x = trmt, y = c_buzz),
     width = 0.08, height = 0,
     alpha = 0.08, size = 0.7
@@ -583,14 +587,16 @@ p_trmt_m11 <- ggplot() +
   labs(
     x = "Treatment",
     y = "Predicted feeding buzzes",
-    title = "Effect of artificial light on feeding buzz activity"
+    title = ""
   ) +
   theme_minimal(base_size = 12) +
   theme(
     legend.position = "none",
-    axis.text.x = element_text(angle = 45, hjust = 1),
-    strip.text = element_text(size = 9),
-    plot.title = element_text(hjust = 0.5)
+    axis.title = element_text(size = 12),
+    axis.text  = element_text(size = 12),
+    plot.title = element_text(size = 12),
+    strip.text = element_text(size = 11),
+    text = element_text(family = "serif")
   )
 
 p_trmt_m11
@@ -655,13 +661,15 @@ raw_jday <- rob_db %>%
   mutate(
     trmt = factor(trmt_bin, levels = c(-1, 1), labels = c("Dark", "Lit"))
   )
+# I dont't need all the raw points for the plot just a fraction 
+raw_jday_sub <- raw_jday %>% sample_frac(0.25)
 
 # plot
 p_jday_raw <- ggplot() +
   geom_point(
-    data = raw_jday,
-    aes(x = jday, y = c_buzz, color = trmt ),
-    alpha = 0.50,
+    data = raw_jday_sub,
+    aes(x = jday, y = c_buzz ),
+    alpha = 0.20,
     size = 0.9,
     position = position_jitter(width = 0.3, height = 0)
   ) +
@@ -676,6 +684,8 @@ p_jday_raw <- ggplot() +
     aes(x = jday, y = estimate, color = trmt),
     linewidth = 1.2
   ) +
+  scale_color_manual(values = c("Dark" = "grey20", "Lit" = "grey70")) +
+  scale_fill_manual(values = c("Dark" = "grey20", "Lit" = "grey70"))+
   scale_y_continuous(trans = "log1p") +
   labs(
     x = "Julian day",
@@ -722,54 +732,103 @@ ggplot(pred_diff, aes(x = jday_s, y = diff_lit_dark)) +
 # effect of night average wind speed
 
 
-# sequence across observed range
-wspm_seq <- seq(
-  min(rob_db$nit_avg_wspm_s, na.rm = TRUE),
-  max(rob_db$nit_avg_wspm_s, na.rm = TRUE),
+# back transform wind
+
+w_seq <- seq(
+  min(rob_db$nit_avg_wspm_s_s, na.rm = TRUE),
+  max(rob_db$nit_avg_wspm_s_s, na.rm = TRUE),
   length.out = 100
 )
 
+sd_wind <- sd(rob_db$nit_avg_wspm_s, na.rm = TRUE)
+mean_wind <- mean(rob_db$nit_avg_wspm_s, na.rm = TRUE)
+
 typical <- list(
+  jday_s = 0,
+  nit_avg_temp_c_s = 0,
   avg_moonlight_s = 0,
-  t_lepidoptera_s = 0,
-  elev_max = mean(rob_db$elev_max, na.rm = TRUE),
+  t_leps_s = 0,
+  elev_max_s = mean(rob_db$elev_max_s, na.rm = TRUE),
   yr_s = mean(rob_db$yr_s, na.rm = TRUE)
 )
 
-pred_wspm <- predictions(
+pred_wind <- predictions(
   m11,
   newdata = datagrid(
-    nit_avg_wspm_s = wspm_seq,
-    trmt_bin = mean(c(0, 1)),  # average treatment effect
-    jday_s = 0,
-    nit_avg_temp_c_s = 0,
+    nit_avg_wspm_s_s = w_seq,
+    trmt_bin = 1,   # or -1 (doesn't matter — no interaction)
+    jday_s = typical$jday_s,
+    nit_avg_temp_c_s = typical$nit_avg_temp_c_s,
     avg_moonlight_s = typical$avg_moonlight_s,
-    t_lepidoptera_s = typical$t_lepidoptera_s,
-    elev_max = typical$elev_max,
+    t_leps_s = typical$t_leps_s,
+    elev_max_s = typical$elev_max_s,
     yr_s = typical$yr_s
   ),
   type = "response",
   re.form = NA
 ) %>%
   mutate(
-    trmt = factor(trmt_bin, levels = c(0, 1), labels = c("Dark", "Lit"))
+    wind = nit_avg_wspm_s_s * (2 * sd_wind) + mean_wind
   )
 
+raw_wind <- rob_db
 
-ggplot(pred_wspm, aes(x = nit_avg_wspm_s, y = estimate)) +
-  geom_line(linewidth = 1) +
-  geom_ribbon(aes(ymin = conf.low, ymax = conf.high), alpha = 0.2, color = NA) +
-  labs(
-    x = "Wind speed (scaled)",
-    y = "Predicted feeding buzzes",
-    color = "Treatment",
-    fill = "Treatment",
-    title = "Marginal effect of wind speed on feeding buzzes"
+raw_wind_sub <- rob_db %>%
+  group_by(trmt_bin) %>%
+  slice_sample(prop = 0.15) %>%
+  ungroup()
+
+
+p_wind <- ggplot() +
+  geom_point(
+    data = raw_wind_sub,
+    aes(x = nit_avg_wspm_s, y = c_buzz),
+    alpha = 0.05,
+    size = 0.5,
+    color = "grey40",
+    position = position_jitter(width = 0.1, height = 0)
   ) +
-  theme_minimal(base_size = 13)
+  geom_ribbon(
+    data = pred_wind,
+    aes(x = wind, ymin = conf.low, ymax = conf.high),
+    fill = "grey70",
+    alpha = 0.3
+  ) +
+  geom_line(
+    data = pred_wind,
+    aes(x = wind, y = estimate),
+    color = "black",
+    linewidth = 1.2
+  ) +
+  scale_y_continuous(trans = scales::pseudo_log_trans(base = 10)) +
+  labs(
+    x = "Nightly average wind speed (m/s)",
+    y = "Feeding buzzes",
+    title = ""
+  ) +
+  theme_minimal(base_size = 13) +
+  theme(
+    plot.title = element_text(hjust = 0.5)
+  )
+
+p_wind
+
+ggsave(
+  "figures/rob_spkr_model/p_wind.tiff",
+  plot = p_wind,
+  width = 22,
+  height = 15,
+  dpi = 600,
+  compression = "lzw",
+  units = "cm"
+)
 
 
 # moon marginal effect 
+# 
+# for unsealing predictor 
+sd_moon <- sd(rob_db$avg_moonlight, na.rm = TRUE)
+mean_moon <- mean(rob_db$avg_moonlight, na.rm = TRUE)
 
 moon_seq <- seq(
   min(rob_db$avg_moonlight_s, na.rm = TRUE),
@@ -777,12 +836,14 @@ moon_seq <- seq(
   length.out = 100
 )
 
+
+
 typical <- list(
   jday_s = 0,
-  nit_avg_wspm_s = 0,
+  nit_avg_wspm_s_s = 0,
   nit_avg_temp_c_s = 0,
-  t_lepidoptera_s = 0,
-  elev_max = mean(rob_db$elev_max, na.rm = TRUE),
+  t_leps_s = 0,
+  elev_max_s = mean(rob_db$elev_max_s, na.rm = TRUE),
   yr_s = mean(rob_db$yr_s, na.rm = TRUE)
 )
 
@@ -790,38 +851,71 @@ pred_moon <- predictions(
   m11,
   newdata = datagrid(
     avg_moonlight_s = moon_seq,
-    trmt_bin = c(0, 1),
+    trmt_bin = c(-1, 1),
     jday_s = typical$jday_s,
-    nit_avg_wspm_s = typical$nit_avg_wspm_s,
+    nit_avg_wspm_s_s = typical$nit_avg_wspm_s_s,
     nit_avg_temp_c_s = typical$nit_avg_temp_c_s,
-    t_lepidoptera_s = typical$t_lepidoptera_s,
-    elev_max = typical$elev_max,
+    t_leps_s = typical$t_leps_s,
+    elev_max_s = typical$elev_max_s,
     yr_s = typical$yr_s
   ),
   type = "response",
   re.form = NA
 ) %>%
   mutate(
-    trmt = factor(trmt_bin, levels = c(0, 1), labels = c("Dark", "Lit"))
+    trmt = factor(trmt_bin, levels = c(-1, 1), labels = c("Dark", "Lit")),
+    moon_raw = avg_moonlight_s * (2 * sd_moon) + mean_moon
   )
 
-p_moon <- ggplot(pred_moon, aes(x = avg_moonlight_s, y = estimate, color = trmt, fill = trmt)) +
-  geom_line(linewidth = 1) +
-  geom_ribbon(aes(ymin = conf.low, ymax = conf.high), alpha = 0.2, color = NA) +
+
+
+raw_moon <- rob_db %>%
+  mutate(
+    trmt = factor(trmt_bin, levels = c(-1, 1), labels = c("Dark", "Lit"))
+  )
+raw_moon_sub <- rob_db %>%
+  group_by(trmt_bin) %>%
+  slice_sample(prop = 0.15) %>%
+  ungroup()
+
+p_moon <- ggplot() +
+  geom_point(
+    data = raw_moon_sub,
+    aes(x = avg_moonlight, y = c_buzz),
+    alpha = 0.05,
+    size = 1,
+    color = "grey40"
+  ) +
+  geom_ribbon(
+    data = pred_moon,
+    aes(x = moon_raw, ymin = conf.low, ymax = conf.high, fill = trmt),
+    alpha = 0.2,
+    color = NA
+  ) +
+  geom_line(
+    data = pred_moon,
+    aes(x = moon_raw, y = estimate, color = trmt),
+    linewidth = 1.1
+  ) +
+  scale_color_manual(values = c("Dark" = "grey20", "Lit" = "grey70")) +
+  scale_fill_manual(values = c("Dark" = "grey20", "Lit" = "grey70")) +
+  scale_y_continuous(trans = scales::pseudo_log_trans(base = 10)) +
   labs(
-    x = "Moonlight (scaled)",
-    y = "Predicted feeding buzzes",
+    x = "Average moonlight",
+    y = "Feeding buzzes",
     color = "Treatment",
     fill = "Treatment",
     title = "Marginal effect of moonlight on feeding buzzes"
   ) +
-  theme_minimal(base_size = 13)
+  theme_minimal(base_size = 13) +
+  theme(
+    plot.title = element_text(hjust = 0.5)
+  )
 
 p_moon
 
-
 ggsave(
-  "figures/rob_spkr_model/p_moon.tiff", # this graph needs to be fixed show average increas (misleading),
+  "figures/rob_spkr_model/p_moon.tiff", 
   width = 22,
   height = 15, 
   dpi = 600,
@@ -832,79 +926,138 @@ ggsave(
 
 # Marginal effects plot for year
 
-yr_seq <- seq(
-  min(rob_db$yr_s, na.rm = TRUE),
-  max(rob_db$yr_s, na.rm = TRUE),
-  length.out = 100
-)
-
+# typical values for the other predictors
 typical <- list(
   jday_s = 0,
-  nit_avg_wspm_s = 0,
+  nit_avg_wspm_s_s = 0,
   nit_avg_temp_c_s = 0,
   avg_moonlight_s = 0,
-  t_lepidoptera_s = 0,
-  elev_max = mean(rob_db$elev_max, na.rm = TRUE)
+  t_leps_s = 0,
+  elev_max_s = mean(rob_db$elev_max_s, na.rm = TRUE)
 )
 
-pred_year_disc <- predictions(
+# marginal predictions for year by treatment
+p_year <- predictions(
   m11,
   newdata = datagrid(
-    yr_s = c(-1, 1),
-    trmt_bin = 0.5,
-    jday_s = 0,
-    nit_avg_wspm_s = 0,
-    nit_avg_temp_c_s = 0,
-    avg_moonlight_s = 0,
-    t_lepidoptera_s = 0,
-    elev_max = mean(rob_db$elev_max, na.rm = TRUE)
+    yr_s = c(-1, 1),          # 2021 = -1, 2022 = 1
+    trmt_bin = c(-1, 1),      # Dark vs Lit
+    jday_s = typical$jday_s,
+    nit_avg_wspm_s_s = typical$nit_avg_wspm_s_s,
+    nit_avg_temp_c_s = typical$nit_avg_temp_c_s,
+    avg_moonlight_s = typical$avg_moonlight_s,
+    t_leps_s = typical$t_leps_s,
+    elev_max_s = typical$elev_max_s
   ),
   type = "response",
   re.form = NA
 ) %>%
   mutate(
-    year = factor(yr_s, levels = c(-1, 0, 1),
-                  labels = c("2021", "2022", "2023"))
+    trmt = factor(trmt_bin,
+                  levels = c(-1, 1),
+                  labels = c("Dark", "Lit")
+    ),
+    year = factor(yr_s,
+                  levels = c(-1, 1),
+                  labels = c("2021", "2022")
+    )
   )
 
-ggplot(pred_year_disc, aes(x = year, y = estimate)) +
-  geom_point(size = 2) +
-  geom_errorbar(aes(ymin = conf.low, ymax = conf.high), width = 0.1) +
-  geom_line(aes(group = 1)) +
+plot_year <- ggplot(
+  p_year,
+  aes(x = year, y = estimate, group = trmt, color = trmt)
+) +
+  geom_errorbar(
+    aes(ymin = conf.low, ymax = conf.high),
+    width = 0.1,
+    position = pd,
+    alpha = 0.5,
+    linewidth = 0.7
+  ) +
+  geom_line(
+    position = position_dodge(width = 0.2),
+    linewidth = 1
+  ) +
+  geom_point(
+    size = 3,
+    position = pd
+  ) +
+  scale_color_manual(values = c("Dark" = "grey20", "Lit" = "grey50")) +
   labs(
     x = "Year",
     y = "Predicted feeding buzzes",
-    title = "Marginal effect of year on feeding buzzes"
+    title = "Interannual variation in feeding buzzes by treatment",
+    color = "Treatment"
   ) +
-  theme_minimal(base_size = 13)
-
-raw_year <- rob_db %>%
-  mutate(
-    year = factor(yr_s, levels = c(-1, 0, 1),
-                  labels = c("2021", "2022", "2023"))
+  theme_minimal(base_size = 14) +
+  theme(
+    text = element_text(family = "serif", size = 14),
+    plot.title = element_text(size = 18, face = "bold", hjust = 0.5),
+    axis.title = element_text(size = 18, face = "bold"),
+    axis.text = element_text(size = 13),
+    legend.position = "bottom"
   )
 
-ggplot() +
-  geom_jitter(
-    data = raw_year,
-    aes(x = year, y = c_buzz),
-    alpha = 0.05,
-    width = 0.1
-  ) +
-  geom_point(
-    data = pred_year_disc,
-    aes(x = year, y = estimate),
-    size = 2
-  ) +
-  geom_errorbar(
-    data = pred_year_disc,
-    aes(x = year, ymin = conf.low, ymax = conf.high),
-    width = 0.1
-  ) +
-  labs(
-    x = "Year",
-    y = "Feeding buzzes",
-    title = "Year effect on feeding buzzes"
-  ) +
-  scale_y_continuous(trans = "log1p") +
-  theme_minimal(base_size = 13)
+plot_year
+
+ggsave(
+  "figures/rob_spkr_model/p_year.tiff",
+  plot = plot_year,
+  width = 22,
+  height = 15,
+  dpi = 600,
+  compression = "lzw",
+  units = "cm"
+)
+
+# marginal effects for elevation
+
+sd_elev <- sd(rob_db$elev_max, na.rm = TRUE)
+mean_elev <- mean(rob_db$elev_max, na.rm = TRUE)
+
+pred_elev <- predictions(
+  m11,
+  newdata = datagrid(
+    elev_max_s = seq(
+      min(rob_db$elev_max_s, na.rm = TRUE),
+      max(rob_db$elev_max_s, na.rm = TRUE),
+      length.out = 100
+    ),
+    trmt_bin = c(-1, 1),
+    jday_s = typical$jday_s,
+    nit_avg_wspm_s_s = typical$nit_avg_wspm_s_s,
+    nit_avg_temp_c_s = typical$nit_avg_temp_c_s,
+    avg_moonlight_s = typical$avg_moonlight_s,
+    t_leps_s = typical$t_leps_s,
+    yr_s = typical$yr_s
+  ),
+  type = "response",
+  re.form = NA
+) %>%
+  mutate(
+    trmt = factor(trmt_bin, levels = c(-1, 1), labels = c("Dark", "Lit")),
+    elev_raw = elev_max_s * (2 * sd_elev) + mean_elev
+  )
+
+
+elevation<-ggplot(pred_elev, aes(x = elev_raw, y = estimate, color = trmt)) +
+  geom_ribbon(aes(ymin = conf.low, ymax = conf.high, fill = trmt), alpha = 0.2, color = NA) +
+  geom_line(linewidth = 1.2) +
+  scale_color_manual(values = c("Dark" = "grey20", "Lit" = "grey70")) +
+  scale_fill_manual(values = c("Dark" = "grey20", "Lit" = "grey70")) 
+
+ggsave(
+  "figures/rob_spkr_model/p_elev.tiff",
+  plot = elevation,
+  width = 22,
+  height = 15,
+  dpi = 600,
+  compression = "lzw",
+  units = "cm"
+)
+
+
+#############################################################################################
+#############################################################################################
+ 
+# model for the speaker data 

@@ -898,6 +898,12 @@ I produced several marginal effects plots for the robomoth data.
 
 3/25/2026
 
-I updated the insect predictor from c_bugs to ins_bm, and I have reworked the speakr_all data as it was missing some manual vetting. \
+I updated the insect predictor from c_bugs to ins_bm, and I have reworked the speakr_all data as it was missing some manual vetting.\
 \
 I am updating the models for the robomoth data today. I also updated the treatment so it is dark= -1 and lit = 1
+
+------------------------------------------------------------------------
+
+3/26/2026
+
+I did some marginal effects plots for the bat paper.
