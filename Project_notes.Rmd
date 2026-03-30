@@ -906,4 +906,19 @@ I am updating the models for the robomoth data today. I also updated the treatme
 
 3/26/2026
 
-I did some marginal effects plots for the bat paper.
+I did some marginal effects plots for the bat paper.\
+i removed temp to see if the model m11 changed. I should readd it later
+
+------------------------------------------------------------------------
+
+3/28/2026
+
+keept working on the marginal effects plots
+
+------------------------------------------------------------------------
+
+3/29/2026
+
+I completed the initial set of plots for the spkr model.
+
+created script glmm_v4.R to reanalyze the bat actrivity data. Arrived to model m1.8 as the best model.

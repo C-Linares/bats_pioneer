@@ -77,6 +77,9 @@ rob_db <- rob_db %>%
   )
 
 glimpse(rob_db)
+
+
+
 # models -------------------------------------------------------------------------
 
 # possible model: occurrence of feeding using a binomial variable for those events where there is feeding and when there is no feedin. asks Does light changes the probability of feeding?
@@ -392,7 +395,7 @@ anova( m1, m2, m3, m4, m5, m6, m7, m9, m10)
 # 
 
 m11 <- glmmTMB(
-  c_buzz ~ trmt_bin + jday_s + I(jday_s^2) + nit_avg_wspm_s_s  + avg_moonlight_s + elev_max_s + yr_s   + t_leps_s +
+  c_buzz ~ trmt_bin + jday_s + I(jday_s^2) + nit_avg_wspm_s_s  + nit_avg_temp_c_s + avg_moonlight_s + elev_max_s + yr_s   + t_leps_s +
     (1 | site) + (1 + trmt_bin | sp) +
     #interactions
     trmt_bin * jday_s + trmt_bin * I(jday_s^2) + trmt_bin * avg_moonlight_s,
@@ -1058,6 +1061,1163 @@ ggsave(
 
 
 #############################################################################################
-#############################################################################################
+##################Spkr analysis############################################################
  
 # model for the speaker data 
+
+glimpse(spkr_db)
+
+# correct the treatment variable to be binary -1 to 1
+spkr_db <- spkr_db %>%
+  mutate(trmt_bin = if_else(treatmt == "dark", -1, 1))
+
+m0_sp <- glmmTMB(
+  c_buzz ~ trmt_bin + (1 | site),
+  family = poisson(link = "log"),
+  data = spkr_db
+)
+
+check_singularity(m0_sp)
+m0_sp$sdr$pdHess
+m0_sp$fit$message
+check_zeroinflation(m0_sp)
+calculate_c_hat(m0_sp)   
+performance_mae(m0_sp)
+range(rob_db$c_buzz)
+hist(rob_db$c_buzz, breaks = 100 )
+performance::r2(m0_sp)
+DHARMa::simulateResiduals(m0_sp, n = 1000, plot = TRUE)
+performance::check_collinearity(m0_sp)
+summary(m0_sp)
+
+
+
+m1_sp <- glmmTMB(
+  c_buzz ~ trmt_bin + (1 | site),
+  family = nbinom2,
+  data = spkr_db
+)
+
+
+check_singularity(m1_sp)
+m1_sp$sdr$pdHess
+m1_sp$fit$message
+check_zeroinflation(m1_sp)
+calculate_c_hat(m1_sp)   
+performance_mae(m1_sp)
+range(rob_db$c_buzz)
+hist(rob_db$c_buzz, breaks = 100 )
+performance::r2(m1_sp)
+DHARMa::simulateResiduals(m1_sp, n = 1000, plot = TRUE)
+performance::check_collinearity(m1_sp)
+summary(m1_sp)
+
+anova(m0_sp, m1_sp)
+
+# so negative binomial is better than poisson, now we can add the seasonality
+
+m2_sp <- glmmTMB(
+  c_buzz ~ trmt_bin +
+    jday_s + I(jday_s^2) +
+    (1 | site),
+  family = nbinom2,
+  data = spkr_db
+)
+
+check_singularity(m1_sp)
+m1_sp$sdr$pdHess
+m1_sp$fit$message
+check_zeroinflation(m1_sp)
+calculate_c_hat(m1_sp)   
+performance_mae(m1_sp)
+range(rob_db$c_buzz)
+hist(rob_db$c_buzz, breaks = 100 )
+performance::r2(m1_sp)
+DHARMa::simulateResiduals(m1_sp, n = 1000, plot = TRUE)
+performance::check_collinearity(m1_sp)
+summary(m2_sp)
+anova(m1_sp, m2_sp)
+
+# including seasonality improves the model, light still affects feeding buzzes at speaker lures. likelihood and AIC still indicate the model m2_sp is better. now we try covariates 
+
+
+m3_sp <- glmmTMB(
+  c_buzz ~ trmt_bin +
+    jday_s + I(jday_s^2) +
+    nit_avg_wspm_s_s +
+    nit_avg_temp_c_s +
+    avg_moonlight_s +
+    elev_max_s +
+    yr_s +
+    (1 | site),
+  family = nbinom2,
+  data = spkr_db
+)
+
+m4_sp <- glmmTMB(
+  c_buzz ~ trmt_bin +
+    jday_s + I(jday_s^2) +
+    nit_avg_wspm_s_s +
+    nit_avg_temp_c_s +
+    avg_moonlight_s +
+    elev_max_s +
+    yr_s +
+    t_leps_s +
+    (1 | site),
+  family = nbinom2,
+  data = spkr_db
+)
+
+m5_sp <- glmmTMB(
+  c_buzz ~ trmt_bin +
+    jday_s + I(jday_s^2) +
+    nit_avg_wspm_s_s +
+    nit_avg_temp_c_s +
+    avg_moonlight_s +
+    elev_max_s +
+    yr_s +
+    t_leps_s +
+    (1 | site) +
+    trmt_bin * t_leps_s,
+  family = nbinom2,
+  data = spkr_db
+)
+
+m6_sp <- glmmTMB(
+  c_buzz ~ trmt_bin +
+    jday_s + I(jday_s^2) +
+    nit_avg_wspm_s_s +
+    nit_avg_temp_c_s +
+    avg_moonlight_s +
+    elev_max_s +
+    yr_s +
+    t_leps_s +
+    (1 | site) +
+    (1 | sp),
+  family = nbinom2,
+  data = spkr_db
+)
+
+
+# model with all predictors and no interactions but treatmentr as random slop s by species
+
+m7_sp <- glmmTMB(
+  c_buzz ~ trmt_bin +
+    jday_s + I(jday_s^2) +
+    nit_avg_wspm_s_s +
+    nit_avg_temp_c_s +
+    avg_moonlight_s +
+    elev_max_s +
+    yr_s +
+    t_leps_s +
+    (1 | site) +
+    (1 + trmt_bin | sp),
+  family = nbinom2,
+  data = spkr_db
+)
+
+check_singularity(m7_sp)
+m7_sp$sdr$pdHess
+m7_sp$fit$message
+check_zeroinflation(m7_sp)
+calculate_c_hat(m7_sp)
+performance_mae(m7_sp)
+range(spkr_db$c_buzz)
+hist(spkr_db$c_buzz, breaks = 100)
+performance::r2(m7_sp)
+DHARMa::simulateResiduals(m7_sp, n = 1000, plot = TRUE)
+performance::check_collinearity(m7_sp)
+summary(m7_sp)                            
+
+anova(m1_sp, m2_sp, m3_sp, m4_sp, m5_sp, m6_sp, m7_sp)
+
+
+
+# now we test interactions between treatment and seasonality
+
+m8_sp <- glmmTMB(
+  c_buzz ~ trmt_bin +
+    jday_s + I(jday_s^2) +
+    nit_avg_wspm_s_s +
+    nit_avg_temp_c_s +
+    avg_moonlight_s +
+    elev_max_s +
+    yr_s +
+    t_leps_s +
+    (1 | site) +
+    (1 + trmt_bin | sp) +
+    trmt_bin * jday_s + trmt_bin * I(jday_s^2),
+  family = nbinom2,
+  data = spkr_db
+)
+
+check_singularity(m8_sp)
+m8_sp$sdr$pdHess
+m8_sp$fit$message
+check_zeroinflation(m8_sp)
+calculate_c_hat(m8_sp)
+performance_mae(m8_sp)
+range(spkr_db$c_buzz)
+hist(spkr_db$c_buzz, breaks = 100)
+performance::r2(m8_sp)
+DHARMa::simulateResiduals(m8_sp, n = 1000, plot = TRUE)
+performance::check_collinearity(m8_sp)
+summary(m8_sp)
+anova(m1_sp, m2_sp, m3_sp, m4_sp, m5_sp, m6_sp, m7_sp, m8_sp)
+
+
+# adding interaction with seasonality improves the model. it does increases collinearity of temperature so we might have to remove
+
+# now we check the interaction with moonlight
+
+m9_sp <- glmmTMB(
+  c_buzz ~ trmt_bin +
+    jday_s + I(jday_s^2) +
+    nit_avg_wspm_s_s +
+    nit_avg_temp_c_s +
+    avg_moonlight_s +
+    elev_max_s +
+    yr_s +
+    t_leps_s +
+    (1 | site) +
+    (1 + trmt_bin | sp) +
+    trmt_bin * jday_s + trmt_bin * I(jday_s^2) + trmt_bin * avg_moonlight_s,
+  family = nbinom2,
+  data = spkr_db
+)
+
+check_singularity(m9_sp)
+m9_sp$sdr$pdHess
+m9_sp$fit$message
+check_zeroinflation(m9_sp)
+calculate_c_hat(m9_sp)
+performance_mae(m9_sp)
+range(spkr_db$c_buzz)
+hist(spkr_db$c_buzz, breaks = 100)
+performance::r2(m9_sp)
+DHARMa::simulateResiduals(m9_sp, n = 1000, plot = TRUE)
+performance::check_collinearity(m9_sp)
+summary(m9_sp)
+anova(m1_sp, m2_sp, m3_sp, m4_sp, m5_sp, m6_sp, m7_sp, m8_sp, m9_sp)
+
+
+
+
+# marginal effects  -------------------------------------------------------
+
+
+# species IDs to exclude
+drop_ids <- c("hilo", "hif", "hifrag", "lof", "mysp", "euma", "pahe")
+
+# lookup table
+sp_lookup <- spkr_db %>%
+  select(sp, sp_label) %>%
+  distinct()
+
+# keep only clearly identified species with labels
+keep_sp <- sp_lookup %>%
+  filter(!sp %in% drop_ids, !is.na(sp_label)) %>%
+  pull(sp)
+
+typical <- list(
+  jday_s = 0,
+  nit_avg_wspm_s_s = 0,
+  nit_avg_temp_c_s = 0,
+  avg_moonlight_s = 0,
+  t_leps_s = 0,
+  elev_max_s = mean(spkr_db$elev_max_s, na.rm = TRUE),
+  yr_s = mean(spkr_db$yr_s, na.rm = TRUE)
+)
+
+pred_comm_spkr <- predictions(
+  m9_sp,
+  newdata = datagrid(
+    trmt_bin = c(-1, 1),
+    jday_s = typical$jday_s,
+    nit_avg_wspm_s_s = typical$nit_avg_wspm_s_s,
+    nit_avg_temp_c_s = typical$nit_avg_temp_c_s,
+    avg_moonlight_s = typical$avg_moonlight_s,
+    t_leps_s = typical$t_leps_s,
+    elev_max_s = typical$elev_max_s,
+    yr_s = typical$yr_s
+  ),
+  type = "response",
+  re.form = NA
+) %>%
+  mutate(
+    trmt = factor(trmt_bin, levels = c(-1, 1), labels = c("Dark", "Lit")),
+    panel = "Community"
+  )
+
+
+pred_sp_spkr <- predictions(
+  m9_sp,
+  newdata = datagrid(
+    sp = sort(unique(spkr_db$sp[spkr_db$sp %in% keep_sp])),
+    trmt_bin = c(-1, 1),
+    jday_s = typical$jday_s,
+    nit_avg_wspm_s_s = typical$nit_avg_wspm_s_s,
+    nit_avg_temp_c_s = typical$nit_avg_temp_c_s,
+    avg_moonlight_s = typical$avg_moonlight_s,
+    t_leps_s = typical$t_leps_s,
+    elev_max_s = typical$elev_max_s,
+    yr_s = typical$yr_s
+  ),
+  type = "response",
+  re.form = NULL
+) %>%
+  left_join(sp_lookup, by = "sp") %>%
+  mutate(
+    trmt = factor(trmt_bin, levels = c(-1, 1), labels = c("Dark", "Lit")),
+    panel = sp_label
+  )
+
+panel_order <- pred_sp_spkr %>%
+  select(panel, trmt, estimate) %>%
+  pivot_wider(names_from = trmt, values_from = estimate) %>%
+  mutate(light_effect = Lit - Dark) %>%
+  arrange(desc(light_effect)) %>%
+  pull(panel)
+
+panel_levels <- c("Community", panel_order)
+
+
+pred_all <- bind_rows(
+  pred_comm_spkr %>% select(panel, trmt, estimate, conf.low, conf.high),
+  pred_sp_spkr %>% select(panel, trmt, estimate, conf.low, conf.high)
+) %>%
+  mutate(panel = factor(panel, levels = panel_levels))
+
+
+set.seed(123)
+
+raw_sp_sub <- spkr_db %>%
+  filter(sp %in% keep_sp) %>%
+  mutate(
+    trmt = factor(trmt_bin, levels = c(-1, 1), labels = c("Dark", "Lit")),
+    panel = sp_label
+  ) %>%
+  group_by(panel, trmt) %>%
+  slice_sample(prop = 0.15) %>%
+  ungroup()
+
+raw_comm_sub <- spkr_db %>%
+  mutate(
+    trmt = factor(trmt_bin, levels = c(-1, 1), labels = c("Dark", "Lit")),
+    panel = "Community"
+  ) %>%
+  group_by(trmt) %>%
+  slice_sample(prop = 0.10) %>%
+  ungroup()
+
+raw_all <- bind_rows(
+  raw_comm_sub %>% select(panel, trmt, c_buzz),
+  raw_sp_sub %>% select(panel, trmt, c_buzz)
+) %>%
+  mutate(panel = factor(panel, levels = panel_levels))
+
+p_trmt_spkr <- ggplot() +
+  geom_jitter(
+    data = raw_all,
+    aes(x = trmt, y = c_buzz),
+    width = 0.08,
+    height = 0,
+    alpha = 0.08,
+    size = 0.5,
+    color = "grey45"
+  ) +
+  geom_line(
+    data = pred_all,
+    aes(x = trmt, y = estimate, group = 1, color = trmt),
+    linewidth = 0.7
+  ) +
+  geom_point(
+    data = pred_all,
+    aes(x = trmt, y = estimate, color = trmt),
+    size = 1.8
+  ) +
+  geom_errorbar(
+    data = pred_all,
+    aes(x = trmt, ymin = conf.low, ymax = conf.high, color = trmt),
+    width = 0.06,
+    linewidth = 0.4
+  ) +
+  facet_wrap(~ panel, scales = "free_y", ncol = 4) +
+  scale_color_manual(values = c("Dark" = "grey20", "Lit" = "grey70")) +
+  scale_y_continuous(trans = scales::pseudo_log_trans(base = 10)) +
+  labs(
+    x = "Treatment",
+    y = "Feeding buzzes",
+    color = "Treatment",
+    title = "Effect of artificial light on feeding buzzes in the acoustic lure experiment"
+  ) +
+  theme_minimal(base_size = 13) +
+  theme(
+    plot.title = element_text(hjust = 0.5)
+  )
+
+p_trmt_spkr
+
+
+ggsave(
+  filename = "figures/rob_spkr_model/spkr_light.tiff",
+  plot = p_trmt_spkr,
+  width = 22,
+  height = 15,
+  dpi = 600,
+  compression = "lzw",
+  units = "cm"
+)
+
+
+# the following graph need both the speaker and the robolight data to be plotted together, so both models and predictions need to be ran to work it out.
+
+pred_all_spkr <- bind_rows(
+  pred_comm_spkr %>% select(panel, trmt, estimate, conf.low, conf.high),
+  pred_sp_spkr %>% select(panel, trmt, estimate, conf.low, conf.high)
+) %>%
+  mutate(
+    experiment = "Speaker"
+  )
+
+pred_all_rob <- bind_rows(
+  pred_comm %>% select(panel, trmt, estimate, conf.low, conf.high),
+  pred_sp %>% select(panel, trmt, estimate, conf.low, conf.high)
+) %>%
+  mutate(
+    experiment = "Robomoth"
+  )
+
+shared_panels <- intersect(
+  unique(as.character(pred_all_spkr$panel)),
+  unique(as.character(pred_all_rob$panel))
+)
+
+pred_compare <- bind_rows(pred_all_rob, pred_all_spkr) %>%
+  filter(panel %in% shared_panels)
+
+
+library(dplyr)
+library(tidyr)
+
+panel_order <- pred_compare %>%
+  select(panel, experiment, trmt, estimate) %>%
+  pivot_wider(names_from = trmt, values_from = estimate) %>%
+  mutate(light_effect = Lit - Dark) %>%
+  group_by(panel) %>%
+  summarise(mean_effect = mean(light_effect, na.rm = TRUE), .groups = "drop") %>%
+  arrange(desc(mean_effect)) %>%
+  pull(panel)
+
+panel_levels <- c("Community", setdiff(panel_order, "Community"))
+
+pred_compare <- pred_compare %>%
+  mutate(
+    panel = factor(panel, levels = panel_levels),
+    experiment = factor(experiment, levels = c("Robomoth", "Speaker"))
+  )
+
+library(ggplot2)
+
+pd <- position_dodge(width = 0.18)
+
+p_compare <- ggplot(
+  pred_compare,
+  aes(x = trmt, y = estimate, group = experiment, color = experiment)
+) +
+  geom_errorbar(
+    aes(ymin = conf.low, ymax = conf.high),
+    width = 0.06,
+    linewidth = 0.45,
+    position = pd
+  ) +
+  geom_line(
+    linewidth = 0.7,
+    position = pd
+  ) +
+  geom_point(
+    size = 2,
+    position = pd
+  ) +
+  facet_wrap(~ panel, scales = "free_y", ncol = 4) +
+  scale_color_manual(values = c("Robomoth" = "grey20", "Speaker" = "grey60")) +
+  scale_y_continuous(trans = scales::pseudo_log_trans(base = 10)) +
+  labs(
+    x = "Treatment",
+    y = "Predicted feeding buzzes",
+    color = "Experiment",
+    title = "Treatment effects on feeding buzzes across experiments"
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(
+    legend.position = "bottom",
+    axis.title = element_text(size = 12),
+    axis.text = element_text(size = 11),
+    strip.text = element_text(size = 10),
+    plot.title = element_text(hjust = 0.5),
+    text = element_text(family = "serif")
+  )
+
+p_compare
+
+ggsave(
+  filename = "figures/rob_spkr_model/p_compare.png",
+  plot = p_compare,
+  width = 22,
+  height = 15,
+  dpi = 600,
+  # compression = "lzw",
+  units = "cm"
+)
+
+
+
+# julian day graph 
+
+jday_seq <- seq(
+  min(spkr_db$jday_s, na.rm = TRUE),
+  max(spkr_db$jday_s, na.rm = TRUE),
+  length.out = 100
+)
+
+
+typical <- list(
+  nit_avg_wspm_s_s = 0,
+  nit_avg_temp_c_s = 0,
+  avg_moonlight_s = 0,
+  t_leps_s = 0,
+  elev_max_s = mean(spkr_db$elev_max_s, na.rm = TRUE),
+  yr_s = mean(spkr_db$yr_s, na.rm = TRUE)
+)
+
+pred_jday <- predictions(
+  m9_sp,
+  newdata = datagrid(
+    jday_s = jday_seq,
+    trmt_bin = c(-1, 1),
+    nit_avg_wspm_s_s = typical$nit_avg_wspm_s_s,
+    nit_avg_temp_c_s = typical$nit_avg_temp_c_s,
+    avg_moonlight_s = typical$avg_moonlight_s,
+    t_leps_s = typical$t_leps_s,
+    elev_max_s = typical$elev_max_s,
+    yr_s = typical$yr_s
+  ),
+  type = "response",
+  re.form = NA
+) %>%
+  mutate(
+    trmt = factor(trmt_bin, levels = c(-1, 1), labels = c("Dark", "Lit"))
+  )
+
+mean_jday <- mean(spkr_db$jday, na.rm = TRUE)
+sd_jday   <- sd(spkr_db$jday, na.rm = TRUE)
+
+pred_jday <- pred_jday %>%
+  mutate(
+    jday = jday_s * (2 * sd_jday) + mean_jday
+  )
+
+p_jday <- ggplot(pred_jday,
+                 aes(x = jday, y = estimate, color = trmt, fill = trmt)
+) +
+  geom_ribbon(
+    aes(ymin = conf.low, ymax = conf.high),
+    alpha = 0.2,
+    color = NA
+  ) +
+  geom_line(linewidth = 1) +
+  scale_color_manual(values = c("Dark" = "grey20", "Lit" = "grey70")) +
+  scale_fill_manual(values = c("Dark" = "grey20", "Lit" = "grey70")) +
+  labs(
+    x = "Julian day",
+    y = "Predicted feeding buzzes",
+    color = "Treatment",
+    fill = "Treatment",
+    title = "Seasonal effect of Julian day on feeding buzzes"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(
+    text = element_text(family = "serif"),
+    plot.title = element_text(hjust = 0.5)
+  )
+
+p_jday
+
+
+set.seed(123)
+
+raw_sub <- spkr_db %>%
+  mutate(
+    trmt = factor(trmt_bin, levels = c(-1, 1), labels = c("Dark", "Lit"))
+  ) %>%
+  sample_frac(0.05)
+
+p_jday +
+  geom_point(
+    data = raw_sub,
+    aes(x = jday, y = c_buzz),
+    alpha = 1,
+    size = 0.5,
+    inherit.aes = FALSE
+  )
+
+ggsave(
+  filename = "figures/rob_spkr_model/p_jday_spkr.tiff",
+  plot = p_jday,
+  width = 22,
+  height = 15,
+  dpi = 600,
+  compression = "lzw",
+  units = "cm"
+)
+
+
+
+# moon_light marginal effects plot 
+
+moon_seq <- seq(
+  min(spkr_db$avg_moonlight_s, na.rm = TRUE),
+  max(spkr_db$avg_moonlight_s, na.rm = TRUE),
+  length.out = 100
+)
+
+typical <- list(
+  jday_s = 0,
+  `jday_s^2` = 0,   # optional but not used directly
+  nit_avg_wspm_s_s = 0,
+  nit_avg_temp_c_s = 0,
+  t_leps_s = 0,
+  elev_max_s = mean(spkr_db$elev_max_s, na.rm = TRUE),
+  yr_s = mean(spkr_db$yr_s, na.rm = TRUE)
+)
+
+
+# pred_moon <- predictions(
+#   m9_sp,
+#   newdata = datagrid(
+#     avg_moonlight_s = moon_seq,
+#     trmt_bin = c(-1, 1),
+#     
+#     # main variable held constant
+#     jday_s = typical$jday_s,
+#     `I(jday_s^2)` = typical$jday_s^2,   # 🔴 REQUIRED FIX
+#     
+#     nit_avg_wspm_s_s = typical$nit_avg_wspm_s_s,
+#     nit_avg_temp_c_s = typical$nit_avg_temp_c_s,
+#     t_leps_s = typical$t_leps_s,
+#     elev_max_s = typical$elev_max_s,
+#     yr_s = typical$yr_s,
+#     
+#     # grouping variables (safe to include)
+#     site = unique(spkr_db$site)[1],
+#     sp = unique(spkr_db$sp)[1]
+#   ),
+#   type = "response",
+#   re.form = NA
+# ) %>%
+#   mutate(
+#     trmt = factor(trmt_bin, levels = c(-1, 1), labels = c("Dark", "Lit"))
+#   )
+# 
+
+
+
+pred_moon <- predictions(
+  m9_sp,
+  newdata = datagrid(
+    avg_moonlight_s = moon_seq,
+    trmt_bin = c(-1, 1),
+    jday_s = typical$jday_s,
+    nit_avg_wspm_s_s = typical$nit_avg_wspm_s_s,
+    nit_avg_temp_c_s = typical$nit_avg_temp_c_s,
+    t_leps_s = typical$t_leps_s,
+    elev_max_s = typical$elev_max_s,
+    yr_s = typical$yr_s,
+    site = unique(spkr_db$site)[1],
+    sp = unique(spkr_db$sp)[1]
+  ),
+  type = "response",
+  re.form = NA
+) %>%
+  mutate(
+    trmt = factor(trmt_bin, levels = c(-1, 1), labels = c("Dark", "Lit"))
+  )
+
+mean_moon <- mean(spkr_db$avg_moonlight, na.rm = TRUE)
+sd_moon   <- sd(spkr_db$avg_moonlight, na.rm = TRUE)
+
+pred_moon <- pred_moon %>%
+  mutate(
+    avg_moonlight = avg_moonlight_s * (2 * sd_moon) + mean_moon
+  )
+
+
+
+p_moon <- ggplot(
+  pred_moon,
+  aes(x = avg_moonlight, y = estimate, color = trmt, fill = trmt)
+) +
+  geom_ribbon(
+    aes(ymin = conf.low, ymax = conf.high),
+    alpha = 0.2,
+    color = NA
+  ) +
+  geom_line(linewidth = 1) +
+  scale_color_manual(values = c("Dark" = "grey20", "Lit" = "grey70")) +
+  scale_fill_manual(values = c("Dark" = "grey20", "Lit" = "grey70")) +
+  scale_y_continuous(trans = scales::pseudo_log_trans(base = 10)) +
+  labs(
+    x = "Average moonlight",
+    y = "Predicted feeding buzzes",
+    color = "Treatment",
+    fill = "Treatment",
+    title = "Effect of moonlight on feeding buzzes"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(
+    text = element_text(family = "serif"),
+    plot.title = element_text(hjust = 0.5)
+  )
+
+p_moon
+
+
+set.seed(123)
+
+raw_moon_sub <- spkr_db %>%
+  mutate(
+    trmt = factor(trmt_bin, levels = c(-1, 1), labels = c("Dark", "Lit"))
+  ) %>%
+  sample_frac(0.05)
+
+
+p_moon +
+  geom_point(
+    data = raw_moon_sub,
+    aes(x = avg_moonlight, y = c_buzz),
+    inherit.aes = FALSE,
+    alpha = 0.05,
+    size = 0.5,
+    color = "grey40"
+  )
+
+ggsave(
+  filename = "figures/rob_spkr_model/p_moon_spkr.tiff",
+  plot = p_moon,
+  width = 22,
+  height = 15,
+  dpi = 600,
+  # compression = "lzw",
+  units = "cm"
+)
+
+
+# now we do the marginal effects graph for wind speed. 
+
+
+# sequence across the observed scaled wind range
+wind_seq <- seq(
+  min(spkr_db$nit_avg_wspm_s_s, na.rm = TRUE),
+  max(spkr_db$nit_avg_wspm_s_s, na.rm = TRUE),
+  length.out = 100
+)
+
+# raw wind column is nit_avg_wspm_s (despite the confusing name)
+mean_wind <- mean(spkr_db$nit_avg_wspm_s, na.rm = TRUE)
+sd_wind   <- sd(spkr_db$nit_avg_wspm_s, na.rm = TRUE)
+
+# typical values for the other predictors
+typical <- list(
+  trmt_bin = 0,   # midpoint between Dark (-1) and Lit (1)
+  jday_s = 0,
+  nit_avg_temp_c_s = 0,
+  avg_moonlight_s = 0,
+  t_leps_s = 0,
+  elev_max_s = mean(spkr_db$elev_max_s, na.rm = TRUE),
+  yr_s = mean(spkr_db$yr_s, na.rm = TRUE)
+)
+
+pred_wind <- predictions(
+  m9_sp,
+  newdata = datagrid(
+    nit_avg_wspm_s_s = wind_seq,
+    trmt_bin = typical$trmt_bin,
+    jday_s = typical$jday_s,
+    `I(jday_s^2)` = typical$jday_s^2,
+    nit_avg_temp_c_s = typical$nit_avg_temp_c_s,
+    avg_moonlight_s = typical$avg_moonlight_s,
+    t_leps_s = typical$t_leps_s,
+    elev_max_s = typical$elev_max_s,
+    yr_s = typical$yr_s,
+    site = unique(spkr_db$site)[1],
+    sp = unique(spkr_db$sp)[1]
+  ),
+  type = "response",
+  re.form = NA
+) %>%
+  mutate(
+    wind = nit_avg_wspm_s_s * (2 * sd_wind) + mean_wind
+  )
+
+p_wind <- ggplot(pred_wind, aes(x = wind, y = estimate)) +
+  geom_ribbon(
+    aes(ymin = conf.low, ymax = conf.high),
+    fill = "grey70",
+    alpha = 0.25
+  ) +
+  geom_line(
+    color = "grey20",
+    linewidth = 1
+  ) +
+  # scale_y_continuous(trans = pseudo_log_trans(base = 10)) +
+  labs(
+    x = "Nightly average wind speed (m/s)",
+    y = "Predicted feeding buzzes",
+    title = "Marginal effect of wind speed on feeding buzzes"
+  ) +
+  theme_minimal(base_size = 13) +
+  theme(
+    text = element_text(family = "serif"),
+    plot.title = element_text(hjust = 0.5)
+  )
+
+p_wind
+
+ggsave(
+  filename = "figures/rob_spkr_model/p_wind_spkdr.tiff",
+  plot = p_wind,
+  width = 22,
+  height = 15,
+  dpi = 600,
+  compression = "lzw",
+  units = "cm"
+)
+
+# now the temperature marginal effects plot
+
+
+
+# sequence across the observed scaled temperature range
+temp_seq <- seq(
+  min(spkr_db$nit_avg_temp_c_s, na.rm = TRUE),
+  max(spkr_db$nit_avg_temp_c_s, na.rm = TRUE),
+  length.out = 100
+)
+
+# raw temperature mean and SD
+mean_temp <- mean(spkr_db$nit_avg_temp_c, na.rm = TRUE)
+sd_temp   <- sd(spkr_db$nit_avg_temp_c, na.rm = TRUE)
+
+# typical values for the other predictors
+typical <- list(
+  trmt_bin = 0,   # midpoint between Dark (-1) and Lit (1)
+  jday_s = 0,
+  nit_avg_wspm_s_s = 0,
+  avg_moonlight_s = 0,
+  t_leps_s = 0,
+  elev_max_s = mean(spkr_db$elev_max_s, na.rm = TRUE),
+  yr_s = mean(spkr_db$yr_s, na.rm = TRUE)
+)
+
+pred_temp <- predictions(
+  m9_sp,
+  newdata = datagrid(
+    nit_avg_temp_c_s = temp_seq,
+    trmt_bin = typical$trmt_bin,
+    jday_s = typical$jday_s,
+    `I(jday_s^2)` = typical$jday_s^2,
+    nit_avg_wspm_s_s = typical$nit_avg_wspm_s_s,
+    avg_moonlight_s = typical$avg_moonlight_s,
+    t_leps_s = typical$t_leps_s,
+    elev_max_s = typical$elev_max_s,
+    yr_s = typical$yr_s,
+    site = unique(spkr_db$site)[1],
+    sp = unique(spkr_db$sp)[1]
+  ),
+  type = "response",
+  re.form = NA
+) %>%
+  mutate(
+    temp_c = nit_avg_temp_c_s * (2 * sd_temp) + mean_temp
+  )
+
+
+p_temp <- ggplot(pred_temp, aes(x = temp_c, y = estimate)) +
+  geom_ribbon(
+    aes(ymin = conf.low, ymax = conf.high),
+    fill = "grey70",
+    alpha = 0.25
+  ) +
+  geom_line(
+    color = "grey20",
+    linewidth = 1
+  ) +
+  # scale_y_continuous() +
+  labs(
+    x = "Nightly average temperature (°C)",
+    y = "Predicted feeding buzzes",
+    title = "Marginal effect of temperature on feeding buzzes"
+  ) +
+  theme_minimal(base_size = 13) +
+  theme(
+    text = element_text(family = "serif"),
+    plot.title = element_text(hjust = 0.5)
+  )
+
+p_temp
+
+ggsave(
+  filename = "figures/rob_spkr_model/p_temp_spkr.tiff",
+  plot = p_temp,
+  width = 22,
+  height = 15,
+  dpi = 600,
+  compression = "lzw",
+  units = "cm"
+)
+
+# now the elevation marginal effects plot for the speaker data.
+
+# elevation spkr ----------------------------------------------------------
+
+
+# sequence across the observed scaled elevation range
+elev_seq <- seq(
+  min(spkr_db$elev_max_s, na.rm = TRUE),
+  max(spkr_db$elev_max_s, na.rm = TRUE),
+  length.out = 100
+)
+
+# raw elevation mean and SD
+mean_elev <- mean(spkr_db$elev_max, na.rm = TRUE)
+sd_elev   <- sd(spkr_db$elev_max, na.rm = TRUE)
+
+# typical values for the other predictors
+typical <- list(
+  trmt_bin = 0,
+  jday_s = 0,
+  nit_avg_wspm_s_s = 0,
+  nit_avg_temp_c_s = 0,
+  avg_moonlight_s = 0,
+  t_leps_s = 0,
+  yr_s = mean(spkr_db$yr_s, na.rm = TRUE)
+)
+
+pred_elev <- predictions(
+  m9_sp,
+  newdata = datagrid(
+    elev_max_s = elev_seq,
+    trmt_bin = typical$trmt_bin,
+    jday_s = typical$jday_s,
+    `I(jday_s^2)` = typical$jday_s^2,
+    nit_avg_wspm_s_s = typical$nit_avg_wspm_s_s,
+    nit_avg_temp_c_s = typical$nit_avg_temp_c_s,
+    avg_moonlight_s = typical$avg_moonlight_s,
+    t_leps_s = typical$t_leps_s,
+    yr_s = typical$yr_s,
+    site = unique(spkr_db$site)[1],
+    sp = unique(spkr_db$sp)[1]
+  ),
+  type = "response",
+  re.form = NA
+) %>%
+  mutate(
+    elev_max = elev_max_s * (2 * sd_elev) + mean_elev
+  )
+
+p_elev <- ggplot(pred_elev, aes(x = elev_max, y = estimate)) +
+  geom_ribbon(
+    aes(ymin = conf.low, ymax = conf.high),
+    fill = "grey70",
+    alpha = 0.25
+  ) +
+  geom_line(
+    color = "grey20",
+    linewidth = 1
+  ) +
+  # scale_y_continuous(trans = log1p()) + # this is not working
+  labs(
+    x = "Maximum elevation (m)",
+    y = "Predicted feeding buzzes",
+    title = "Marginal effect of elevation on feeding buzzes"
+  ) +
+  theme_minimal(base_size = 13) +
+  theme(
+    text = element_text(family = "serif"),
+    plot.title = element_text(hjust = 0.5)
+  )
+
+p_elev
+
+ggsave(
+  filename = "figures/rob_spkr_model/p_elev_spkr.tiff",
+  plot = p_elev,
+  width = 22,
+  height = 15,
+  dpi = 600,
+  compression = "lzw",
+  units = "cm"
+)
+
+
+
+# year marginal spkr ------------------------------------------------------
+
+
+# typical values for the other predictors
+typical <- list(
+  trmt_bin = 0,   # midpoint between Dark (-1) and Lit (1)
+  jday_s = 0,
+  nit_avg_wspm_s_s = 0,
+  nit_avg_temp_c_s = 0,
+  avg_moonlight_s = 0,
+  t_leps_s = 0,
+  elev_max_s = mean(spkr_db$elev_max_s, na.rm = TRUE)
+)
+
+pred_year <- predictions(
+  m9_sp,
+  newdata = datagrid(
+    yr_s = c(-1, 1),
+    trmt_bin = typical$trmt_bin,
+    jday_s = typical$jday_s,
+    `I(jday_s^2)` = typical$jday_s^2,
+    nit_avg_wspm_s_s = typical$nit_avg_wspm_s_s,
+    nit_avg_temp_c_s = typical$nit_avg_temp_c_s,
+    avg_moonlight_s = typical$avg_moonlight_s,
+    t_leps_s = typical$t_leps_s,
+    elev_max_s = typical$elev_max_s,
+    site = unique(spkr_db$site)[1],
+    sp = unique(spkr_db$sp)[1]
+  ),
+  type = "response",
+  re.form = NA
+) %>%
+  mutate(
+    year = factor(yr_s, levels = c(-1, 1), labels = c("2022", "2023"))
+  )
+
+p_year <- ggplot(pred_year, aes(x = year, y = estimate, group = 1)) +
+  geom_errorbar(
+    aes(ymin = conf.low, ymax = conf.high),
+    width = 0.08,
+    linewidth = 0.5,
+    color = "grey30"
+  ) +
+  geom_line(
+    linewidth = 0.8,
+    color = "grey30"
+  ) +
+  geom_point(
+    size = 2.5,
+    color = "grey20"
+  ) +
+  scale_y_continuous(trans = scales::pseudo_log_trans(base = 10)) +
+  labs(
+    x = "Year",
+    y = "Predicted feeding buzzes",
+    title = "Marginal effect of year on feeding buzzes"
+  ) +
+  theme_minimal(base_size = 13) +
+  theme(
+    text = element_text(family = "serif"),
+    plot.title = element_text(hjust = 0.5)
+  )
+
+p_year
+
+ggsave(
+  filename = "figures/rob_spkr_model/p_year_spkr.tiff",
+  plot = p_year,
+  width = 22,
+  height = 15,
+  dpi = 600,
+  compression = "lzw",
+  units = "cm"
+)
+
+
+# marginal effects leps spkr ----------------------------------------------
+
+
+# marginal effects for the number of leps in the area.
+
+# sequence across the observed scaled Lepidoptera range
+leps_seq <- seq(
+  min(spkr_db$t_leps_s, na.rm = TRUE),
+  max(spkr_db$t_leps_s, na.rm = TRUE),
+  length.out = 100
+)
+
+# raw Lepidoptera mean and SD
+mean_leps <- mean(spkr_db$t_leps, na.rm = TRUE)
+sd_leps   <- sd(spkr_db$t_leps, na.rm = TRUE)
+
+# typical values for the other predictors
+typical <- list(
+  trmt_bin = 0,   # midpoint between Dark (-1) and Lit (1)
+  jday_s = 0,
+  nit_avg_wspm_s_s = 0,
+  nit_avg_temp_c_s = 0,
+  avg_moonlight_s = 0,
+  elev_max_s = mean(spkr_db$elev_max_s, na.rm = TRUE),
+  yr_s = mean(spkr_db$yr_s, na.rm = TRUE)
+)
+
+pred_leps <- predictions(
+  m9_sp,
+  newdata = datagrid(
+    t_leps_s = leps_seq,
+    trmt_bin = typical$trmt_bin,
+    jday_s = typical$jday_s,
+    `I(jday_s^2)` = typical$jday_s^2,
+    nit_avg_wspm_s_s = typical$nit_avg_wspm_s_s,
+    nit_avg_temp_c_s = typical$nit_avg_temp_c_s,
+    avg_moonlight_s = typical$avg_moonlight_s,
+    elev_max_s = typical$elev_max_s,
+    yr_s = typical$yr_s,
+    site = unique(spkr_db$site)[1],
+    sp = unique(spkr_db$sp)[1]
+  ),
+  type = "response",
+  re.form = NA
+) %>%
+  mutate(
+    t_leps = t_leps_s * (2 * sd_leps) + mean_leps
+  )
+
+p_leps <- ggplot(pred_leps, aes(x = t_leps, y = estimate)) +
+  geom_ribbon(
+    aes(ymin = conf.low, ymax = conf.high),
+    fill = "grey70",
+    alpha = 0.25
+  ) +
+  geom_line(
+    color = "grey20",
+    linewidth = 1
+  ) +
+  scale_y_continuous(trans = scales::pseudo_log_trans(base = 10)) +
+  labs(
+    x = "Lepidoptera abundance",
+    y = "Predicted feeding buzzes",
+    title = "Marginal effect of Lepidoptera abundance on feeding buzzes"
+  ) +
+  theme_minimal(base_size = 13) +
+  theme(
+    text = element_text(family = "serif"),
+    plot.title = element_text(hjust = 0.5)
+  )
+
+p_leps
+
+ggsave(
+  filename = "figures/rob_spkr_model/p_leps_spkr.tiff",
+  plot = p_leps,
+  width = 22,
+  height = 15,
+  dpi = 600,
+  compression = "lzw",
+  units = "cm"
+)
+
+
