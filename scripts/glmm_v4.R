@@ -541,6 +541,8 @@ performance::check_collinearity(m1.8)
 anova( m1.2, m1.3,m1.4,m1.5,m1.6, m1.8)
 summary(m1.8)
 
+gtsummary::tbl_regression(m1.8, exponentiate = TRUE)
+
 # this model seems strong and it show ecologically interesting effects light the treatment cahnging throuhg the years. plus this effect improves the model chisqu 30.6651   pr(chisqu) 3.066e-08 ***
 
 
@@ -574,6 +576,34 @@ summary(m1.9)
 
 # including the lepidoptera does not improve the model so we keep m1.8
 
+
+# runa a model with all the same predictors but with the miller activity index as the response variable.
+
+m1.10<- glmmTMB(
+  #fixed effects
+  activity_min ~ trmt_bin + jday_s + I(jday_s^2) + avg_moonlight_s + nit_avg_temp_c_s +
+    nit_avg_wspm_s_s + yr_s  + t_lepidoptera_s +
+    #random effects
+    (1 | site) + (1 + trmt_bin + jday_s + I(jday_s^2) | sp) +
+    #interactions
+    jday_s * trmt_bin + I(jday_s^2) * trmt_bin + trmt_bin*avg_moonlight_s + trmt_bin*yr_s,  
+  data = bm2,
+  family = nbinom2(link = "log")
+)
+
+check_singularity(m1.10)
+m1.10$sdr$pdHess
+m1.10$fit$message
+check_zeroinflation(m1.10)
+calculate_c_hat(m1.10) 
+performance_mae(m1.10)
+range(bm2$n)
+hist(bm2$n, breaks = 500)
+performance::r2(m1.10)
+DHARMa::simulateResiduals(m1.10, n = 1000, plot = TRUE)
+performance::check_collinearity(m1.10)
+anova( m1.2, m1.3,m1.4,m1.5,m1.6, m1.8, m1.10)
+summary(m1.10)
 
 # marginal effects m1.8 ---------------------------------------------------
 
@@ -681,7 +711,6 @@ p_trmt <- ggplot() +
     title = "Species-specific response of bat activity to artificial light"
   ) +
   scale_y_continuous(trans = "log1p")+
-  
   scale_x_continuous(
     breaks = c(-1, 1),
     labels = c("Dark", "Lit")
@@ -708,10 +737,6 @@ ggsave(
 
 # jday 
 
-library(dplyr)
-library(ggplot2)
-library(marginaleffects)
-library(stringr)
 
 jday_seq <- seq(
   min(bm2$jday_s, na.rm = TRUE),
@@ -761,15 +786,22 @@ p_jday <- ggplot() +
   geom_line(
     data = pred_jday,
     aes(x = jday, y = estimate, color = trmt),
-    linewidth = 1
+    linewidth = 1.2
   ) +
-  facet_wrap(~ sp_label, scales = "free_y") +
+  facet_wrap(~ sp, scales = "free_y") +
   labs(
     x = "Julian day",
     y = "Predicted bat calls",
     color = "Treatment",
     title = "Species-specific seasonal patterns in bat activity"
   ) +
+  scale_color_manual(
+    values = c(
+      "Lit" = "grey70",  # light grey
+      "Dark"  = "grey20"   # darker grey
+    )
+  )+
+  scale_y_continuous(trans = "log1p")+
   theme_minimal() +
   theme(
     strip.text = element_text(size = 8),
@@ -777,6 +809,470 @@ p_jday <- ggplot() +
   )
 
 p_jday
+
+
+ggsave(
+  filename = "figures/glmm_v4/jday_v1.png",
+  plot = p_jday,
+  width = 10,
+  height = 8,
+  dpi = 300
+)
+
+
+# marginal effects of light and moonlight interactions.
+
+
+moon_seq <- seq(
+  min(bm2$avg_moonlight_s, na.rm = TRUE),
+  max(bm2$avg_moonlight_s, na.rm = TRUE),
+  length.out = 100
+)
+
+pred_moon <- predictions(
+  m1.8,
+  newdata = datagrid(
+    avg_moonlight_s = moon_seq,
+    trmt_bin = c(-1, 1),
+    sp = unique(bm2$sp),
+    jday_s = 0,
+    nit_avg_temp_c_s = 0,
+    nit_avg_wspm_s_s = 0,
+    yr_s = 0,
+    t_lepidoptera_s = 0
+  ),
+  type = "response"
+) %>%
+  mutate(
+    trmt = ifelse(trmt_bin == -1, "Dark", "Lit"),
+    sp_label = str_replace(sp, "([A-Z])[A-Z]+([A-Z]+)", "\\1. \\2")
+  )
+
+
+p_moon <- ggplot() +
+  # geom_point(
+  #   data = bm2,
+  #   aes(x = avg_moonlight_s, y = n, color = treatmt.x),
+  #   alpha = 0.08,
+  #   size = 0.6
+  # ) +
+  geom_line(
+    data = pred_moon,
+    aes(x = avg_moonlight_s, y = estimate, color = trmt),
+    linewidth = 1
+  ) +
+  facet_wrap(~ sp, scales = "free_y") +
+  labs(
+    x = "Moonlight (scaled)",
+    y = "Predicted bat calls",
+    color = "Treatment"
+  ) +
+  scale_color_manual(values = c("Lit" = "grey70", "Dark" = "grey20")) +
+  scale_y_continuous(trans = "log1p") +
+  theme_minimal()
+
+p_moon
+
+
+ggsave(
+  filename = "figures/glmm_v4/moon_v1.png",
+  plot = p_moon,
+  width = 10,
+  height = 8,
+  dpi = 300
+)
+
+# now the year interaction 
+
+
+pred_year <- predictions(
+  m1.8,
+  newdata = datagrid(
+    yr_s = c(-1, 0, 1),   # ← include ALL years
+    trmt_bin = c(-1, 1),
+    sp = unique(bm2$sp),
+    jday_s = 0,
+    avg_moonlight_s = 0,
+    nit_avg_temp_c_s = 0,
+    nit_avg_wspm_s_s = 0,
+    t_lepidoptera_s = 0
+  ),
+  type = "response"
+)
+
+pred_year <- pred_year %>%
+  mutate(
+    trmt = ifelse(trmt_bin == -1, "Dark", "Lit"),
+    year = case_when(
+      yr_s == -1 ~ "2021",
+      yr_s ==  0 ~ "2022",
+      yr_s ==  1 ~ "2023"
+    ),
+    sp_label = str_replace(sp, "([A-Z])[A-Z]+([A-Z]+)", "\\1. \\2")
+  )
+
+
+p_year <- ggplot(pred_year,
+                 aes(x = trmt, y = estimate, group = year, color = year)) +
+  geom_point(size = 2) +
+  geom_line(linewidth = 1) +
+  facet_wrap(~ sp, scales = "free_y") +
+  labs(
+    x = "Treatment",
+    y = "Predicted bat calls",
+    color = "Year",
+    title = "Year-specific treatment effects on bat activity"
+  ) +
+  theme_minimal() +
+  theme(
+    strip.text = element_text(size = 8),
+    legend.position = "top"
+  )
+
+p_year
+# these panels might need to be organized the colors need to change and the olrder of the panesl too. I want to present the panels in three groups first the ones that constantly declined like antpal or edumac then the ones that fip their response like cortow dna eptfus 
+# and then the ones that show increases in lit sites constantly like lasnoc or myluc should I add data points?
+
+
+p_year_alt <- ggplot(pred_year,
+                     aes(x = year, y = estimate, color = trmt, group = trmt)) +
+  geom_point(size = 2) +
+  geom_line(linewidth = 1) +
+  facet_wrap(~ sp, scales = "free_y") +
+  labs(
+    x = "Year",
+    y = "Predicted bat calls",
+    color = "Treatment",
+    title = "Treatment × Year interaction in bat activity"
+  ) +
+  scale_color_manual(values = c("Lit" = "grey70", "Dark" = "grey20")) +
+  theme_minimal()
+
+p_year_alt
+
+
+bm_year_plot <- bm2 %>%
+  mutate(
+    year = as.character(yr),
+    trmt = ifelse(trmt_bin == -1, "Dark", "Lit"),
+    sp_label = str_replace(sp, "([A-Z])[A-Z]+([A-Z]+)", "\\1. \\2")
+  )
+
+p_year_alt <- ggplot() +
+  
+  # 🔹 raw data (background)
+  # geom_jitter(
+  #   data = bm_year_plot,
+  #   aes(x = year, y = n, color = trmt),
+  #   width = 0.15,
+  #   alpha = 0.08,
+  #   size = 0.6
+  # ) +
+  
+  # 🔹 model predictions
+  geom_point(
+    data = pred_year,
+    aes(x = year, y = estimate, color = trmt),
+    size = 2
+  ) +
+  geom_line(
+    data = pred_year,
+    aes(x = year, y = estimate, color = trmt, group = trmt),
+    linewidth = 1
+  ) +
+  # geom_errorbar(
+  #   data = pred_year,
+  #   aes(x = year, ymin = conf.low, ymax = conf.high, color = trmt),
+  #   width = 0.1,
+  #   position = position_dodge(width = 0.2)
+  # )+
+  
+  facet_wrap(~ sp, scales = "free_y") +
+  
+  labs(
+    x = "Year",
+    y = "Predicted bat calls",
+    color = "Treatment",
+    title = "Treatment × Year interaction in bat activity"
+  ) +
+  
+  scale_color_manual(
+    values = c("Lit" = "grey70", "Dark" = "grey20")
+  ) +
+  
+  scale_y_continuous(trans = "log1p") +
+  
+  theme_minimal() +
+  theme(
+    strip.text = element_text(size = 8),
+    legend.position = "top"
+  )
+
+p_year_alt
+ggsave(
+  filename = "figures/glmm_v4/year_v1.png",
+  plot = p_year_alt,
+  width = 10,
+  height = 8,
+  dpi = 300
+)
+
+summary(m1.8)
+
+# not graphs for the temperature 
+
+
+temp_seq <- seq(
+  min(bm2$nit_avg_temp_c_s, na.rm = TRUE),
+  max(bm2$nit_avg_temp_c_s, na.rm = TRUE),
+  length.out = 100
+)
+
+pred_temp_comm <- predictions(
+  m1.8,
+  newdata = datagrid(
+    nit_avg_temp_c_s = temp_seq,
+    trmt_bin = 0,
+    jday_s = 0,
+    avg_moonlight_s = 0,
+    nit_avg_wspm_s_s = 0,
+    yr_s = 0,
+    t_lepidoptera_s = 0
+  ),
+  type = "response",
+  re.formula = NA
+)
+
+temp_mean <- mean(bm2$nit_avg_temp_c, na.rm = TRUE)
+temp_sd   <- sd(bm2$nit_avg_temp_c, na.rm = TRUE)
+
+pred_temp_comm <- pred_temp_comm %>%
+  mutate(
+    temp_c = nit_avg_temp_c_s * (2 * temp_sd) + temp_mean
+  )
+
+
+p_temp_comm <- ggplot(pred_temp_comm, aes(x = temp_c, y = estimate)) +
+  geom_ribbon(
+    aes(ymin = conf.low, ymax = conf.high),
+    alpha = 0.2,
+    fill = "grey70",
+    color = NA
+  ) +
+  geom_line(
+    linewidth = 1,
+    color = "grey20"
+  ) +
+  labs(
+    x = "Nightly average temperature (°C)",
+    y = "Predicted bat call counts",
+    title = "Community-level effect of temperature on bat activity"
+  ) +
+  theme_minimal()
+
+p_temp_comm
+
+ggsave(
+  filename = "figures/glmm_v4/temp_comm_v1.png",
+  plot = p_temp_comm,
+  width = 6,
+  height = 4,
+  dpi = 300
+)
+
+# not lets do the wind 
+
+wind_seq <- seq(
+  min(bm2$nit_avg_wspm_s_s, na.rm = TRUE),
+  max(bm2$nit_avg_wspm_s_s, na.rm = TRUE),
+  length.out = 100
+)
+
+pred_wind_comm <- predictions(
+  m1.8,
+  newdata = datagrid(
+    nit_avg_wspm_s_s = wind_seq,
+    trmt_bin = 0,
+    jday_s = 0,
+    avg_moonlight_s = 0,
+    nit_avg_wspm_s_s = 0,
+    yr_s = 0,
+    t_lepidoptera_s = 0
+  ),
+  type = "response",
+  re.formula = NA
+)
+
+wind_mean <- mean(bm2$nit_avg_wspm_s, na.rm = TRUE)
+wind_sd   <- sd(bm2$nit_avg_wspm_s, na.rm = TRUE)
+
+pred_wind_comm <- pred_wind_comm %>%
+  mutate(
+    windms = nit_avg_wspm_s_s * (2 * wind_sd) + wind_mean
+  )
+
+
+p_wind_comm <- ggplot(pred_wind_comm, aes(x = windms, y = estimate)) +
+  geom_ribbon(
+    aes(ymin = conf.low, ymax = conf.high),
+    alpha = 0.2,
+    fill = "grey70",
+    color = NA
+  ) +
+  geom_line(
+    linewidth = 1,
+    color = "grey20"
+  ) +
+  labs(
+    x = "Nightly average wind (m/s)",
+    y = "Predicted bat call counts",
+    title = "Community-level effect of temperature on bat activity"
+  ) +
+  theme_minimal()
+
+p_wind_comm
+
+ggsave(
+  filename = "figures/glmm_v4/wind_comm_v1.png",
+  plot = p_wind_comm,
+  width = 6,
+  height = 4,
+  dpi = 300
+)
+
+
+
+
+# marginal effects m1.10 acoustic index -----------------------------------
+
+typical <- list(
+  jday_s = 0,
+  avg_moonlight_s = 0,
+  nit_avg_temp_c_s = 0,
+  nit_avg_wspm_s_s = 0,
+  yr_s = 0,
+  t_lepidoptera_s = 0
+)
+
+
+pred_trmt <- predictions(
+  m1.10,
+  newdata = datagrid(
+    trmt_bin = c(-1, 1),
+    sp = unique(bm2$sp),
+    jday_s = typical$jday_s,
+    avg_moonlight_s = typical$avg_moonlight_s,
+    nit_avg_temp_c_s = typical$nit_avg_temp_c_s,
+    nit_avg_wspm_s_s = typical$nit_avg_wspm_s_s,
+    yr_s = typical$yr_s,
+    t_lepidoptera_s = typical$t_lepidoptera_s
+  ),
+  type = "response"   # VERY IMPORTANT → gives counts, not log scale
+)
+
+
+
+pred_trmt <- pred_trmt %>%
+  mutate(
+    sp_label = str_replace(sp, "([A-Z])[A-Z]+([A-Z]+)", "\\1. \\2"),
+    trmt = ifelse(trmt_bin == -1, "Dark", "Lit")
+  )
+
+pred_trmt <- pred_trmt %>%
+  group_by(sp) %>%
+  mutate(
+    change = estimate[trmt_bin == -1] - estimate[trmt_bin == 1]
+  )
+
+library(ggplot2)
+
+p_trmt <- ggplot(pred_trmt, aes(x = trmt_bin, y = estimate, group = sp)) +
+  geom_point(size = 2) +
+  geom_line() +
+  geom_errorbar(
+    aes(ymin = conf.low, ymax = conf.high),
+    width = 0.1
+  ) +
+  facet_wrap(~ sp, scales = "free_y") +
+  labs(
+    x = "Treatment",
+    y = "Predicted bat calls",
+    title = "Species-specific response of bat activity to artificial light"
+  ) +
+  theme_minimal() +
+  theme(
+    strip.text = element_text(size = 8),
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  )
+
+p_trmt
+
+bm_plot <- bm2 %>%
+  mutate(
+    trmt = ifelse(trmt_bin == -1, "Dark", "Lit"),
+    sp_label = str_replace(sp, "([A-Z])[A-Z]+([A-Z]+)", "\\1. \\2")
+  )
+
+# improved graph with raw data in the bakground and log y x to better visualize the differences between species.
+
+p_trmt_m1.10 <- ggplot() +
+  
+  # 🔹 RAW DATA (background)
+  geom_jitter(
+    data = bm_plot,
+    aes(x = trmt_bin, y = n),
+    width = 0.15,
+    alpha = 0.15,
+    size = 0.6,
+    color = "grey40"
+  ) +
+  
+  # 🔹 MODEL PREDICTIONS (foreground)
+  geom_point(
+    data = pred_trmt,
+    aes(x = trmt_bin, y = estimate),
+    size = 2
+  ) +
+  
+  geom_line(
+    data = pred_trmt,
+    aes(x = trmt_bin, y = estimate, group = sp),
+    linewidth = 0.8
+  ) +
+  
+  facet_wrap(~ sp, scales = "free_y") +
+  
+  labs(
+    x = "Treatment",
+    y = "Predicted bat calls",
+    title = "Species-specific response of bat activity to artificial light"
+  ) +
+  scale_y_continuous(trans = "log1p")+
+  scale_x_continuous(
+    breaks = c(-1, 1),
+    labels = c("Dark", "Lit")
+  ) +
+  
+  theme_minimal() +
+  theme(
+    strip.text = element_text(size = 8),
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  )
+
+p_trmt_m1.10
+
+ggsave(
+  filename = "figures/glmm_v4/trmt_v1_acoustic_index.png",
+  plot = p_trmt_m1.10,
+  width = 10,
+  height = 8,
+  dpi = 300
+)
+
+
+
+
+
 
 
 ###

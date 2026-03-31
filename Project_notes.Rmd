@@ -922,3 +922,9 @@ keept working on the marginal effects plots
 I completed the initial set of plots for the spkr model.
 
 created script glmm_v4.R to reanalyze the bat actrivity data. Arrived to model m1.8 as the best model.
+
+------------------------------------------------------------------------
+
+3/30/2026
+
+I built the marginal effects plot for the final model (m1.8) for bat echolocations across experimental sites.
