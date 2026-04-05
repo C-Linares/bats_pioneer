@@ -82,7 +82,13 @@ mlight <- light %>%
   group_by(site) %>%
   summarise(mean_mwatts = mean(mwatts, na.rm = TRUE))
 
+# add light as a treatment 
+litsites<-c("iron01","iron03","iron05","long01","long03")
 
+
+mlight$treatmt<-ifelse(mlight$site %in% litsites , "lit", "dark")
+
+head(mlight)
 # elevation
 
 elev<-read_csv('data_for_analysis/elev/elevation.csv', name_repair = "universal")
@@ -90,7 +96,7 @@ elev<-rename(elev, site=name)
 
 # insects
 
-insect<-read_csv('data_for_analysis/insect_wranglin/c_bugs.csv', name_repair = "universal")
+insect<-read_csv('data_for_analysis/insect_wranglin/ins_bm.csv', name_repair = "universal")
 
 # we need to summarize total lepidoptera by site 
 
@@ -142,7 +148,7 @@ pred_matrix<-left_join(mlight,insect, by="site")
 pred_matrix<-left_join(pred_matrix, elev, by="site")
 pred_matrix<-pred_matrix %>% select(-c(time, buff_area))
 
-# standardize predictors
+# standardize predictors Gelman method
 
 pred_matrix_std <- pred_matrix %>%
   mutate(across(
@@ -151,7 +157,7 @@ pred_matrix_std <- pred_matrix %>%
   ))
 
 
-head(pred_matrix)
+head(pred_matrix_std)
 
 # check predictors for colinearity
 
@@ -162,12 +168,18 @@ cor(pred_matrix %>% select(mean_mwatts, t.leps, elev_mean), use = "pairwise.comp
 # Run partial dbRDA---------------------------------------------------
 
 # # just light predictor
-# dbrda_full <- dbrda(bray_dist ~ mean_mwatts, data = pred_matrix)
+ dbrda_full <- dbrda(bray_dist ~ treatmt, data = pred_matrix)
+
 # 
 # # full dbRDA 
 # dbrda_partial <- dbrda(bray_dist ~ mean_mwatts + t.leps + elev_mean , data = pred_matrix_std)
 
 dbrda_full<- dbrda(comm_matrix_std ~ mean_mwatts + t.leps + elev_mean, pred_matrix_std,dist="bray")
+
+# run light as treatment 
+
+dbrda_full<- dbrda(comm_matrix_std ~ treatmt + t.leps + elev_mean, pred_matrix_std,dist="bray")
+
 # add species scores 
 
 sppscores(dbrda_full)<-wisconsin(bray_dist)
@@ -249,6 +261,252 @@ ggsave("figures/dbrd/dbRDA_v1.tiff",
        bg = "white",)
 
 
+
+# dbrda second version  ---------------------------------------------------
+
+# sampling unit year site 
+
+row_unit<-c("site", "yr")
+
+# effort: nights per row unit 
+
+effrot_tbl<- bm %>%
+  distinct(across(c(all_of(row_unit), noche))) %>% #unique night sampled
+  count(across(all_of(row_unit)), name = "n_nights") # count nights per row unitross)
+
+effort_keep<-effrot_tbl %>%  filter (n_nights > 5) # we keep those nights site years with more than 5 nights sampled.
+
+# species abundance per row unit
+
+comm_long<- bm %>% 
+  semi_join(effort_keep, by = row_unit) %>% 
+  group_by(across(c(all_of(row_unit), sp))) %>%
+  summarise(n_tot= sum(n, na.rm= TRUE), .groups = "drop")
+
+# standardize by effort
+
+comm_std_long<- comm_long %>% 
+  left_join(effort_keep, by = row_unit) %>% 
+  mutate(activity = n_tot/n_nights)
+
+#wide community matrix: one row per row unit, colums = species 
+
+bat_com_std<-comm_std_long %>% 
+  select(all_of(row_unit), sp, activity) %>% 
+  pivot_wider(names_from = sp, values_from = activity, values_fill = 0) %>% 
+  arrange(across(all_of(row_unit))) 
+
+# Save the row id (for later joins) and set rownames for vegan
+row_id <- bat_com_std %>% select(all_of(row_unit))
+comm_matrix_std <- bat_com_std %>%
+  select(-all_of(row_unit)) %>%
+  as.data.frame()
+rownames(comm_matrix_std) <- apply(row_id, 1, paste, collapse = "_")
+
+
+# com matrix for mvGLM site-year x species count
+
+bat_comm_counts <-comm_std_long %>% 
+  select(all_of(row_unit), sp, n_tot) %>% 
+  pivot_wider(names_from = sp, values_from = n_tot, values_fill = 0) %>% 
+  arrange(across(all_of(row_unit)))
+
+row_id <- bat_comm_counts %>% select(all_of(row_unit))
+
+comm_matrix_counts <- bat_comm_counts %>%  # this one should be used in mvglm
+  select(-all_of(row_unit)) %>%
+  as.data.frame()
+rownames(comm_matrix_counts) <- apply(row_id, 1, paste, collapse = "_")
+
+
+
+
+# Bray–Curtis distance ----------------------------------------------
+# we take the com matrix standardize to caculate the brady index matrix
+bray_dist <- vegdist(comm_matrix_std, method = "bray")
+
+# now we need the predictors at the same resolution as the comm matrix, 
+
+# we read the bm2 data used in the glmmm_v4 analysis because it has all the predictors
+
+# Predictor matrix at the SAME resolution as the comm matrix ---------------------------
+# Example: mean light and Lepidoptera summed/averaged per row unit (site/year)
+pred_matrix <- bm2 %>%
+  group_by(across(all_of(row_unit))) %>%
+  summarise(
+    mean_mwatts = mean(mwatts, na.rm = TRUE),
+    t_leps      = sum(t_lepidoptera, na.rm = TRUE),
+    # elev_mean   = mean(elev_mean, na.rm = TRUE), # lets try it without elevation for now
+    .groups = "drop"
+  ) %>%
+  semi_join(effort_keep, by = row_unit)
+
+# Keep only rows present in the community matrix
+pred_matrix$RowKey <- apply(pred_matrix[row_unit], 1, paste, collapse = "_") # creates col Rowkey
+pred_matrix <- pred_matrix %>% filter(RowKey %in% rownames(comm_matrix_std)) %>%
+  column_to_rownames("RowKey")
+
+
+#then we scale those variables
+
+scale_by_2sd_tidy <- function(data, variables_to_scale) {
+  # Keep only variables that exist and are numeric
+  valid_vars <- variables_to_scale[variables_to_scale %in% names(data) & sapply(data[variables_to_scale], is.numeric)]
+  
+  if (length(valid_vars) == 0) {
+    warning("No valid numeric variables found to scale.")
+    return(data)
+  }
+  
+  data <- data %>%
+    mutate(across(all_of(valid_vars),
+                  ~ (. - mean(., na.rm = TRUE)) / (2 * sd(., na.rm = TRUE)),
+                  .names = "{.col}_s"))
+  
+  return(data)
+}
+
+
+variables_to_scale <- c(
+  "t.lepidoptera",
+  "mean_mwatts"
+# elev_mean
+  )
+
+pred_matrix_std <- pred_matrix %>%
+  ungroup() %>%                                   # <- key
+  scale_by_2sd_tidy(c("t_leps","mean_mwatts"))
+
+summary(pred_matrix_std)
+
+cor(pred_matrix_std %>% select(mean_mwatts, t_leps), use = "pairwise.complete.obs")
+
+# add treatment 
+
+pred_matrix_std$treatmt<-ifelse(pred_matrix_std$mean_mwatts_s > 0, "lit", "dark")
+
+
+
+# now we run the dbrda
+
+dbrda_full <- dbrda(comm_matrix_std ~ treatmt + t_leps_s,
+                    data = pred_matrix_std, distance = "bray")
+dbrda_light<- dbrda(comm_matrix_std ~ treatmt, pred_matrix_std, dist= "bray")
+
+# add species scores 
+# dbRDA has no information on species you we have to include it manually.
+sppscores(dbrda_full)<-wisconsin(bray_dist)
+
+anova.cca(dbrda_full,dbrda_light)
+
+# Test marginal (type III) effects of each predictor
+anova_marginal <- anova.cca(dbrda_full, by = "margin", permutations = 999)
+anova_marginal
+
+anova.cca(dbrda_light)                # overall
+anova.cca(dbrda_light, by = "margin") # marginal (type III) effects
+
+# explained variation 
+
+RsquareAdj(dbrda_full) # total variation explaned is r.quared 
+RsquareAdj(dbrda_light)
+
+
+# Variation partitioning
+# 1. Apply Hellinger transformation to community data
+comm_hell <- decostand(comm_matrix_std, method = "hellinger")
+
+# 2. Run variation partitioning on transformed data
+varpart_result <- varpart(comm_hell,
+                          ~ mean_mwatts,
+                          ~ t_leps,
+                          # ~ elev_mean,
+                          data = pred_matrix)
+
+# 3. Check the adjusted R² fractions
+varpart_result
+plot(varpart_result,
+     bg = c("gold", "lightblue", "forestgreen"),
+     Xnames = c("Light", "Lepidoptera", "Elevation"))
+
+
+plot(dbrda_full, display = c("sites", "bp"), scaling = 2)
+plot(dbrda_light)
+
+library(ggvegan)
+
+autoplot(dbrda_full, scaling = 2) +
+  theme_minimal() +
+  labs(title = "dbRDA of bat communities",
+       subtitle = "Constrained by mean_mwatts, t.leps, and elev_mean")
+
+autoplot(dbrda_light, scaling = 2) +
+  theme_minimal() +
+  labs(title = "dbRDA of bat communities",
+       subtitle = "Constrained by mean_mwatts, t.leps, and elev_mean")
+
+
+library(ggrepel)
+# Get site, species, and environmental scores
+site_scores <- scores(dbrda_full, display = "sites", scaling = 2)
+site_scores_df <- as.data.frame(site_scores)
+site_scores_df$site <- rownames(site_scores)
+
+# compute species scores manually
+species_scores <- wascores(site_scores, comm_matrix_std)
+species_scores_df <- as.data.frame(species_scores)
+species_scores_df$species <- rownames(species_scores_df)
+
+env_scores <- scores(dbrda_full, display = "bp", scaling = 2)
+env_scores_df <- as.data.frame(env_scores)
+env_scores_df$variable <- rownames(env_scores)
+
+# adding light
+# make rows names to columns firt 
+pred_matrix_std2 <- pred_matrix_std %>% rownames_to_column(var = "ID")
+# do the same for stie_scores
+site_scores_df<- site_scores_df %>% rownames_to_column(var = "ID")
+# join them 
+site_scores_df<- left_join(pred_matrix_std2, site_scores_df, by= "ID")
+
+# # change names of the variables to be able to plot the actual names. 
+# 
+# site_scores_df<- site_scores_df %>% 
+#   rename(light = mean_mwatts, elevation = elev_mean, leps = t_leps)
+
+# Plot
+p1<-ggplot() +
+  # Sites (small, light gray)
+  geom_point(data = site_scores_df, 
+             aes(x = dbRDA1, y = dbRDA2, color = mean_mwatts), 
+             size = 4, alpha = 0.6, shape = 16) +
+  geom_text_repel(data = site_scores_df,
+                  aes(x = dbRDA1, y = dbRDA2, label = site.x, color = mean_mwatts),
+                  size = 4, max.overlaps = 30) +
+
+  # Species (blue, bigger font)
+  # geom_text_repel(data = species_scores_df,
+  #                 aes(x = dbRDA1, y = dbRDA2, label = species),
+  #                 size = 4, fontface = "bold", color = "black",
+  #                 max.overlaps = 30) +
+  
+  # Environmental vectors (arrows, red)
+  geom_segment(data = env_scores_df,
+               aes(x = 0, y = 0, xend = dbRDA1, yend = dbRDA2),
+               arrow = arrow(length = unit(0.25, "cm")), 
+               color = "#D55E00", size = 1.2) +
+  geom_text_repel(data = env_scores_df, 
+                  aes(x = dbRDA1, y = dbRDA2, label = variable),
+                  size = 6, color = "black",
+                  max.overlaps = 30) +
+  
+  labs(title = "dbRDA of bat community",
+       x = "dbRDA1", y = "dbRDA2") +
+  scale_color_viridis_c(option = "inferno", end = 0.9) +  # nice continuous color scale
+  theme_minimal(base_size = 14, base_family = "serif") +
+  theme(legend.position = "right",
+  )
+p1
 
 
 
