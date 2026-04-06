@@ -263,6 +263,7 @@ ggsave("figures/dbrd/dbRDA_v1.tiff",
 
 
 # dbrda second version  ---------------------------------------------------
+# here we want to make the site-year the sampling unit and see if there's any signal for light as treatment not as watts affecting the community. 
 
 # sampling unit year site 
 
@@ -282,6 +283,9 @@ comm_long<- bm %>%
   semi_join(effort_keep, by = row_unit) %>% 
   group_by(across(c(all_of(row_unit), sp))) %>%
   summarise(n_tot= sum(n, na.rm= TRUE), .groups = "drop")
+
+#remove noise and noid
+comm_long<- comm_long %>% filter(!sp %in% c("Noise", "NoID")) # remove noise and noid
 
 # standardize by effort
 
@@ -328,15 +332,24 @@ bray_dist <- vegdist(comm_matrix_std, method = "bray")
 # now we need the predictors at the same resolution as the comm matrix, 
 
 # we read the bm2 data used in the glmmm_v4 analysis because it has all the predictors
+bm2<- read_csv("data_for_analysis/dbrda/bm2.csv") %>% 
+  clean_names() %>% 
+  filter(!sp %in% c("Noise", "NoID")) # remove noise and noid
 
-# Predictor matrix at the SAME resolution as the comm matrix ---------------------------
+head(bm2)
+
+# we need to add elevation 
+
+bm2<- left_join(bm2, elev, by = "site")
+
 # Example: mean light and Lepidoptera summed/averaged per row unit (site/year)
+
 pred_matrix <- bm2 %>%
   group_by(across(all_of(row_unit))) %>%
   summarise(
     mean_mwatts = mean(mwatts, na.rm = TRUE),
     t_leps      = sum(t_lepidoptera, na.rm = TRUE),
-    # elev_mean   = mean(elev_mean, na.rm = TRUE), # lets try it without elevation for now
+    elev_mean   = mean(elev_mean, na.rm = TRUE), # lets try it without elevation for now
     .groups = "drop"
   ) %>%
   semi_join(effort_keep, by = row_unit)
@@ -369,17 +382,17 @@ scale_by_2sd_tidy <- function(data, variables_to_scale) {
 
 variables_to_scale <- c(
   "t.lepidoptera",
-  "mean_mwatts"
-# elev_mean
+  "mean_mwatts",
+  "elev_mean"
   )
 
 pred_matrix_std <- pred_matrix %>%
   ungroup() %>%                                   # <- key
-  scale_by_2sd_tidy(c("t_leps","mean_mwatts"))
+  scale_by_2sd_tidy(c("t_leps","mean_mwatts","elev_mean" ))
 
 summary(pred_matrix_std)
 
-cor(pred_matrix_std %>% select(mean_mwatts, t_leps), use = "pairwise.complete.obs")
+cor(pred_matrix_std %>% select(mean_mwatts, t_leps, elev_mean), use = "pairwise.complete.obs")
 
 # add treatment 
 
@@ -389,7 +402,7 @@ pred_matrix_std$treatmt<-ifelse(pred_matrix_std$mean_mwatts_s > 0, "lit", "dark"
 
 # now we run the dbrda
 
-dbrda_full <- dbrda(comm_matrix_std ~ treatmt + t_leps_s,
+dbrda_full <- dbrda(comm_matrix_std ~ treatmt + t_leps_s + elev_mean_s  ,
                     data = pred_matrix_std, distance = "bray")
 dbrda_light<- dbrda(comm_matrix_std ~ treatmt, pred_matrix_std, dist= "bray")
 
@@ -420,7 +433,7 @@ comm_hell <- decostand(comm_matrix_std, method = "hellinger")
 varpart_result <- varpart(comm_hell,
                           ~ mean_mwatts,
                           ~ t_leps,
-                          # ~ elev_mean,
+                          ~ elev_mean,
                           data = pred_matrix)
 
 # 3. Check the adjusted R² fractions
@@ -478,18 +491,18 @@ site_scores_df<- left_join(pred_matrix_std2, site_scores_df, by= "ID")
 p1<-ggplot() +
   # Sites (small, light gray)
   geom_point(data = site_scores_df, 
-             aes(x = dbRDA1, y = dbRDA2, color = mean_mwatts), 
-             size = 4, alpha = 0.6, shape = 16) +
-  geom_text_repel(data = site_scores_df,
-                  aes(x = dbRDA1, y = dbRDA2, label = site.x, color = mean_mwatts),
-                  size = 4, max.overlaps = 30) +
+             aes(x = dbRDA1, y = dbRDA2, color = treatmt ), 
+             size = 4, alpha = 0.6) +
+  # geom_text_repel(data = site_scores_df,
+  #                 aes(x = dbRDA1, y = dbRDA2, label = site.x, color = mean_mwatts),
+  #                 size = 4, max.overlaps = 30) +
 
   # Species (blue, bigger font)
-  # geom_text_repel(data = species_scores_df,
-  #                 aes(x = dbRDA1, y = dbRDA2, label = species),
-  #                 size = 4, fontface = "bold", color = "black",
-  #                 max.overlaps = 30) +
-  
+  geom_text_repel(data = species_scores_df,
+                  aes(x = dbRDA1, y = dbRDA2, label = species),
+                  size = 4, fontface = "bold", color = "black",
+                  max.overlaps = 30, alpha=0.5) +
+
   # Environmental vectors (arrows, red)
   geom_segment(data = env_scores_df,
                aes(x = 0, y = 0, xend = dbRDA1, yend = dbRDA2),
@@ -502,16 +515,20 @@ p1<-ggplot() +
   
   labs(title = "dbRDA of bat community",
        x = "dbRDA1", y = "dbRDA2") +
-  scale_color_viridis_c(option = "inferno", end = 0.9) +  # nice continuous color scale
+  scale_color_manual(values = c("dark" = "black", "lit" = "grey50"))+
+  # scale_color_viridis_c(option = "inferno", end = 0.9) +  # nice continuous color scale
   theme_minimal(base_size = 14, base_family = "serif") +
   theme(legend.position = "right",
   )
 p1
 
-
+species_scores_df %>%
+  arrange(desc(abs(dbRDA1))) %>%
+  head(10)
 
 # mvGLM -----------------------------------------------------------------
 
+library(mvabund)
 # Prepare data -------------------------------------------------------------
 # Response = bat community abundance matrix (species × sites)
 # Convert comm_matrix_std into an mvabund object
@@ -524,6 +541,9 @@ pred_matrix<- pred_matrix %>% left_join(total_effort) %>%
 X <- pred_matrix %>%
   column_to_rownames("site") %>%
   mutate(across(everything(), scale))   # center & scale predictors
+
+#add treatment
+X$treatmt<-ifelse(X$mean_mwatts > 0, "lit", "dark")
 
 # Ensure matching row order
 X <- X[rownames(comm_matrix), ]
@@ -563,6 +583,132 @@ ggplot(fitted_long, aes(x = species, y = fit)) +
 
 
 
+# mvGLM updated-------------------------------------------------------------------
+
+
+# Prepare data -------------------------------------------------------------
+# Response = bat community abundance matrix (species × site/year)
+# Convert comm_matrix_std into an mvabund object
+Y <- mvabund(comm_matrix_counts)
+
+# Predictors = environmental variables and offset of total effort. 
+pred_matrix_std <- pred_matrix_std %>%
+  left_join(effort_keep, by = c("site", "yr")) %>%
+  mutate(log_nights = log(n_nights))
+
+X <- pred_matrix_std 
+# mutate(across(everything(), scale))   # center & scale predictors
+
+# # Ensure matching row order
+# X <- X[rownames(comm_matrix), ]
+
+
+# Build mvGLM --------------------------------------------------------------
+# Negative binomial family is often best for overdispersed count data
+fit <- manyglm(Y ~ treatmt + t_leps_s + elev_mean_s,
+               data = X,
+               family = "negative.binomial",
+               offset = X$log_nights)
+summary(fit)
+# Model diagnostics --------------------------------------------------------
+# Residual checks (optional but recommended)
+plot(fit)   # residual vs fitted, QQ plot etc.
+
+# Hypothesis tests ---------------------------------------------------------
+# Overall test: does the full predictor set explain variation in the community?
+anova_full <- anova.manyglm(fit, resamp = "pit.trap", nBoot = 999)
+anova_full
+
+# Marginal tests: importance of each predictor individually (Type III)
+anova_marginal <- anova.manyglm(fit, p.uni = "adjusted", resamp = "pit.trap", nBoot = 999)
+anova_marginal
+
+anova_species <- anova.manyglm(
+  fit,
+  resamp = "pit.trap",
+  nBoot = 999,
+  p.uni = "adjusted"  # gives species-level tests
+)
+
+
+
+mv_tab_manual <- tibble::tibble(
+  term = c("Treatment", "Lepidoptera", "Elevation"),
+  Df = c(1, 1, 1),
+  Dev = c(85.38, 18.82, 41.66),
+  p_value = c(0.001, 0.251, 0.020)
+)
+
+flextable::flextable(mv_tab_manual)
+# Extract univariate test table
+uni_table <- as.data.frame(anova_species$uni.test)
+
+
+
+# --- Clean and reshape univariate results for plotting ---
+
+uni_table <- as.data.frame(anova_species$uni.test) %>%
+  tibble::rownames_to_column("predictor")
+
+uni_long <- uni_table %>%
+  pivot_longer(
+    cols = -predictor,
+    names_to = "species",
+    values_to = "p_value"
+  ) %>%
+  mutate(
+    significance = case_when(
+      p_value < 0.001 ~ "***",
+      p_value < 0.01  ~ "**",
+      p_value < 0.05  ~ "*",
+      TRUE            ~ ""
+    )
+  )
+
+
+# filter the intercept 
+
+uni_long <- uni_long %>%
+  filter(predictor != "intercept")
+
+
+ggplot(uni_long, aes(x = predictor, y = reorder(species, p_value), color = p_value)) +
+  geom_point(size = 4) +
+  geom_text(aes(label = significance), nudge_x = 0.2, size = 4) +
+  scale_color_viridis_c(option = "C", direction = 1, name = "p-value") +
+  scale_x_discrete(
+    labels = c(
+      "mean_mwatts_s" = "Light (Watts)",
+      "t_leps_s" = "Lepidoptera",
+      "elev_mean_s" = "Elevation"
+    )
+  ) +
+  labs(
+    x = "Predictor",
+    y = "Species",
+    title = "Species-level significance (mvGLM)",
+    subtitle = "P-values per predictor (PIT-trap resampling, 999 iterations)"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(
+    axis.text.y = element_text(family = "Times", size = 12, face = "italic"),
+    axis.text.x = element_text(family = "Times", size = 13, face = "bold"),
+    plot.title = element_text(size = 16, face = "bold"),
+    legend.position = "right"
+  )
+
+ # Visualize effects --------------------------------------------------------
+# Turn fitted values into long format for plotting
+fitted_vals <- fitted(fit)
+fitted_df <- as.data.frame(fitted_vals)
+fitted_df$site <- rownames(comm_matrix_counts)
+fitted_long <- pivot_longer(fitted_df, -site, names_to = "species", values_to = "fit")
+
+ggplot(fitted_long, aes(x = species, y = fit)) +
+  geom_boxplot() +
+  theme_minimal() +
+  labs(title = "Fitted bird abundances across species",
+       y = "Fitted abundance (calls)", x = "Species")
 
 # rank abundance curves ---------------------------------------------------
 
@@ -653,6 +799,418 @@ m1 <- lmer(richness_change ~ mean_mwatts + t.leps + yr2 +elev_mean+ (1|site), da
 summary(m1)
 
 
+
+
+#updated rank abundance curves
+
+library(codyn)
+
+#sample unit
+
+row_unit<-c("site", "yr")
+
+# 1) Effort (nights) per row unit --------------------------------------
+effort_tbl <- bm %>%
+  distinct(across(c(all_of(row_unit), noche))) %>%   # unique nights sampled
+  count(across(all_of(row_unit)), name = "n_nights")
+
+effort_keep <- effort_tbl %>% filter(n_nights >= 10) # we filter nights site,years that have more than 10 nights 
+range(effort_keep$n_nights) # check range of nights sampled per site-year)
+# most sites have plenty of data the range of number of night sampled is 28-78
+
+
+# we use community long table 
+
+comm_long
+# add effort
+comm_long<-left_join(comm_long, effort_tbl, by= c("site","yr"))
+summary(comm_long)
+
+## standardize detection with the effort as detections per day*
+comm_long<- comm_long %>% 
+  mutate(dpd = n_tot/  n_nights)
+
+
+# run RCA from cody package 
+# 
+
+rac_cambio<-RAC_change(df=comm_long, # this function seems to be the one Jennings 2025 used. 
+                       time.var = "yr",
+                       species.var = "sp",
+                       abundance.var = "dpd", # detections per day
+                       replicate.var = "site",
+                       reference.time = 2021)
+
+rac_dif<-RAC_difference(df=comm_long,
+                        time.var = 'yr',
+                        species.var = "sp",
+                        abundance.var = "dpd",
+                        replicate.var = 'site')
+
+
+# 4. Join treatments
+
+litsites<-c("iron01","iron03","iron05","long01","long03")
+
+rac_cambio$treatmt<- ifelse(rac_cambio$site %in% litsites, 1, -1)
+rac_cambio$tmt<- ifelse(rac_cambio$site %in% litsites, "lit", "dark")
+
+rac_cambio <- rac_cambio %>%
+  mutate(yr_s = case_when(
+    yr2 == 2021 ~ -1,
+    yr2 == 2022 ~ 0,
+    TRUE ~ 1
+  ))
+
+# add light.
+rac_cambio<- rac_cambio %>% left_join(light, by=c("site", "yr2"="yr"))
+
+# add elevation
+
+rac_cambio<- rac_cambio %>% left_join(elev, by=c("site"))
+
+
+# standardize predictors
+
+rac_cambio<- rac_cambio %>% 
+  mutate(mwatts_s= (mwatts - mean(mwatts, na.rm=TRUE))/(2*sd(mwatts, na.rm=TRUE)),
+         elev_mean_s= (elev_mean - mean(elev_mean, na.rm=TRUE))/(2*sd(elev_mean, na.rm=TRUE))
+  )
+
+# standardize predictors
+
+rac_cambio<- rac_cambio %>% 
+  mutate(mwatts_s= (mwatts - mean(mwatts, na.rm=TRUE))/(2*sd(mwatts, na.rm=TRUE)),
+         elev_mean_s= (elev_mean - mean(elev_mean, na.rm=TRUE))/(2*sd(elev_mean, na.rm=TRUE))
+  )
+
+
+# 5. Model example (rank change)
+
+library(lme4)
+library(lmerTest)
+
+# we ran the models using the treament as light/dark and years as factor (2022,2023) with 2021 as reference (see above).
+
+m_rich <- lmer(richness_change  ~ tmt * as.factor(yr2) + (1|site), data = rac_cambio)
+m_even <- lmer(evenness_change ~ tmt * as.factor(yr2) + (1|site), data = rac_cambio)
+m_rank <- lmer(rank_change ~ tmt * as.factor(yr2) + (1|site), data = rac_cambio)
+m_gain <- lmer(gains ~ tmt * as.factor(yr2) + (1|site), data = rac_cambio)
+m_loss <- lmer(losses ~ tmt * as.factor(yr2) + (1|site), data = rac_cambio)
+
+confidenceIntervals <- function(model) {
+  confint(model, level = 0.95, method = "Wald")
+}
+
+
+confidenceIntervals(m_rich)
+
+
+summary(m_rich)
+summary(m_even)
+summary(m_rank)
+summary(m_gain)
+summary(m_loss)
+
+plot(m_rich)
+plot(m_even)
+plot(m_rank)
+plot(m_gain)
+plot(m_loss)
+
+# 6. Plot marginal effects
+library(ggeffects)
+
+pred_rich <- ggpredict(m_rich, terms = c("yr2 [2022,2023]", "tmt")) %>% as.data.frame()
+pred_even <- ggpredict(m_even, terms = c("yr2 [2022,2023]", "tmt")) %>% as.data.frame()
+pred_rank <- ggpredict(m_rank, terms = c("yr2 [2022,2023]", "tmt")) %>% as.data.frame()
+pred_gain <- ggpredict(m_gain, terms = c("yr2 [2022,2023]", "tmt")) %>% as.data.frame()
+pred_loss <- ggpredict(m_loss, terms = c("yr2 [2022,2023]", "tmt")) %>% as.data.frame()
+
+# rename 
+
+pred_rich <- pred_rich %>% rename(yr=x,
+                                  tmt = group)
+pred_even <- pred_even %>% rename(yr=x,
+                                  tmt = group)
+pred_rank <- pred_rank %>%  rename(yr=x,
+                                   tmt=group)
+pred_gain <- pred_gain %>% rename(yr=x,
+                                  tmt=group)
+
+pred_loss <- pred_loss %>% rename(yr=x,
+                                  tmt=group)
+
+
+
+rich<-ggplot() +
+  # raw site points (semi-transparent)
+  geom_point(
+    data = rac_cambio,
+    aes(x = tmt, y = richness_change, color = as.factor(yr2)),
+    position = position_jitter(width = 0.1, height = 0, seed = 1),
+    alpha = 0.35, size = 2
+  ) +
+  # predicted mean and CI
+  geom_errorbar(
+    data = pred_rich,
+    aes(x = tmt, ymin = conf.low, ymax = conf.high, color = as.factor(yr)),
+    width = 0.08, linewidth = 1,
+    position = position_dodge(width = 0.4)
+  ) +
+  geom_point(
+    data = pred_rich,
+    aes(x = tmt, y = predicted, color = as.factor(yr)),
+    size = 3,
+    position = position_dodge(width = 0.4)
+  ) +
+  scale_color_manual(values = c("2022" = "gray50", "2023" = "#1b9e77"), name = "Year") +
+  labs(
+    x = "", y = "Change in Richness",
+    title = "RAC: change in richness by light treatment 2021 as reference"
+  ) +
+  theme_minimal(base_size = 14)
+
+
+rich
+
+
+even<-ggplot() +
+  # raw site points (semi-transparent)
+  geom_point(
+    data = rac_cambio,
+    aes(x = tmt, y = evenness_change, color = as.factor(yr2)),
+    position = position_jitter(width = 0.1, height = 0, seed = 1),
+    alpha = 0.35, size = 2
+  ) +
+  # predicted mean and CI
+  geom_errorbar(
+    data = pred_even,
+    aes(x = tmt, ymin = conf.low, ymax = conf.high, color = as.factor(yr)),
+    width = 0.08, linewidth = 1,
+    position = position_dodge(width = 0.4)
+  ) +
+  geom_point(
+    data = pred_even,
+    aes(x = tmt, y = predicted, color = as.factor(yr)),
+    size = 3,
+    position = position_dodge(width = 0.4)
+  ) +
+  scale_color_manual(values = c("2022" = "gray50", "2023" = "#1b9e77"), name = "Year") +
+  labs(
+    x = "", y = "Change in Evenness",
+    title = "RAC: change in Evenness by light treatment 2021 as reference"
+  ) +
+  theme_minimal(base_size = 14)
+
+
+even
+
+
+
+
+rank<-ggplot() +
+  # raw site points (semi-transparent)
+  geom_point(
+    data = rac_cambio,
+    aes(x = tmt, y = rank_change, color = as.factor(yr2)),
+    position = position_jitter(width = 0.1, height = 0, seed = 1),
+    alpha = 0.35, size = 2
+  ) +
+  # predicted mean and CI
+  geom_errorbar(
+    data = pred_rank,
+    aes(x = tmt, ymin = conf.low, ymax = conf.high, color = as.factor(yr)),
+    width = 0.08, linewidth = 1,
+    position = position_dodge(width = 0.4)
+  ) +
+  geom_point(
+    data = pred_rank,
+    aes(x = tmt, y = predicted, color = as.factor(yr)),
+    size = 3,
+    position = position_dodge(width = 0.4)
+  ) +
+  scale_color_manual(values = c("2022" = "gray50", "2023" = "#1b9e77"), name = "Year") +
+  labs(
+    x = "", y = "Change in Rank",
+    title = "RAC: change in Rank by light treatment 2021 as reference"
+  ) +
+  theme_minimal(base_size = 14)
+
+
+rank
+
+
+gains<-ggplot() +
+  # raw site points (semi-transparent)
+  geom_point(
+    data = rac_cambio,
+    aes(x = tmt, y = gains, color = as.factor(yr2)),
+    position = position_jitter(width = 0.1, height = 0, seed = 1),
+    alpha = 0.35, size = 2
+  ) +
+  # predicted mean and CI
+  geom_errorbar(
+    data = pred_gain,
+    aes(x = tmt, ymin = conf.low, ymax = conf.high, color = as.factor(yr)),
+    width = 0.08, linewidth = 1,
+    position = position_dodge(width = 0.4)
+  ) +
+  geom_point(
+    data = pred_gain,
+    aes(x = tmt, y = predicted, color = as.factor(yr)),
+    size = 3,
+    position = position_dodge(width = 0.4)
+  ) +
+  scale_color_manual(values = c("2022" = "gray50", "2023" = "#1b9e77"), name = "Year") +
+  labs(
+    x = "", y = "Gains",
+    title = "RAC: change in Gains by light treatment 2021 as reference"
+  ) +
+  theme_minimal(base_size = 14)
+
+
+gains
+
+losses<-ggplot() +
+  # raw site points (semi-transparent)
+  geom_point(
+    data = rac_cambio,
+    aes(x = tmt, y = losses, color = as.factor(yr2)),
+    position = position_jitter(width = 0.1, height = 0, seed = 1),
+    alpha = 0.35, size = 2
+  ) +
+  # predicted mean and CI
+  geom_errorbar(
+    data = pred_loss,
+    aes(x = tmt, ymin = conf.low, ymax = conf.high, color = as.factor(yr)),
+    width = 0.08, linewidth = 1,
+    position = position_dodge(width = 0.4)
+  ) +
+  geom_point(
+    data = pred_loss,
+    aes(x = tmt, y = predicted, color = as.factor(yr)),
+    size = 3,
+    position = position_dodge(width = 0.4)
+  ) +
+  scale_color_manual(values = c("2022" = "gray50", "2023" = "#1b9e77"), name = "Year") +
+  labs(
+    x = "", y = "Losses",
+    title = "RAC: change in Losses by light treatment 2021 as reference"
+  ) +
+  theme_minimal(base_size = 14)
+
+losses
+
+RAC<-rich + gains + losses 
+
+# Now I want to make the graph into a three panels with richness, gains, and losses. 
+# below there is the code to polish the graph above according to chatgpt
+
+# --- 1) Make sure "Year" is a factor in both raw + predicted data ----------
+rac_cambio <- rac_cambio %>%
+  mutate(yr2_f = factor(yr2))
+
+pred_rich <- pred_rich %>% mutate(yr_f = factor(yr))
+pred_gain <- pred_gain %>% mutate(yr_f = factor(yr))
+pred_loss <- pred_loss %>% mutate(yr_f = factor(yr))
+
+# --- 2) Shared palette + shared theme --------------------------------------
+year_cols <- c("2022" = "gray50", "2023" = "#1b9e77")
+
+theme_serif <- theme_minimal(base_size = 14, base_family = "serif") +
+  theme(
+    legend.position = "bottom",
+    legend.title = element_text(size = 12),
+    legend.text  = element_text(size = 11),
+    plot.title   = element_text(size = 14),
+    panel.grid.minor = element_blank()
+  )
+
+# Helper: same scales in every panel (required for guide collection)
+scale_year <- list(
+  scale_color_manual(values = year_cols, name = "Year"),
+  guides(color = guide_legend(override.aes = list(alpha = 1, size = 3)))
+)
+
+# --- 3) Build plots (note: keep legends ON; patchwork will collect them) ----
+rich <- ggplot() +
+  geom_point(
+    data = rac_cambio,
+    aes(x = tmt, y = richness_change, color = yr2_f),
+    position = position_jitter(width = 0.1, height = 0, seed = 1),
+    alpha = 0.35, size = 2
+  ) +
+  geom_errorbar(
+    data = pred_rich,
+    aes(x = tmt, ymin = conf.low, ymax = conf.high, color = yr_f),
+    width = 0.08, linewidth = 1,
+    position = position_dodge(width = 0.4)
+  ) +
+  geom_point(
+    data = pred_rich,
+    aes(x = tmt, y = predicted, color = yr_f),
+    size = 3,
+    position = position_dodge(width = 0.4)
+  ) +
+  scale_year +
+  labs(x = NULL, y = "Change in Richness", title = "RAC: Richness") +
+  theme_serif
+
+gains <- ggplot() +
+  geom_point(
+    data = rac_cambio,
+    aes(x = tmt, y = gains, color = yr2_f),
+    position = position_jitter(width = 0.1, height = 0, seed = 1),
+    alpha = 0.35, size = 2
+  ) +
+  geom_errorbar(
+    data = pred_gain,
+    aes(x = tmt, ymin = conf.low, ymax = conf.high, color = yr_f),
+    width = 0.08, linewidth = 1,
+    position = position_dodge(width = 0.4)
+  ) +
+  geom_point(
+    data = pred_gain,
+    aes(x = tmt, y = predicted, color = yr_f),
+    size = 3,
+    position = position_dodge(width = 0.4)
+  ) +
+  scale_year +
+  labs(x = NULL, y = "Gains", title = "RAC: Gains") +
+  theme_serif
+
+losses <- ggplot() +
+  geom_point(
+    data = rac_cambio,
+    aes(x = tmt, y = losses, color = yr2_f),
+    position = position_jitter(width = 0.1, height = 0, seed = 1),
+    alpha = 0.35, size = 2
+  ) +
+  geom_errorbar(
+    data = pred_loss,
+    aes(x = tmt, ymin = conf.low, ymax = conf.high, color = yr_f),
+    width = 0.08, linewidth = 1,
+    position = position_dodge(width = 0.4)
+  ) +
+  geom_point(
+    data = pred_loss,
+    aes(x = tmt, y = predicted, color = yr_f),
+    size = 3,
+    position = position_dodge(width = 0.4)
+  ) +
+  scale_year +
+  labs(x = NULL, y = "Losses", title = "RAC: Losses") +
+  theme_serif
+
+# --- 4) Combine with ONE legend --------------------------------------------
+RAC <- (rich + gains + losses) +
+  plot_layout(ncol = 3, guides = "collect") &
+  theme(legend.position = "bottom",
+        panel.grid = element_blank()   # removes all grid lines
+  )  # applies after collecting
+
+RAC
 
 # trash -------------------------------------------------------------------
 

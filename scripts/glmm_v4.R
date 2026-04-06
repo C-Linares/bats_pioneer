@@ -212,6 +212,9 @@ bm2 <- bm2 %>%
 bm2<- bm2 %>%
   left_join(light, by = c("site", "yr"))
 
+# note:
+# we are going to write this table to use for the predictors in the dbrda analysis. 
+# write_csv(bm2, "data_for_analysis/dbrda/bm2.csv")
 
 # correlation -------------------------------------------------------------
 
