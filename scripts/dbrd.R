@@ -509,7 +509,7 @@ p1<-ggplot() +
                arrow = arrow(length = unit(0.25, "cm")), 
                color = "#D55E00", size = 1.2) +
   geom_text_repel(data = env_scores_df, 
-                  aes(x = dbRDA1, y = dbRDA2, label = variable),
+                  aes(x = dbRDA1 * 1.3, y = dbRDA2 *1.3, label = variable),
                   size = 6, color = "black",
                   max.overlaps = 30) +
   
@@ -521,6 +521,18 @@ p1<-ggplot() +
   theme(legend.position = "right",
   )
 p1
+
+
+# this graph looks good but I want to understand why do I have a point all the way up. It seems like we have some outliers just from the visual inspection of the graph. 
+
+
+ggsave("figures/dbrd/dbRDA_v2.tiff",
+       p1,
+       dev = "tiff",
+       dpi = 600,
+       width = 10,
+       height = 8,
+       bg = "white",)
 
 species_scores_df %>%
   arrange(desc(abs(dbRDA1))) %>%
