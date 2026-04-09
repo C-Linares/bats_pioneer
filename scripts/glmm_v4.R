@@ -516,7 +516,7 @@ anova( m1.2, m1.3,m1.4,m1.5,m1.6)
 summary(m1.6)
 
 
-#now we try the interactrion with year
+#now we try the interaction with year
 
 m1.8<-glmmTMB(
   #fixed effects
@@ -1735,6 +1735,127 @@ ggsave(
 )
 
 
+
+
+
+# table for models  -------------------------------------------------------
+
+#---------------------------
+# 1. Put models in a list
+#---------------------------
+mods_count <- list(
+  "m1.3" = m1.3,
+  "m1.6" = m1.6,
+  "m1.8" = m1.8,
+  "m1.9" = m1.9
+)
+
+# m1.10 has a different response, so keep it separate
+mods_activity <- list(
+  "m1.10" = m1.10
+)
+
+#---------------------------
+# 2. Function to extract model info
+#---------------------------
+extract_model_info <- function(fit, model_name, comparison = NULL) {
+  
+  out <- tibble::tibble(
+    model = model_name,
+    df = attr(logLik(fit), "df"),
+    logLik = as.numeric(logLik(fit)),
+    AIC = AIC(fit),
+    chisq = NA_real_,
+    p = NA_real_
+  )
+  
+  if (!is.null(comparison)) {
+    comp_tab <- anova(comparison, fit)
+    out$chisq <- comp_tab$Chisq[2]
+    out$p     <- comp_tab$`Pr(>Chisq)`[2]
+  }
+  
+  out
+}
+#---------------------------
+# 3. Build comparison table
+#---------------------------
+tab_count <- bind_rows(
+  extract_model_info(m1.3, "No random slopes"),
+  extract_model_info(m1.6, "Base + light × moonlight"),
+  extract_model_info(m1.8, "Base + light × moonlight + light × year", comparison = m1.6),
+  extract_model_info(m1.9, "Base + light × moonlight + light × year + light × Lepidoptera", comparison = m1.8)
+)
+
+tab_activity <- bind_rows(
+  extract_model_info(m1.10, "Base + light × moonlight + light × year")
+)
+
+tab_all <- bind_rows(
+  tibble(
+    activity_metric = "bat call counts (response = n)",
+    model = NA_character_,
+    df = NA_real_, logLik = NA_real_, AIC = NA_real_,
+    chisq = NA_real_, p = NA_real_
+  ),
+  tab_count %>% mutate(activity_metric = ""),
+  
+  tibble(
+    activity_metric = "activity timing (response = activity_min)",
+    model = NA_character_,
+    df = NA_real_, logLik = NA_real_, AIC = NA_real_,
+    chisq = NA_real_, p = NA_real_
+  ),
+  tab_activity %>% mutate(activity_metric = "")
+) %>%
+  select(activity_metric, model, df, logLik, AIC, chisq, p) %>%
+  mutate(
+    activity_metric = ifelse(is.na(activity_metric), "", activity_metric),
+    model   = ifelse(is.na(model), "", model),
+    df      = ifelse(is.na(df), "", sprintf("%.0f", df)),
+    logLik  = ifelse(is.na(logLik), "", sprintf("%.1f", logLik)),
+    AIC     = ifelse(is.na(AIC), "", sprintf("%.1f", AIC)),
+    chisq   = ifelse(is.na(chisq), "", sprintf("%.3f", chisq)),
+    p = case_when(
+      is.na(p)  ~ "",
+      p < 0.001 ~ "<0.001*",
+      p < 0.05  ~ paste0(sprintf("%.4f", p), "*"),
+      TRUE      ~ sprintf("%.4f", p)
+    )
+  )
+
+
+library(officer)
+ft <- flextable(tab_all)
+
+ft <- ft |>
+  set_header_labels(
+    activity_metric = "activity metrics",
+    model = "model",
+    df = "d.f.",
+    logLik = "logLik",
+    AIC = "AIC",
+    chisq = "\u03C7\u00B2",
+    p = "p"
+  ) |>
+  theme_booktabs() |>
+  bold(part = "header") |>
+  bg(part = "header", bg = "white") |>
+  color(part = "header", color = "white") |>
+  bold(i = ~ activity_metric != "", j = 1, bold = TRUE) |>
+  italic(j = "p", part = "header") |>
+  align(j = 1:2, align = "left", part = "all") |>
+  align(j = 3:7, align = "center", part = "all") |>
+  hline(i = ~ activity_metric != "", 
+        border = officer::fp_border(color = "grey", width = 1.5)) |>
+  hline(part = "header", 
+        border = officer::fp_border(color = "grey", width = 1.5)) |>
+  autofit()
+
+ft
+
+save_as_docx("Model comparison table" = ft, path = "model_comparison_table.docx")
+
 # save working environment ------------------------------------------------
 
-save.image("working_env/glmm_v3.RData")
+save.image("working_env/glmm_v4.RData")
