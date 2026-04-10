@@ -1856,6 +1856,57 @@ ft
 
 save_as_docx("Model comparison table" = ft, path = "model_comparison_table.docx")
 
+
+
+# I want to model the moth data to see if it shows a signal when model all together. 
+
+m1.11 <- glmmTMB(t_lepidoptera_s ~ trmt_bin + jday_s + I(jday_s^2) + avg_moonlight_s + nit_avg_temp_c_s + nit_avg_wspm_s_s + yr_s +
+    (1 | site),
+  data = bm2,
+  family = gaussian(link = "identity")
+)
+
+check_singularity(m1.11)
+m1.11$sdr$pdHess
+m1.11$fit$message
+check_zeroinflation(m1.11)
+calculate_c_hat(m1.11) 
+performance_mae(m1.11)
+range(bm2$n)
+hist(bm2$n, breaks = 500)
+performance::r2(m1.11)
+DHARMa::simulateResiduals(m1.11, n = 1000, plot = TRUE)
+# anova( m1.2, m1.3)
+summary(m1.11)
+
+
+# what if we filter the data for just moths specialist such as hoary bats and see if there's an effect of lepidoptera in that bat 
+
+bm_hory <- bm2 %>%
+  filter(sp %in% c("LASCIN"))
+
+m1.12 <- glmmTMB(n ~ trmt_bin + jday_s + I(jday_s^2) + avg_moonlight_s + nit_avg_temp_c_s + nit_avg_wspm_s_s + yr_s +
+    t_lepidoptera_s +
+    (1 | site)+
+      jday_s * trmt_bin,
+  data = bm_hory,
+  family = nbinom2(link = "log")
+)
+
+check_singularity(m1.12)
+m1.12$sdr$pdHess
+m1.12$fit$message
+check_zeroinflation(m1.12)
+calculate_c_hat(m1.12) 
+performance_mae(m1.12)
+range(bm2$n)
+hist(bm2$n, breaks = 500)
+performance::r2(m1.12)
+DHARMa::simulateResiduals(m1.12, n = 1000, plot = TRUE)
+summary(m1.12)
+
+# anova( m1.2, m1.3
+
 # save working environment ------------------------------------------------
 
 save.image("working_env/glmm_v4.RData")

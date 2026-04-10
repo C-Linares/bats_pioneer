@@ -351,3 +351,323 @@ ggsave(p1, file = "figures/bat_delta_sunset/overlap_v1.tiff", width = 10, height
 
 
 density_graph+p1
+
+
+
+# new version with help from chatgpt
+
+# delta_sunset_clean.R
+#
+# Purpose:
+# Compare bat activity timing between lit and dark sites
+# using time relative to sunset in HOURS (not radians).
+# ---------------------------
+
+# libraries --------------------------------------------------------------
+if (!require("pacman")) install.packages("pacman")
+
+pacman::p_load(
+  tidyverse,
+  lubridate,
+  here,
+  janitor,
+  patchwork
+)
+
+# data -------------------------------------------------------------------
+bat_combine <- read_csv("data_for_analysis/prep_for_glmm/bat_combined.csv") %>%
+  clean_names()
+
+# remove variables not needed here
+bat_combine <- bat_combine %>%
+  select(-c(eff_hrs, jday, trmt_bin))
+
+# remove noise and NoID rows
+bat_combine <- bat_combine %>%
+  filter(!sp %in% c("Noise", "NoID"))
+
+# ------------------------------------------------------------------------
+# CHANGE 1:
+# Make sure date_time is in the correct timezone.
+# Use with_tz() if the timestamp is already stored in UTC and you want the
+# equivalent local time in America/Denver.
+# Use force_tz() only if the clock time is already local but missing the label.
+# ------------------------------------------------------------------------
+
+bat_combine <- bat_combine %>%
+  mutate(
+    date_time = force_tz(date_time, tzone = "America/Denver")
+  )
+
+# sunset data ------------------------------------------------------------
+sunset_data <- read_csv("data_for_analysis/sunrise_sunset/sunrise_sunset_.csv") %>%
+  clean_names() %>%
+  mutate(date = as.Date(date))
+
+# merge ------------------------------------------------------------------
+bat_with_sunset <- bat_combine %>%
+  left_join(sunset_data, by = c("noche" = "date"))
+
+missing_sunset_data <- bat_combine %>%
+  anti_join(sunset_data, by = c("noche" = "date"))
+
+# ------------------------------------------------------------------------
+# CHANGE 2:
+# Keep time relative to sunset in HOURS.
+# This is the variable you should use in plots.
+# Negative values = before sunset
+# Positive values = after sunset
+# ------------------------------------------------------------------------
+
+bat_with_sunset <- bat_with_sunset %>%
+  mutate(
+    sunset = as.POSIXct(sunset, tz = "America/Denver"),
+    hours_since_sunset = as.numeric(difftime(date_time, sunset, units = "hours")),
+    minutes_since_sunset = as.numeric(difftime(date_time, sunset, units = "mins"))
+  )
+
+# ------------------------------------------------------------------------
+# CHANGE 3:
+# If you still want the circular version for some other analysis, keep it.
+# But DO NOT use it for the main figure if you want interpretable axes.
+# ------------------------------------------------------------------------
+
+bat_with_sunset <- bat_with_sunset %>%
+  mutate(
+    deltasunset_rad = ifelse(
+      hours_since_sunset < 0,
+      (24 + hours_since_sunset) / 24,
+      hours_since_sunset / 24
+    ) * 2 * pi
+  )
+
+# add species labels -----------------------------------------------------
+bats <- read_csv("data_for_analysis/Species_bats.csv") %>%
+  clean_names()
+
+bat_with_sunset <- left_join(
+  bat_with_sunset,
+  bats,
+  by = c("sp" = "six_letter_species_code")
+)
+
+spp <- unique(bat_with_sunset$sp)
+spplabs <- unique(bat_with_sunset$common_name)
+
+# ------------------------------------------------------------------------
+# CHANGE 4:
+# Main plot uses HOURS, not radians
+# Also lower density smoothing slightly to preserve peaks better
+# ------------------------------------------------------------------------
+
+density_graph_hours <- bat_with_sunset %>%
+  filter(sp %in% spp, !is.na(hours_since_sunset)) %>%
+  ggplot(aes(x = hours_since_sunset, color = treatmt, fill = treatmt)) +
+  geom_density(alpha = 0.3, adjust = 0.8) +
+  facet_wrap(
+    ~ sp,
+    labeller = labeller(sp = setNames(spplabs, spp)),
+    scales = "free_y"
+  ) +
+  coord_cartesian(xlim = c(-2, 10)) +
+  labs(
+    x = "Hours since sunset",
+    y = "Density",
+    color = "Treatment",
+    fill = "Treatment"
+  ) +
+  scale_x_continuous(
+    breaks = seq(-2, 10, by = 2)
+  ) +
+  scale_color_manual(values = c("lit" = "orange", "dark" = "blue")) +
+  scale_fill_manual(values = c("lit" = "orange", "dark" = "blue")) +
+  theme_minimal(base_size = 12) +
+  theme(
+    strip.text = element_text(face = "bold"),
+    legend.position = "top",
+    axis.text.y = element_blank(),
+    axis.ticks.y = element_blank()
+  )
+
+density_graph_hours
+
+# save -------------------------------------------------------------------
+ggsave(
+  filename = "figures/bat_delta_sunset/density_graph_hours_v1.tiff",
+  plot = density_graph_hours,
+  width = 10,
+  height = 9,
+  dpi = 300
+)
+
+# ------------------------------------------------------------------------
+# OPTIONAL VERSION:
+# If you want more visible peaks, use a histogram instead of density
+# ------------------------------------------------------------------------
+
+hist_graph_hours <- bat_with_sunset %>%
+  filter(sp %in% spp, !is.na(hours_since_sunset)) %>%
+  ggplot(aes(x = hours_since_sunset, fill = treatmt)) +
+  geom_histogram(
+    position = "identity",
+    alpha = 0.4,
+    binwidth = 0.5
+  ) +
+  facet_wrap(
+    ~ sp,
+    labeller = labeller(sp = setNames(spplabs, spp)),
+    scales = "free_y"
+  ) +
+  coord_cartesian(xlim = c(-2, 10)) +
+  labs(
+    x = "Hours since sunset",
+    y = "Number of calls",
+    fill = "Treatment"
+  ) +
+  scale_x_continuous(
+    breaks = seq(-2, 10, by = 2)
+  ) +
+  scale_fill_manual(values = c("lit" = "orange", "dark" = "blue")) +
+  theme_minimal(base_size = 12) +
+  theme(
+    strip.text = element_text(face = "bold"),
+    legend.position = "top"
+  )
+
+hist_graph_hours
+
+
+
+
+library(dplyr)
+library(purrr)
+library(tidyr)
+library(overlap)
+
+compute_overlap <- function(df, sp_name) {
+  
+  lit <- df %>%
+    filter(scientific_name == sp_name, treatmt == "lit") %>%
+    pull(deltasunset_rad) %>%
+    na.omit()
+  
+  dark <- df %>%
+    filter(scientific_name == sp_name, treatmt == "dark") %>%
+    pull(deltasunset_rad) %>%
+    na.omit()
+  
+  n_lit  <- length(lit)
+  n_dark <- length(dark)
+  
+  # only compute if both groups have enough data
+  if (n_lit > 5 && n_dark > 5) {
+    
+    # choose estimator depending on sample size
+    estimator <- if (min(n_lit, n_dark) < 75) "Dhat1" else "Dhat4"
+    
+    overlap_est <- overlapEst(lit, dark, type = estimator)
+    
+    tibble(
+      species = sp_name,
+      n_lit = n_lit,
+      n_dark = n_dark,
+      estimator = estimator,
+      overlap = overlap_est
+    )
+    
+  } else {
+    
+    tibble(
+      species = sp_name,
+      n_lit = n_lit,
+      n_dark = n_dark,
+      estimator = NA_character_,
+      overlap = NA_real_
+    )
+  }
+}
+
+overlap_results <- bat_with_sunset %>%
+  distinct(scientific_name) %>%
+  pull(scientific_name) %>%
+  map_dfr(~ compute_overlap(bat_with_sunset, .x))
+
+overlap_results
+
+compute_overlap_ci <- function(df, sp_name, nboot = 1000) {
+  
+  lit <- df %>%
+    filter(scientific_name == sp_name, treatmt == "lit") %>%
+    pull(deltasunset_rad) %>%
+    na.omit()
+  
+  dark <- df %>%
+    filter(scientific_name == sp_name, treatmt == "dark") %>%
+    pull(deltasunset_rad) %>%
+    na.omit()
+  
+  n_lit  <- length(lit)
+  n_dark <- length(dark)
+  
+  if (n_lit > 5 && n_dark > 5) {
+    
+    estimator <- if (min(n_lit, n_dark) < 75) "Dhat1" else "Dhat4"
+    est <- overlapEst(lit, dark, type = estimator)
+    
+    # bootstrap
+    boot_vals <- bootstrap(lit, dark, nb = nboot, type = estimator)
+    ci <- quantile(boot_vals, probs = c(0.025, 0.975), na.rm = TRUE)
+    
+    tibble(
+      species = sp_name,
+      n_lit = n_lit,
+      n_dark = n_dark,
+      estimator = estimator,
+      overlap = est,
+      conf.low = ci[[1]],
+      conf.high = ci[[2]]
+    )
+    
+  } else {
+    
+    tibble(
+      species = sp_name,
+      n_lit = n_lit,
+      n_dark = n_dark,
+      estimator = NA_character_,
+      overlap = NA_real_,
+      conf.low = NA_real_,
+      conf.high = NA_real_
+    )
+  }
+}
+
+overlap_results <- bat_with_sunset %>%
+  distinct(scientific_name) %>%
+  pull(scientific_name) %>%
+  map_dfr(~ compute_overlap_ci(bat_with_sunset, .x, nboot = 1000))
+
+overlap_results
+
+
+library(ggplot2)
+
+p_overlap <- overlap_results %>%
+  filter(!is.na(overlap)) %>%
+  mutate(species = reorder(species, overlap)) %>%
+  ggplot(aes(x = species, y = overlap)) +
+  geom_errorbar(
+    aes(ymin = conf.low, ymax = conf.high),
+    width = 0.2,
+    color = "grey40"
+  ) +
+  geom_point(size = 2, color = "black") +
+  coord_flip() +
+  labs(
+    title = "Activity overlap between lit and dark treatments",
+    x = "Species",
+    y = "Overlap coefficient (Δ)"
+  ) +
+  theme_minimal(base_size = 14)
+
+p_overlap
