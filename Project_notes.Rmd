@@ -64,31 +64,31 @@ I talked to Jen Cruz, and she mentioned I have to be careful with the things tha
 
 12/4/2023
 
--   I worked on the bat_pop_analysis.R script. I have organized the Lano, slc, and obs. cov, so they have no site column, and they are arranged in ascending order of week.
+- I worked on the bat_pop_analysis.R script. I have organized the Lano, slc, and obs. cov, so they have no site column, and they are arranged in ascending order of week.
 
--   I created this R mark notebook to take notes of the thing here instead of a Word document.
+- I created this R mark notebook to take notes of the thing here instead of a Word document.
 
--   Created obs.cov2 for moon. illumination
+- Created obs.cov2 for moon. illumination
 
 ------------------------------------------------------------------------
 
 12/05/2023
 
--   started building the plotting code. got a margina plot for elevation but not for light or dark.
+- started building the plotting code. got a margina plot for elevation but not for light or dark.
 
--   need to calculate weather variables.
+- need to calculate weather variables.
 
--   need to calculate NDVI
+- need to calculate NDVI
 
--   I meet with Jen she mentioned that the models did not converged so I increase the max number of iterations to one million. the results still not converged...
+- I meet with Jen she mentioned that the models did not converged so I increase the max number of iterations to one million. the results still not converged...
 
 ------------------------------------------------------------------------
 
 12/06/2023
 
--   I need to build the weather data base to run the pop models.
--   Problems with the model :\
-    ![m1 diag plot](figures/m1_diag_plot.png){width="957"}
+- I need to build the weather data base to run the pop models.
+- Problems with the model :\
+  ![m1 diag plot](figures/m1_diag_plot.png){width="957"}
 
 -There are several peaks for density plot. This means there's problems with identifiability because there are multiple plots in the posterior?\
 -the chains are not in the same space. This means they are getting stuck in the same spot right?
@@ -101,13 +101,13 @@ When I increased to two million the Rhat values decreased? does this mean we are
 
 meeting with Jen:
 
--   The model is still not converging. We change the random intercept for abundance from site to week. It seems there is great variability in bat activity between weeks (see lano_js.csv). One solution might be to select certain weeks to be the ones that we analyze. Another solution is to add an extra level to the model to account for availability.
+- The model is still not converging. We change the random intercept for abundance from site to week. It seems there is great variability in bat activity between weeks (see lano_js.csv). One solution might be to select certain weeks to be the ones that we analyze. Another solution is to add an extra level to the model to account for availability.
 
 ------------------------------------------------------------------------
 
 12/21/2023
 
--   I ran into a problem with the data from 2021 for bats. The raw data produced with the script build data base v3 and v4. Currently the 2021 data has only 13 sites. It should be 14 because one site is missing entirely from the data base. I intended to update the data base with new code to get all the data points. Unfortunately it seems I am not collecting all the output files from Sonobat (Data_CumulativeSonoBatch_v420). I am in the process of compiling them but making a list of all the txt files using the function list.files() take a long time. So I am using the function dir_ls() from the fs package.
+- I ran into a problem with the data from 2021 for bats. The raw data produced with the script build data base v3 and v4. Currently the 2021 data has only 13 sites. It should be 14 because one site is missing entirely from the data base. I intended to update the data base with new code to get all the data points. Unfortunately it seems I am not collecting all the output files from Sonobat (Data_CumulativeSonoBatch_v420). I am in the process of compiling them but making a list of all the txt files using the function list.files() take a long time. So I am using the function dir_ls() from the fs package.
 
 ------------------------------------------------------------------------
 
@@ -116,7 +116,7 @@ meeting with Jen:
 In the code build_data_base_v4 I was able to see what what happening with the bat 2021 data. - some files have not been analyzed with sonobat and are missing from the database - once all the .txt files in the 2021 folder are compiled, there are two ways of getting the data out.\
 - sonofiles1\<- sm3dirs[grepl("\_CumulativeSonoBatch_v420.txt", sm3dirs)] - sonofiles2\<- sm3dirs[grepl("SonoBatch_v420.txt", sm3dirs)] \# this one doubles the data as it also get all the cumulativesonobatch files. I will be using the first one.
 
--   Also, we need to start using the column marked as 1st for species present in the recordings. This provides us with more data to work with compared to just the SpAccp column.
+- Also, we need to start using the column marked as 1st for species present in the recordings. This provides us with more data to work with compared to just the SpAccp column.
 
 ------------------------------------------------------------------------
 
@@ -126,37 +126,37 @@ I am still running Sonobat on some 2021 data and it needs to be run in all 2023 
 
 I will start building the 2022 database for bats.
 
--   I need to check what days were for each site. I need to check what dates where sampled for insects with bucket traps.
+- I need to check what days were for each site. I need to check what dates where sampled for insects with bucket traps.
 
--   I need to check the variation of bat calls per species by week
+- I need to check the variation of bat calls per species by week
 
 ------------------------------------------------------------------------
 
 1/29/2023
 
--   I created bat2022_v2. It has the species and the dates. we need to calculate the moon.
+- I created bat2022_v2. It has the species and the dates. we need to calculate the moon.
 
--   I also realized that I should calculate the date for the raw data. That way, I could know how many hours each recording was working.
+- I also realized that I should calculate the date for the raw data. That way, I could know how many hours each recording was working.
 
--   **IMPORTANT**: the batraw2022 database has data for iron 1 to 6. We need to fix this one too.
+- **IMPORTANT**: the batraw2022 database has data for iron 1 to 6. We need to fix this one too.
 
-    ------------------------------------------------------------------------
+  ------------------------------------------------------------------------
 
 1/30/2023
 
--   I will fix the issue with the batraw2022 data, so we have the data for all the sites. One possible issue is that we need to run more sites with Sonobat.
+- I will fix the issue with the batraw2022 data, so we have the data for all the sites. One possible issue is that we need to run more sites with Sonobat.
 
--   I also realize I need to check some call data data to corroborate these are properly ID correctly.
+- I also realize I need to check some call data data to corroborate these are properly ID correctly.
 
--   I can run some Sonobat data through kaleidoscope to see how these compare.
+- I can run some Sonobat data through kaleidoscope to see how these compare.
 
 ------------------------------------------------------------------------
 
 1/31/2024
 
--   I updated the code for the 2021 data but and I believe not all audio files have been ran trough Sonobat.
+- I updated the code for the 2021 data but and I believe not all audio files have been ran trough Sonobat.
 
-    ------------------------------------------------------------------------
+  ------------------------------------------------------------------------
 
 02/13/2024
 
@@ -288,21 +288,21 @@ The next step should be rerun the model with the data from 2022 and 2023. I am b
 
 8/07/2024
 
--   I coded the year variable in the bm data set a as -1,0,1 for 2021,22,23 respectively
+- I coded the year variable in the bm data set a as -1,0,1 for 2021,22,23 respectively
 
--   change the scaling on the model from 2sd to just by one standard deviation
+- change the scaling on the model from 2sd to just by one standard deviation
 
--   remove ndvi and max-freq from the model m1.5nb. I also filtered out the "no-Id" calls from the model before running it.
+- remove ndvi and max-freq from the model m1.5nb. I also filtered out the "no-Id" calls from the model before running it.
 
--   I need to code the treatment as -1, 0, 1 for sites close to lit sites and control sites. I needto check the time and date inthe raw data. when parsing these from the robomoth they did not work well but it could be due to the recordings comming from audiomoths.
+- I need to code the treatment as -1, 0, 1 for sites close to lit sites and control sites. I needto check the time and date inthe raw data. when parsing these from the robomoth they did not work well but it could be due to the recordings comming from audiomoths.
 
 ------------------------------------------------------------------------
 
 08/14/2024
 
--   from the m1.5nb model, I should plot the marginal effects for the variables that are not in the random effects but have an significan effect. For exampl (elevation, tem, wind, year)
+- from the m1.5nb model, I should plot the marginal effects for the variables that are not in the random effects but have an significan effect. For exampl (elevation, tem, wind, year)
 
--   I plotted yr
+- I plotted yr
 
 ![](images/clipboard-1745413645.png)
 
@@ -436,15 +436,15 @@ next is to run the same models with the ai index as I did for the whole data.
 
 I sitill need to run all the data with the bm.miller.day.csv.
 
--   need to recalculate values with the moonlit package for moon illumination
+- need to recalculate values with the moonlit package for moon illumination
 
--   need to correct for abundance.
+- need to correct for abundance.
 
-    I will do this by getting all the detentions by at lit and dark and getting the difference between both. then modeling such difference.
+  I will do this by getting all the detentions by at lit and dark and getting the difference between both. then modeling such difference.
 
--   find some temporal change look one note notes [Jesse meeting](onenote:https://d.docs.live.net/389838b7e3cff5ec/Documentos/phd/Phd_meetings%20advisors.one#Jesse%20meeting&section-id=%7BD72C4F66-1EBB-43B2-9B02-FF45D4030D0F%7D&page-id=%7B646664F3-8A08-4FBC-8106-B794329320F6%7D&end)  ([Web view](https://onedrive.live.com/view.aspx?resid=389838B7E3CFF5EC%2130314&id=documents&wd=target%28Phd_meetings%20advisors.one%7CD72C4F66-1EBB-43B2-9B02-FF45D4030D0F%2FJesse%20meeting%7C646664F3-8A08-4FBC-8106-B794329320F6%2F%29))
+- find some temporal change look one note notes [Jesse meeting](onenote:https://d.docs.live.net/389838b7e3cff5ec/Documentos/phd/Phd_meetings%20advisors.one#Jesse%20meeting&section-id=%7BD72C4F66-1EBB-43B2-9B02-FF45D4030D0F%7D&page-id=%7B646664F3-8A08-4FBC-8106-B794329320F6%7D&end)  ([Web view](https://onedrive.live.com/view.aspx?resid=389838B7E3CFF5EC%2130314&id=documents&wd=target%28Phd_meetings%20advisors.one%7CD72C4F66-1EBB-43B2-9B02-FF45D4030D0F%2FJesse%20meeting%7C646664F3-8A08-4FBC-8106-B794329320F6%2F%29))
 
--   
+- 
 
 did:
 
@@ -458,7 +458,7 @@ I worked on the correction for the bat calls. Not sure I got it right. it seems 
 
 Trying to calculate the moon predictor using the [moonlit](https://github.com/msmielak/moonlit) package. Not working very well to calculate because the data time I have are stored as UTC and when I pass it to MDT the night turns into day and the moon calculations don't work.
 
--   if I just give the function dates it calculates everything for the day and there's no moon.
+- if I just give the function dates it calculates everything for the day and there's no moon.
 
 ------------------------------------------------------------------------
 
@@ -470,9 +470,9 @@ I worked on the code to see if it would be bettert to create a sequence of dates
 
 I am still trying to calculate the moon illumination, however I have found a couple things to fix.
 
--   First I realized that I had to use the force_tz() function to make the date-time column into "America\\denver" time zone without changing the actual time. If this is not done, the times are all wrong for when you calculate the moon illumination.
+- First I realized that I had to use the force_tz() function to make the date-time column into "America\\denver" time zone without changing the actual time. If this is not done, the times are all wrong for when you calculate the moon illumination.
 
--   second: I realized that when merging dates and times that are ymd-00:00:00 that corresponds to midnight the information about midnight disapeared. the time was parsed out of the column. see code prep_for_glm.R
+- second: I realized that when merging dates and times that are ymd-00:00:00 that corresponds to midnight the information about midnight disapeared. the time was parsed out of the column. see code prep_for_glm.R
 
 Doing: I am figuring out how to prevent midnight times to disappear when merged with a date and parse it as time.\
 I did some work and tried my best to make it work. The moon.intensity function eventually worked. I can't make the moon stats function to work.
@@ -505,7 +505,7 @@ To ensure accuracy in analyzing date-time data, all entries corresponding to mid
 
 This adjustment prevents potential misinterpretation of exact midnight timestamps in downstream analyses.
 
--   I created the normalized_bm.csv data set to control for abundance. According to Jesse, this helps us see if there is a difference in the number of bats at lit and dark sites over time.
+- I created the normalized_bm.csv data set to control for abundance. According to Jesse, this helps us see if there is a difference in the number of bats at lit and dark sites over time.
 
 ------------------------------------------------------------------------
 
@@ -513,27 +513,27 @@ Carlos 12/13/2024
 
 I started working on analyzing the normalized data to see if it changes by time in the glmm_norm.R script.\
 
--   I encountered a problem while calculating the correlation between numeric variables. I realized the normalized data should have a special case when a species has no activity in the control site but it is present in the experimental site. If left as it is the result is NA as we are dividing the experiment/ control sites.
+- I encountered a problem while calculating the correlation between numeric variables. I realized the normalized data should have a special case when a species has no activity in the control site but it is present in the experimental site. If left as it is the result is NA as we are dividing the experiment/ control sites.
 
 ------------------------------------------------------------------------
 
 ![](images/clipboard-3251885484.png)
 
--   From the figure above, it seems that the data is zero-inflated and we need to account for that when analyzing it. (graph fro pep_for_glmm.R script)
+- From the figure above, it seems that the data is zero-inflated and we need to account for that when analyzing it. (graph fro pep_for_glmm.R script)
 
--   I corrected the data for the cases when the control where 0 and now we can check it
+- I corrected the data for the cases when the control where 0 and now we can check it
 
 Bad news I ran a few models with the data I have, the models are not a good fit because of residuals plots showing a pattern.
 
--   I tried one solution: I made the normalized abundance bound between zero and one. I end up doing a change in the normalization calculation\
+- I tried one solution: I made the normalized abundance bound between zero and one. I end up doing a change in the normalization calculation\
 
-    `normalized_activity = experimental_activity / (control_mean+ experimental_activity)  # Calculate normalized activity`
+  `normalized_activity = experimental_activity / (control_mean+ experimental_activity)  # Calculate normalized activity`
 
-    `)`
+  `)`
 
 This way we don't have trouble with the zeros and stays between zero and 1.
 
--   I will try to find a model that works with this one.
+- I will try to find a model that works with this one.
 
 ------------------------------------------------------------------------
 
@@ -541,9 +541,9 @@ I was able to run run a couple models by calculating a new variable: bin_act.\
 \
 **Binary Indicator**: Create `bin_act`:
 
--   `1` if experimental activity ≥ control mean.
+- `1` if experimental activity ≥ control mean.
 
--   `0` otherwise.
+- `0` otherwise.
 
 This allow me to run a couple of models a glm and a glmm. both seemed ok althoug I don't know how to evaluate the fit yet.
 
@@ -557,15 +557,15 @@ year + jday +jday2 seemed to be significant, but the model appears to be bad...
 
 Ideas:
 
--   focus on finding the moon and weather variables that are more relevant.
+- focus on finding the moon and weather variables that are more relevant.
 
--   work on the data for bats to finish the analysis.
+- work on the data for bats to finish the analysis.
 
--   se if there is a difference in activity curves between lit and dark sites.
+- se if there is a difference in activity curves between lit and dark sites.
 
--   focus on the buzz counts
+- focus on the buzz counts
 
--   focus on bird data
+- focus on bird data
 
 ------------------------------------------------------------------------
 
@@ -599,8 +599,8 @@ to do:
 
 Make sure you standardize by two standard deviations given I have different predictors.
 
--   I ran the model m1.9nb but I am not sure it is working.\
-    I need to asses the DHARMa residuals plot and see what does the ks test tell you.
+- I ran the model m1.9nb but I am not sure it is working.\
+  I need to asses the DHARMa residuals plot and see what does the ks test tell you.
 
 ------------------------------------------------------------------------
 
@@ -652,7 +652,7 @@ I found out you can run projects with in the background with background jobs, bu
 \
 Weather :
 
--   I updated the weather_prep.R script with the data crom craters of the moon and created the creates_wtr.csv\
+- I updated the weather_prep.R script with the data crom craters of the moon and created the creates_wtr.csv\
 
 ------------------------------------------------------------------------
 
@@ -677,15 +677,15 @@ bat trait script also needs work.
 
 💡Learned: I learned that the function read_csv from the package readr provides loads the data and keeps dates as dates when loaded. Maybe reduce the problems when parsing data.
 
--   Working on bat traits to get all the traits possible.
+- Working on bat traits to get all the traits possible.
 
-    -   done created the bat_eararm_v2.csv file.
+  - done created the bat_eararm_v2.csv file.
 
--   working on glmm_v2
+- working on glmm_v2
 
-    -   I merged predictors with the data set and realize the moonlit data is missing dates. it seems like those are missing because they should be zeros. I don't know why. Now I know it was because some days the moon was zero or below the horizon so it should not be affecting.
+  - I merged predictors with the data set and realize the moonlit data is missing dates. it seems like those are missing because they should be zeros. I don't know why. Now I know it was because some days the moon was zero or below the horizon so it should not be affecting.
 
--   I also realized that summarizing the moon by night might not tell us much about the effect. for that we would need to find some other way to asses the effect of moon on bat calls. because the moon sometimes was not affecting or present when all bats were there
+- I also realized that summarizing the moon by night might not tell us much about the effect. for that we would need to find some other way to asses the effect of moon on bat calls. because the moon sometimes was not affecting or present when all bats were there
 
 ------------------------------------------------------------------------
 
@@ -701,7 +701,7 @@ next I will try to use Allison's recommendations for plotting graphs and will ad
 
 I will try some models using insects and trait data as predictors now.\
 
--   I tried the model and did a good model m1.2nb. Needs to be rerun because the crom.wet.night has some values that are negative but should not be there.
+- I tried the model and did a good model m1.2nb. Needs to be rerun because the crom.wet.night has some values that are negative but should not be there.
 
 ![](images/clipboard-3240820724.png)
 
@@ -723,11 +723,11 @@ I detected a small problem with the model above. I didn't run it with the standa
 
 ![](images/clipboard-2295829368.png)
 
--   Update the weather files for wind and temp given there were some large negative numbers (-999). Probably to indicate some error in the data collection.
+- Update the weather files for wind and temp given there were some large negative numbers (-999). Probably to indicate some error in the data collection.
 
--   I managed to plot the marginal effects for the significant fixed effects above: Moon, wind, year, ear/arm, lepidoptera, treatment x jday.\
-    \
-    for example: I can see that as the season progress there are more bat calls at lit sites compared to dark.
+- I managed to plot the marginal effects for the significant fixed effects above: Moon, wind, year, ear/arm, lepidoptera, treatment x jday.\
+  \
+  for example: I can see that as the season progress there are more bat calls at lit sites compared to dark.
 
 ![](images/clipboard-3830088763.png)
 
@@ -765,17 +765,17 @@ I also ran a model with the acoustic index instead of the bat calls counts. The 
 
 I am working with the map_bat_activity.R and I realized that iron06 in 2023 has just 763 bat totals. I might need to check the data to see if this is correct or I am missing some stuff.
 
--   1 check recordings to see if all dates are present.
+- 1 check recordings to see if all dates are present.
 
--   2 check for recordings if same dates are present.
+- 2 check for recordings if same dates are present.
 
--   check if the build data base script missed some dates or files.
+- check if the build data base script missed some dates or files.
 
--   differentiate between lit and dark sites. what is magnitude of change and no base map... change in bat calls? number of calls? number of minutes calling?
+- differentiate between lit and dark sites. what is magnitude of change and no base map... change in bat calls? number of calls? number of minutes calling?
 
-    ![](images/clipboard-2052547050.png)
+  ![](images/clipboard-2052547050.png)
 
-    ------------------------------------------------------------------------
+  ------------------------------------------------------------------------
 
 7/29/2025
 
@@ -789,15 +789,15 @@ the light data has some errors, long 02 has no data for one of the years.
 
 7/31/2025
 
--   I was looking at the moon data and it seems we are missing data for the early period of sampling 21-22 06 2021 and for 2023-09-05
+- I was looking at the moon data and it seems we are missing data for the early period of sampling 21-22 06 2021 and for 2023-09-05
 
-    |            |     |
-    |------------|-----|
-    | 2023-09-05 |     |
+  |            |     |
+  |------------|-----|
+  | 2023-09-05 |     |
 
-    I might need to recheck the moon script to produce the estimates.
+  I might need to recheck the moon script to produce the estimates.
 
--   updated the glmm_v2 and found included light data from the spectral measurements. Now I am testing model m1.6nb to see if it does a better job.
+- updated the glmm_v2 and found included light data from the spectral measurements. Now I am testing model m1.6nb to see if it does a better job.
 
 ------------------------------------------------------------------------
 
@@ -805,13 +805,13 @@ the light data has some errors, long 02 has no data for one of the years.
 
 It seems we need to fix the moon prediction scrip to be able to get the 110 na rows we are missing.
 
--   I have to check how many calls we actually have. It seems we might be missing some calls. the bat combine data has the following
+- I have to check how many calls we actually have. It seems we might be missing some calls. the bat combine data has the following
 
-    ![](images/clipboard-2755547527.png){width="781"}
+  ![](images/clipboard-2755547527.png){width="781"}
 
-    but the bm2 file that I am using for modeling has a lot less. WHY? in the paper I am reporting 17 000 ish calls but M.lucifugus has 241 thousand by itself. Something does not match.
+  but the bm2 file that I am using for modeling has a lot less. WHY? in the paper I am reporting 17 000 ish calls but M.lucifugus has 241 thousand by itself. Something does not match.
 
--   R has been crashing and I think I know why now. ti seems like one of the packages might be giving trouble.
+- R has been crashing and I think I know why now. ti seems like one of the packages might be giving trouble.
 
 ------------------------------------------------------------------------
 
@@ -819,13 +819,13 @@ It seems we need to fix the moon prediction scrip to be able to get the 110 na r
 
 R keeps crashing and I suspect is the glmm_v2 script. I will start a new glmm_v3 script and we will review the bat call data base that might have a few calls missing. I will recalculate the moon intensity because it seems it's missing some dates.
 
--   when mergin the moon variable with the bat calls using date, I will make sure to have them both in the same time zone. that might be making things fail.
+- when mergin the moon variable with the bat calls using date, I will make sure to have them both in the same time zone. that might be making things fail.
 
--   I also need to check the bat bm.csv data file. I am suspecting we are missing a bunch of calls for each sepecies. Solved : the error came from reporting the total number of lines for each species instead of the total number of counts for each species. we are not missing calls.
+- I also need to check the bat bm.csv data file. I am suspecting we are missing a bunch of calls for each sepecies. Solved : the error came from reporting the total number of lines for each species instead of the total number of counts for each species. we are not missing calls.
 
--   Update: I think I found the problem with the moon and the bat data. When I calculate the noche column a date disapear becuase it gets converted all to the same date, but there's still calls on that other date. I think the solution might be to calculate the moon intensity with a buffer around the dates of bat calls.\
+- Update: I think I found the problem with the moon and the bat data. When I calculate the noche column a date disapear becuase it gets converted all to the same date, but there's still calls on that other date. I think the solution might be to calculate the moon intensity with a buffer around the dates of bat calls.\
 
-    ------------------------------------------------------------------------
+  ------------------------------------------------------------------------
 
 8/07/2025
 
@@ -928,3 +928,15 @@ created script glmm_v4.R to reanalyze the bat actrivity data. Arrived to model m
 3/30/2026
 
 I built the marginal effects plot for the final model (m1.8) for bat echolocations across experimental sites.
+
+------------------------------------------------------------------------
+
+5/6/2026
+
+After talking with Jesse there's some bat species that we need to filter or manually vet their calls. Some species are easily confused with others when analyzed acoustically, thus we need to change the set some rules for those calls that need to be vetted manually and for those that might change to mytis sp or just hifreq calls depending on the case. \
+
+------------------------------------------------------------------------
+
+5/7/2026\
+\
+I created a script to update the bat matrix that we use in the glm_v4 script. The prep_for_glmm_v2 now will produce te new matrix to be analyzed on a new glm script later. \
