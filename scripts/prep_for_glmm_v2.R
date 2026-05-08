@@ -44,18 +44,48 @@ library(janitor)
 load("working_env/prep_for_glm.RData")
 
 
-
-
-kpro_2021_bat <- fread(file = 'data_for_analysiwin x202I have the fol1_kpro_raw/bats2021_kpro_v1.csv', header = T)
+kpro_2021_bat <- fread(file = 'data_for_analysis/2021_kpro_raw/bats2021_kpro_v1.csv', header = T)
 kpro_2022_bat <- fread(file = 'data_for_analysis/2022_kpro_raw/bat2022_kpr.csv', header = T)
 kpro_2023_bat <- fread(file = 'data_for_analysis/2023_kpro_raw/bat2023_kpr.csv', header = T)
 
 
 bat_combined <- bind_rows(kpro_2021_bat, kpro_2022_bat, kpro_2023_bat)
+bat_combined<- clean_names(bat_combined)
 head(bat_combined)
 summary(bat_combined) # check the output
-
-keep<- c(".id","INDIR","OUTDIR","FOLDER","IN.FILE","DURATION","DATE","TIME","HOUR","AUTO.ID.", "PULSES") # cols to keep
+names(bat_combined)
+keep <- c(
+  "id",
+  "indir",
+  "outdir",
+  "folder",
+  "in_file",
+  "duration",
+  "date",
+  "time",
+  "hour",
+  "date_12",
+  "time_12",
+  "auto_id",
+  "pulses",
+  "alternate_1",
+  "alternate_2",
+  "n",
+  "fc",
+  "sc",
+  "dur",
+  "fmax",
+  "fmin",
+  "fmean",
+  "tbc",
+  "fk",
+  "tk",
+  "s1",
+  "tc",
+  "qual",
+  "files",
+  "manual_id"
+) # cols to keep
 
 bat_combined <- bat_combined %>% select(all_of(keep)) # keeps variables of interest
 
@@ -79,8 +109,8 @@ unique(bat_combined$site) # site labels
 
 # date 
 
-bat_combined$DATE<-lubridate::ymd(bat_combined$DATE)
-sum(is.na(bat_combined$DATE)) # check for NAs. 
+bat_combined$date<-lubridate::ymd(bat_combined$date)
+sum(is.na(bat_combined$date)) # check for NAs. 
 
 # noche/night
 # this variable assigns the same date to calls that belong to a single night. If a call happened on July 6 at 3 am it assigns it to July 5. 
@@ -93,15 +123,15 @@ sum(is.na(bat_combined$DATE)) # check for NAs.
 # 
 # sum(is.na(bat_combined$noche)) # check for NAs. 
 
-bat_combined$noche<- bat_combined$DATE.12
+bat_combined$noche<- bat_combined$date_12
 sum(is.na(bat_combined$noche)) # chceck for NAs
 
 
 # date time col. 
-bat_combined$DATE<-as.character(bat_combined$DATE)
-bat_combined$TIME<-as.character(bat_combined$TIME)
+bat_combined$date<-as.character(bat_combined$date)
+bat_combined$time<-as.character(bat_combined$time)
 
-datetime<-paste(bat_combined$DATE, bat_combined$TIME)#merge date and time 
+datetime<-paste(bat_combined$date, bat_combined$time)#merge date and time 
 
 bat_combined$datetime<- datetime
 
@@ -128,7 +158,7 @@ midnight_rows
 
 #year
 
-bat_combined$yr<-year(bat_combined$DATE)
+bat_combined$yr<-year(bat_combined$date)
 unique(bat_combined$yr) #we check the three years are present.
 
 
@@ -137,7 +167,7 @@ unique(bat_combined$yr) #we check the three years are present.
 litsites<-c("iron01","iron03","iron05","long01","long03")
 
 
-bat_combined$treatmt<-ifelse(bat_combined$site %in% litsites , "lit", "dark") # this makes a treatment variable.
+bat_combined$treatmt <- ifelse(bat_combined$site %in% litsites , "lit", "dark") # this makes a treatment variable.
 
 bat_combined$trmt_bin<- ifelse(bat_combined$treatmt== "lit", 1, 0)
 
@@ -155,76 +185,384 @@ summary(bat_combined)
 # first we tally the species 
 
 species_table <- bat_combined %>%
-  count(AUTO.ID., sort = TRUE)
+  count(auto_id, sort = TRUE)
 
 species_table
 
-# ANPA there are 3k rows. apply the following rules. 
+# ANPA there are 3k rows.
 
-# clean col names. Most likely needs to happen earlier but for now its ok here. 
-bat_clean <- bat_combined %>%
-  clean_names()
 
-# rule for anpa 
-# we need to update it to make all anpa when alternate_1 = Myevo into myoevo 
+
+# remove noise and NoID
+bat_clean <- bat_clean %>%
+  filter(
+    !str_to_upper(auto_id) %in% c("NOISE", "NOID"))
+
+# remove large objcets to keep memory free
+rm(kpro_2021_bat)
+rm(kpro_2022_bat)
+rm(kpro_2023_bat)
+
+gc()
+
+
+
+# rules for anpa 
+
+
+# make all species tags into small caps 
 bat_clean <- bat_combined %>%
-  clean_names() %>%
   mutate(
-    auto_id = str_to_upper(auto_id),
-    alternate_1 = str_to_upper(alternate_1),
-    alternate_2 = str_to_upper(alternate_2),
+    auto_id = str_to_lower(auto_id),
+    alternate_1 = str_to_lower(alternate_1),
+    alternate_2 = str_to_lower(alternate_2)
+  )
+
+# create sp column a exact copy of auto_id
+bat_clean <- bat_clean %>%
+  mutate(sp = auto_id)
+
+# standadize empty spaces as NAs for alternate columns. 
+bat_clean <- bat_clean %>%
+  mutate(
+    alternate_1 = na_if(alternate_1, ""),
+    alternate_2 = na_if(alternate_2, "")
+  )
+
+# step one ANPA make "anpaepfu" when empfu is first alternative. 
+# we need to update it to make all anpa when alternate_1 = Myevo into myoevo 
+
+bat_clean <- bat_clean %>%
+  mutate(
+    auto_id = str_to_lower(auto_id),
+    alternate_1 = str_to_lower(alternate_1),
+    alternate_2 = str_to_lower(alternate_2),
     
     sp = case_when(
       
-      # ANTPAL with MYOEVO alternative gets recoded as MYOEVO
-      auto_id == "ANTPAL" & alternate_1 == "MYOEVO" ~ "myoevo",
+      # Stronger ANTPAL-like rows
+      auto_id == "antpal" &
+        fc >= 24 & fc <= 30 &
+        fmin >= 22 & fmin <= 28 &
+        dur >= 5 &
+        fmax >= 43 & fmax <= 60 &
+        (alternate_1 == "eptfus" | is.na(alternate_1)) ~ "antpal",
       
-      # ANTPAL with EPTFUS alternative becomes ANTPAL/EPTFUS complex
-      auto_id == "ANTPAL" & alternate_1 == "EPTFUS" ~ "anpaepfu",
+      # ANTPAL label, but alternate suggests CORTOW and call is short
+      auto_id == "antpal" &
+        alternate_1 == "cortow" &
+        dur < 5 &
+        fc >= 24 & fc <= 35 ~ "anpa_coto",
       
-      # ANTPAL with any other alternative becomes low-frequency unknown
-      auto_id == "ANTPAL" &
-        (alternate_1 != "EPTFUS" | is.na(alternate_1) | alternate_1 == "") ~ "loF",
+      # ANTPAL label, but alternate suggests MYOEVO and call has higher frequency
+      auto_id == "antpal" &
+        alternate_1 == "myoevo" &
+        fc >= 32 ~ "myoevo",
       
-      # Everything else stays as the original auto_id
-      TRUE ~ str_to_lower(auto_id)
+      # ANTPAL label, but alternative suggests MYOTHY we don't have myothy in sites so lof
+      auto_id == "antpal" &
+        alternate_1 == "myothy" ~ "lof",
+      
+      # ANTPAL with EPTFUS alternative but not strong ANTPAL metrics
+      auto_id == "antpal" &
+        alternate_1 == "eptfus" ~ "anpa_epfu",
+      
+      # All other ANTPAL rows are low-frequency uncertain
+      auto_id == "antpal" ~ "lof",
+      
+      # Everything else remains as originally labeled
+      TRUE ~ auto_id
     ),
     
     inspect = case_when(
-      
-      # inspect ANTPAL rows that were not confidently handled
-      auto_id == "ANTPAL" &
-        (alternate_1 != "EPTFUS" | is.na(alternate_1) | alternate_1 == "") ~ "yes",
-      
-      # optional general quality flags
-      qual < 15 ~ "yes",
-      margin < 0.15 ~ "yes",
-      
+      sp %in% c("anpa_coto", "myoevo", "anpa_epfu", "lof_check") ~ "yes",
       TRUE ~ "no"
     ),
     
     rule_used = case_when(
       
-      auto_id == "ANTPAL" & alternate_1 == "MYOEVO" ~
-        "ANTPAL with MYOEVO alternative recoded as MYOEVO",
+      sp == "antpal" ~ 
+        "ANTPAL retained: fc, fmin, fmax, and duration consistent with ANTPAL reference range",
       
-      auto_id == "ANTPAL" & alternate_1 == "EPTFUS" ~
-        "ANTPAL with EPTFUS alternative recoded as ANPAEPFU complex",
+      sp == "anpa_coto" ~ 
+        "ANTPAL auto_id but CORTOW alternate and short duration; inspect as ANTPAL/CORTOW ambiguity",
       
-      auto_id == "ANTPAL" &
-        (alternate_1 != "EPTFUS" | is.na(alternate_1) | alternate_1 == "") ~
-        "ANTPAL without EPTFUS alternative recoded as loF",
+      sp == "myoevo_check" ~ 
+        "ANTPAL auto_id but MYOEVO alternate and higher fc; inspect as possible MYOEVO",
+      
+      sp == "myothy_check" ~ 
+        "ANTPAL auto_id but MYOTHY alternate; inspect because MYTH fragments can mimic low-frequency calls",
+      
+      sp == "anpa_epfu" ~ 
+        "ANTPAL auto_id with EPTFUS alternate but not strong ANTPAL metric match",
+      
+      sp == "lof_check" ~ 
+        "ANTPAL auto_id but not enough support for confident ANTPAL",
       
       TRUE ~ "original auto_id kept"
     )
   )
 
-bat_clean %>%
-  count(auto_id, alternate_1, sp, inspect, rule_used, sort = TRUE)
+# check if things worked.
 
 bat_clean %>%
-  filter(auto_id == "ANTPAL") %>%
-  count(alternate_1, sp, inspect, rule_used, sort = TRUE)
+  filter(auto_id == "antpal") %>%
+  count(auto_id, sp, alternate_1, inspect, rule_used, sort = TRUE)
+
+table(bat_clean$sp)
+
+# rows to inspect 
+antpal_inspect <- bat_clean %>%
+  filter(auto_id == "antpal", inspect == "yes") %>%
+  select(
+    in_file, auto_id, alternate_1, alternate_2,
+    sp, inspect, rule_used,
+    pulses, fc, dur, fmax, fmin, fmean, qual
+  )
+
+# CORTOW rules ------------------------------------------------------------
+
+
+# CORTOW is often confused with ANPA, LANO, LACI, MYEV, also with Myca and MYth but whit these two cases it should remain as COTO. 
+
+# we have about 1116 calls. 
+
+coto<-bat_clean %>% 
+  filter(auto_id == "cortow")
+
+bat_clean %>% 
+  filter(auto_id == "cortow") %>% 
+  count(auto_id, sp, alternate_1)
+
+# rule
+
+bat_clean <- bat_clean %>%
+  mutate(
+    sp = case_when(
+      
+      # ------------------------------------------------------------
+      # 1. Strong CORTOW-like calls: keep as CORTOW
+      # ------------------------------------------------------------
+      auto_id == "cortow" &
+        fc >= 24 & fc <= 32 &
+        dur >= 1.5 & dur <= 5.0 &
+        fmax >= 34 & fmax <= 52 &
+        fmin >= 21 & fmin <= 31 ~ "cortow",
+      
+      # ------------------------------------------------------------
+      # 2. CORTOW with ANTPAL alternative
+      # If duration is long, consider ANTPAL or CORTOW/ANTPAL ambiguity
+      # ------------------------------------------------------------
+      auto_id == "cortow" &
+        alternate_1 == "antpal" &
+        dur >= 5.5 &
+        fc >= 24 & fc <= 30 ~ "antpal",
+      
+      auto_id == "cortow" &
+        alternate_1 == "antpal" ~ "cortow_antpal",
+      
+      # ------------------------------------------------------------
+      # 3. CORTOW with LASNOC alternative
+      # LASNOC is usually longer and flatter
+      # ------------------------------------------------------------
+      auto_id == "cortow" &
+        alternate_1 == "lasnoc" &
+        dur >= 7 &
+        fc >= 24 & fc <= 29 ~ "lasnoc",
+      
+      auto_id == "cortow" &
+        alternate_1 == "lasnoc" ~ "cortow_lasnoc",
+      
+      # ------------------------------------------------------------
+      # 4. CORTOW with LASCIN alternative
+      # LASCIN usually lower fc and longer duration
+      # ------------------------------------------------------------
+      auto_id == "cortow" &
+        alternate_1 == "lascin" &
+        fc <= 24 &
+        dur >= 7 ~ "lascin",
+      
+      auto_id == "cortow" &
+        alternate_1 == "lascin" ~ "cortow_lascin",
+      
+      # ------------------------------------------------------------
+      # 5. CORTOW with MYOEVO alternative
+      # MYOEVO usually has higher fc and higher bandwidth
+      # ------------------------------------------------------------
+      auto_id == "cortow" &
+        alternate_1 == "myoevo" &
+        fc >= 33 ~ "myoevo",
+      
+      auto_id == "cortow" &
+        alternate_1 == "myoevo" ~ "cortow_myoevo",
+      
+      # ------------------------------------------------------------
+      # 6. CORTOW with MYOCAL or MYOTHY alternative
+      # Your decision: keep as CORTOW, but flag for inspection
+      # ------------------------------------------------------------
+      auto_id == "cortow" &
+        alternate_1 %in% c("myocal", "myothy") ~ "cortow",
+      
+      # ------------------------------------------------------------
+      # 7. CORTOW rows that do not strongly match expected CORTOW metrics
+      # ------------------------------------------------------------
+      auto_id == "cortow" &
+        (
+          dur > 5 |
+            fc < 24 | fc > 32 |
+            fmax < 34 | fmax > 52
+        ) ~ "cortow",
+      
+      # ------------------------------------------------------------
+      # 8. Everything else unchanged
+      # ------------------------------------------------------------
+      TRUE ~ sp
+    ),
+    
+    inspect = case_when(
+      auto_id == "cortow" & sp != "cortow" ~ "yes",
+      auto_id == "cortow" & alternate_1 %in% c("antpal", "lasnoc", "lascin", "myoevo", "myocal", "myothy") ~ "yes",
+      auto_id == "cortow" & qual < 5 ~ "yes",
+      TRUE ~ inspect
+    ),
+    
+    rule_used = case_when(
+      
+      auto_id == "cortow" &
+        fc >= 24 & fc <= 32 &
+        dur >= 1.5 & dur <= 5.0 &
+        fmax >= 34 & fmax <= 52 &
+        fmin >= 21 & fmin <= 31 ~
+        "CORTOW retained: metrics within expected CORTOW range",
+      
+      auto_id == "cortow" &
+        alternate_1 == "antpal" &
+        dur >= 5.5 &
+        fc >= 24 & fc <= 30 ~
+        "CORTOW recoded as ANTPAL: ANTPAL alternative with longer duration",
+      
+      auto_id == "cortow" &
+        alternate_1 == "antpal" ~
+        "CORTOW/ANTPAL ambiguity: inspect",
+      
+      auto_id == "cortow" &
+        alternate_1 == "lasnoc" &
+        dur >= 7 &
+        fc >= 24 & fc <= 29 ~
+        "CORTOW recoded as LASNOC: LASNOC alternative with longer duration",
+      
+      auto_id == "cortow" &
+        alternate_1 == "lasnoc" ~
+        "CORTOW/LASNOC ambiguity: inspect",
+      
+      auto_id == "cortow" &
+        alternate_1 == "lascin" &
+        fc <= 24 &
+        dur >= 7 ~
+        "CORTOW recoded as LASCIN: low fc and long duration",
+      
+      auto_id == "cortow" &
+        alternate_1 == "lascin" ~
+        "CORTOW/LASCIN ambiguity: inspect",
+      
+      auto_id == "cortow" &
+        alternate_1 == "myoevo" &
+        fc >= 33 ~
+        "CORTOW recoded as MYOEVO: MYOEVO alternative with higher fc",
+      
+      auto_id == "cortow" &
+        alternate_1 == "myoevo" ~
+        "CORTOW/MYOEVO ambiguity: inspect",
+      
+      auto_id == "cortow" &
+        alternate_1 %in% c("myocal", "myothy") ~
+        "CORTOW retained but flagged: MYOCAL/MYOTHY alternative",
+      
+      auto_id == "cortow" &
+        (
+          dur > 5 |
+            fc < 24 | fc > 32 |
+            fmax < 34 | fmax > 52
+        ) ~
+        "CORTOW metrics outside conservative range: inspect",
+      
+      TRUE ~ rule_used
+    )
+  )
+
+bat_clean %>%
+  filter(auto_id == "cortow") %>%
+  count(auto_id,alternate_1, sp, inspect, rule_used, sort = TRUE)
+
+cortow_inspect <- bat_clean %>%
+  filter(auto_id == "cortow", inspect == "yes") %>%
+  select(
+    in_file, auto_id, alternate_1, alternate_2,
+    sp, inspect, rule_used,
+    pulses, fc, dur, fmax, fmin, fmean, qual
+  )
+
+cortow_inspect # this are all the rows that need to be inspected. 
+
+
+# rule for EUDMAC
+# this batspecies is not likely at our sites. It is in idaho just not likely at our site. 
+# all need to be recheked so we need to tag those rows as as yes for the inspect column and lof for the sp 
+# but if the alternatives indicate a species that is likely such as lascin we should recode it as lascin and still check. 
+
+bat_clean <- bat_clean %>%
+  mutate(
+    
+    sp = case_when(
+      auto_id == "eudmac" & !is.na(alternate_1) ~ alternate_1,
+      auto_id == "eudmac" & is.na(alternate_1) & !is.na(alternate_2) ~ alternate_2,
+      auto_id == "eudmac" ~ "lof",
+      TRUE ~ sp
+    ),
+    
+    inspect = case_when(
+      auto_id == "eudmac" ~ "yes",
+      TRUE ~ inspect
+    ),
+    
+    rule_used = case_when(
+      auto_id == "eudmac" & !is.na(alternate_1) ~
+        "EUDMAC unlikely at study sites; recoded to alternate_1 and flagged for inspection",
+      
+      auto_id == "eudmac" & is.na(alternate_1) & !is.na(alternate_2) ~
+        "EUDMAC unlikely at study sites; recoded to alternate_2 and flagged for inspection",
+      
+      auto_id == "eudmac" ~
+        "EUDMAC unlikely at study sites; no alternative available, recoded as lof and flagged for inspection",
+      
+      TRUE ~ rule_used
+    )
+  )
+# 
+
+bat_clean %>%
+  filter(auto_id == "eudmac") %>%
+  count(auto_id,sp, inspect, rule_used)
+
+eudmac_inspect <- bat_clean %>%
+  filter(auto_id == "eudmac", inspect == "yes") %>%
+  select(
+    in_file, auto_id, alternate_1, alternate_2,
+    sp, inspect, rule_used,
+    pulses, fc, dur, fmax, fmin, fmean, qual
+  )
+
+eudmac_inspect
+
+
+# MYCA rule ---------------------------------------------------------------
+
+# we have about 3447 observations of mycal
+
+# now we do Myotis Californicus MYCA or myocal
+# this species is most often confused with mycil, myvol, mylu
+myca<-bat_clean %>% 
+  filter(auto_id == "myocal")
 
 # effort ------------------------------------------------------------------
 

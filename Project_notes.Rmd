@@ -933,10 +933,16 @@ I built the marginal effects plot for the final model (m1.8) for bat echolocatio
 
 5/6/2026
 
-After talking with Jesse there's some bat species that we need to filter or manually vet their calls. Some species are easily confused with others when analyzed acoustically, thus we need to change the set some rules for those calls that need to be vetted manually and for those that might change to mytis sp or just hifreq calls depending on the case. \
+After talking with Jesse there's some bat species that we need to filter or manually vet their calls. Some species are easily confused with others when analyzed acoustically, thus we need to change the set some rules for those calls that need to be vetted manually and for those that might change to mytis sp or just hifreq calls depending on the case.\
 
 ------------------------------------------------------------------------
 
 5/7/2026\
 \
-I created a script to update the bat matrix that we use in the glm_v4 script. The prep_for_glmm_v2 now will produce te new matrix to be analyzed on a new glm script later. \
+I created a script to update the bat matrix that we use in the glm_v4 script. The prep_for_glmm_v2 now will produce te new matrix to be analyzed on a new glm script later.
+
+------------------------------------------------------------------------
+
+5/8/2026
+
+I am building the rules for cleaning the bat data and reanalize it later. \
