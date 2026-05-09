@@ -945,4 +945,5 @@ I created a script to update the bat matrix that we use in the glm_v4 script. Th
 
 5/8/2026
 
-I am building the rules for cleaning the bat data and reanalize it later. \
+I am building the rules for cleaning the bat data and reanalize it later.\
+I am still working on the rules to analyze the data. \

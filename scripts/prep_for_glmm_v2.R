@@ -564,6 +564,217 @@ eudmac_inspect
 myca<-bat_clean %>% 
   filter(auto_id == "myocal")
 
+
+likely_myotis_alt <- c("myocil", "myovol", "myoluc")
+
+bat_clean <- bat_clean %>%
+  mutate(
+    
+    sp = case_when(
+      
+      # ------------------------------------------------------------
+      # 1. MYOCAL auto_id but alternate_1 supports MYOLUC
+      # MYOLUC tends to have lower fc and longer duration.
+      # ------------------------------------------------------------
+      auto_id == "myocal" &
+        alternate_1 == "myoluc" &
+        fc >= 39 & fc <= 44 &
+        fmax >= 55 & fmax <= 85 &
+        dur >= 4.5 ~ "myoluc",
+      
+      # ------------------------------------------------------------
+      # 2. MYOCAL auto_id but alternate_2 supports MYOLUC
+      # ------------------------------------------------------------
+      auto_id == "myocal" &
+        alternate_2 == "myoluc" &
+        fc >= 39 & fc <= 44 &
+        fmax >= 55 & fmax <= 85 &
+        dur >= 4.5 ~ "myoluc",
+      
+      # ------------------------------------------------------------
+      # 3. MYOCAL auto_id but alternate_1 supports MYOVOL
+      # MYOVOL around 40-43 kHz, often shorter/steeper than MYOLUC.
+      # ------------------------------------------------------------
+      auto_id == "myocal" &
+        alternate_1 == "myovol" &
+        fc >= 40 & fc <= 46 &
+        fmax >= 55 & fmax <= 95 &
+        dur >= 3.0 & dur <= 6.0 ~ "myovol",
+      
+      # ------------------------------------------------------------
+      # 4. MYOCAL auto_id but alternate_2 supports MYOVOL
+      # This catches the row you mentioned: myoyum + myovol.
+      # ------------------------------------------------------------
+      auto_id == "myocal" &
+        alternate_2 == "myovol" &
+        fc >= 40 & fc <= 46 &
+        fmax >= 55 & fmax <= 95 &
+        dur >= 3.0 & dur <= 6.0 ~ "myovol",
+      
+      # ------------------------------------------------------------
+      # 5. MYOCAL auto_id but alternate_1 supports MYOCIL
+      # MYOCIL tends to have high fmax.
+      # ------------------------------------------------------------
+      auto_id == "myocal" &
+        alternate_1 == "myocil" &
+        fc >= 40 & fc <= 45 &
+        fmax >= 75 &
+        dur >= 2.5 & dur <= 5.5 ~ "myocil",
+      
+      # ------------------------------------------------------------
+      # 6. MYOCAL auto_id but alternate_2 supports MYOCIL
+      # ------------------------------------------------------------
+      auto_id == "myocal" &
+        alternate_2 == "myocil" &
+        fc >= 40 & fc <= 45 &
+        fmax >= 75 &
+        dur >= 2.5 & dur <= 5.5 ~ "myocil",
+      
+      # ------------------------------------------------------------
+      # 7. Strong MYOCAL-like calls, but only if no likely target
+      # alternative is available.
+      # ------------------------------------------------------------
+      auto_id == "myocal" &
+        !(alternate_1 %in% likely_myotis_alt) &
+        !(alternate_2 %in% likely_myotis_alt) &
+        fc >= 47 & fc <= 53 &
+        fmax >= 70 &
+        fmin >= 40 &
+        dur >= 2.5 & dur <= 5.5 ~ "myocal",
+      
+      # ------------------------------------------------------------
+      # 8. MYOYUM alternatives without a target alternate
+      # ------------------------------------------------------------
+      auto_id == "myocal" &
+        (alternate_1 == "myoyum" | alternate_2 == "myoyum") &
+        !(alternate_1 %in% likely_myotis_alt) &
+        !(alternate_2 %in% likely_myotis_alt) ~ "mysp",
+      
+      # ------------------------------------------------------------
+      # 9. Short Myotis calls are weak for species-level ID
+      # ------------------------------------------------------------
+      auto_id == "myocal" &
+        dur < 3.5 ~ "mysp",
+      
+      # ------------------------------------------------------------
+      # 10. Lower-frequency 40 kHz Myotis metrics without a supported
+      # target alternative
+      # ------------------------------------------------------------
+      auto_id == "myocal" &
+        fc >= 39 & fc <= 45 ~ "mysp",
+      
+      # ------------------------------------------------------------
+      # 11. Any remaining MYOCAL rows
+      # ------------------------------------------------------------
+      auto_id == "myocal" ~ "mysp",
+      
+      TRUE ~ sp
+    ),
+    
+    inspect = case_when(
+      auto_id == "myocal" ~ "yes",
+      TRUE ~ inspect
+    ),
+    
+    rule_used = case_when(
+      
+      auto_id == "myocal" &
+        alternate_1 == "myoluc" &
+        fc >= 39 & fc <= 44 &
+        fmax >= 55 & fmax <= 85 &
+        dur >= 4.5 ~
+        "MYOCAL recoded to MYOLUC: alternate_1 supports MYOLUC and metrics fit lower-frequency longer Myotis",
+      
+      auto_id == "myocal" &
+        alternate_2 == "myoluc" &
+        fc >= 39 & fc <= 44 &
+        fmax >= 55 & fmax <= 85 &
+        dur >= 4.5 ~
+        "MYOCAL recoded to MYOLUC: alternate_2 supports MYOLUC and metrics fit lower-frequency longer Myotis",
+      
+      auto_id == "myocal" &
+        alternate_1 == "myovol" &
+        fc >= 40 & fc <= 46 &
+        fmax >= 55 & fmax <= 95 &
+        dur >= 3.0 & dur <= 6.0 ~
+        "MYOCAL recoded to MYOVOL: alternate_1 supports MYOVOL and metrics fit 40 kHz Myotis",
+      
+      auto_id == "myocal" &
+        alternate_2 == "myovol" &
+        fc >= 40 & fc <= 46 &
+        fmax >= 55 & fmax <= 95 &
+        dur >= 3.0 & dur <= 6.0 ~
+        "MYOCAL recoded to MYOVOL: alternate_2 supports MYOVOL and metrics fit 40 kHz Myotis",
+      
+      auto_id == "myocal" &
+        alternate_1 == "myocil" &
+        fc >= 40 & fc <= 45 &
+        fmax >= 75 &
+        dur >= 2.5 & dur <= 5.5 ~
+        "MYOCAL recoded to MYOCIL: alternate_1 supports MYOCIL and high fmax supports MYOCIL-like call",
+      
+      auto_id == "myocal" &
+        alternate_2 == "myocil" &
+        fc >= 40 & fc <= 45 &
+        fmax >= 75 &
+        dur >= 2.5 & dur <= 5.5 ~
+        "MYOCAL recoded to MYOCIL: alternate_2 supports MYOCIL and high fmax supports MYOCIL-like call",
+      
+      auto_id == "myocal" &
+        !(alternate_1 %in% likely_myotis_alt) &
+        !(alternate_2 %in% likely_myotis_alt) &
+        fc >= 47 & fc <= 53 &
+        fmax >= 70 &
+        fmin >= 40 &
+        dur >= 2.5 & dur <= 5.5 ~
+        "MYOCAL retained: metrics broadly consistent with higher-frequency MYOCAL and no likely target alternative",
+      
+      auto_id == "myocal" &
+        (alternate_1 == "myoyum" | alternate_2 == "myoyum") &
+        !(alternate_1 %in% likely_myotis_alt) &
+        !(alternate_2 %in% likely_myotis_alt) ~
+        "MYOCAL with MYOYUM alternative only: recoded as MYSP because target likely alternatives are not supported",
+      
+      auto_id == "myocal" &
+        dur < 3.5 ~
+        "MYOCAL recoded as MYSP: short Myotis calls are weak for species-level ID",
+      
+      auto_id == "myocal" &
+        fc >= 39 & fc <= 45 ~
+        "MYOCAL recoded as MYSP: lower-frequency 40 kHz Myotis metrics but no supported target alternative",
+      
+      auto_id == "myocal" ~
+        "MYOCAL recoded as MYSP: MYOCAL less likely at study sites and no strong supported alternative",
+      
+      TRUE ~ rule_used
+    )
+  )
+
+bat_clean %>%
+  filter(auto_id == "myocal") %>%
+  count(alternate_1, alternate_2, sp, inspect, rule_used, sort = TRUE)
+
+bat_clean %>%
+  filter(auto_id == "myocal") %>%
+  group_by(sp) %>%
+  summarise(
+    n = n(),
+    mean_fc = mean(fc, na.rm = TRUE),
+    mean_fmax = mean(fmax, na.rm = TRUE),
+    mean_fmin = mean(fmin, na.rm = TRUE),
+    mean_dur = mean(dur, na.rm = TRUE),
+    min_dur = min(dur, na.rm = TRUE),
+    max_dur = max(dur, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+myocal_inspect <- bat_clean %>%
+  filter(auto_id == "myocal", inspect == "yes") %>%
+  select(
+    in_file, auto_id, alternate_1, alternate_2,
+    sp, inspect, rule_used,
+    pulses, fc, dur, fmax, fmin, fmean, qual
+  )
 # effort ------------------------------------------------------------------
 
 
