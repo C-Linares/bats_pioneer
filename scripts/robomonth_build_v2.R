@@ -134,7 +134,7 @@ kpro_column_check <- map_dfr(buzz_files_all, check_kpro_column)
 kpro_column_check %>%
   count(has_kpro_autoid, has_wa_kaleidoscope_auto_id)
 
-# after cheching 2021, 2022, and 2023 data I see only 2022 has been run through kpro and thus we can use the autoID col for all the years. 
+# after checking 2021, 2022, and 2023 data I see only 2022 has been run through kpro and thus we can use the autoID col for all the years. 
 
 #combine robomoth --------------------------------------------------------
 
@@ -295,9 +295,6 @@ buzz_all.1 <- buzz_all.1 %>%
 
 str(buzz_all.1)
 
-
-# I realized I should not remove rows with NAs in the autobuzz counts. these are files that need to be analyzed with sonobat. 
-
 # lets see first what we would be removing in auto buzz 
 
 buzz_all.1 %>%
@@ -403,8 +400,10 @@ sp_key <- c(
   "parhes" = "pahe",
   "cortow" = "coto",
   "myoyum" = "myyu",
-  "myothy" = "myth"
-)
+  "myothy" = "myth",
+  "hifrag" = "hif",
+  "lofrag" = "lof"
+  )
 
 
 
@@ -419,6 +418,18 @@ buzz_all.1 %>%
   count(sp, sort = TRUE)
 
 unique(buzz_all.1$sp)
+
+
+# recode myth, myca, myyu as my sp while we code euma as lof. 
+
+buzz_all.1 <- buzz_all.1 %>%
+  mutate(
+    sp = case_when(
+      sp %in% c("myth", "myca", "myyu") ~ "mysp",
+      sp == "euma" ~ "lof",
+      TRUE ~ sp
+    )
+  )
 
 
 
