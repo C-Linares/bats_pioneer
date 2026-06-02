@@ -946,4 +946,75 @@ I created a script to update the bat matrix that we use in the glm_v4 script. Th
 5/8/2026
 
 I am building the rules for cleaning the bat data and reanalize it later.\
-I am still working on the rules to analyze the data. \
+I am still working on the rules to analyze the data.
+
+------------------------------------------------------------------------
+
+5/16/2026
+
+I realized that for the robomoth data there are some files duplicated for 2022 data\
+
+```{r}
+> amp_robo_all %>%
++   count(filename_norm) %>%
++   filter(n > 1)
+# A tibble: 708 × 2
+   filename_norm                     n
+   <chr>                         <int>
+ 1 iron03-20220713_222340[1].wav     2
+ 2 iron03-20220713_222355[1].wav     2
+ 3 iron03-20220713_222410[1].wav     2
+ 4 iron03-20220713_222425[1].wav     2
+ 5 iron03-20220713_222440[1].wav     2
+ 6 iron03-20220713_222455[1].wav     2
+ 7 iron03-20220713_222510[1].wav     2
+ 8 iron03-20220713_222525[1].wav     2
+ 9 iron03-20220713_222540[1].wav     2
+10 iron03-20220713_222555[1].wav     2
+# ℹ 698 more rows
+# ℹ Use `print(n = ...)` to see more rows
+```
+
+\
+\
+I discovered that iron03 has a second file with the same dates for
+
+|                               |     |
+|-------------------------------|-----|
+| iron03-20220713_222340[1].wav |     |
+
+I moved the duplicated files to a trash folder inside the iron03 folder.
+
+I will remove the folder called "second to a file that does not need to be analyze.\
+Iron 05 also have duplicated files. needs to be rerun with the sonobat buzz and with the amp script
+
+long03 also had double files product of the split larger files.
+
+long05
+
+vizc04
+
+all of this for 2022
+
+------------------------------------------------------------------------
+
+5/18/2026
+
+I removed the files that seemed duplicated, now I should have files that are ready to go. 2023 seemd not to have the same problem. I think I need to recreate the robomoth outputs from sonobat first. I discovered how to add the kpro into the kpro autoid column and that could help me make more reproducible content.
+
+------------------------------------------------------------------------
+
+5/31/2026
+
+I generated a graph of bat calls and the amp frequency. I need to ask what will be the process to select low frequency calls. I think we have to select certain bats to achieve this.\
+I don't know how this works yet. I also need to keep working on the code todo the same for speaker data.\
+\
+![](images/clipboard-2015532310.png)
+
+------------------------------------------------------------------------
+
+6/01/2026
+
+I re coded the calls for myyo, myca, and myth as mysp and euma as low frequecy.\
+I need to do the same for the speaker data and merge it with the amp data.\
+I also need to find a cut off value to keep faint calls.
