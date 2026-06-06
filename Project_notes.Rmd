@@ -1017,4 +1017,26 @@ I don't know how this works yet. I also need to keep working on the code todo th
 
 I re coded the calls for myyo, myca, and myth as mysp and euma as low frequecy.\
 I need to do the same for the speaker data and merge it with the amp data.\
-I also need to find a cut off value to keep faint calls.
+I also need to find a cut off value to keep faint calls.\
+\
+
+------------------------------------------------------------------------
+
+6/2/2026
+
+Improved on the graph to use it as supplements and discuss with Jesse.\
+![](images/clipboard-802186843.png)
+
+------------------------------------------------------------------------
+
+6/05/2026
+
+I ran into a problem with the amp files for the spkr data. There are several files that are duplicate because there is duplicate data for some sites in 2023. I will come back to this after I have remove those files and reran the amplitude script on that folder.
+
+step 1 : remove unecessary folder.
+
+step 2: reproduce the buzz vetting table
+
+step 3: reproduce the amplitude data. \
+\
+for the sm3 data and the buzz counts, I have encounter a great deal or trouble as the ID data seems to be missing and other files are taking long to run. I have decided to focus ont he buzzes later on R merge the buzz data witht he consolidated observations I already have.

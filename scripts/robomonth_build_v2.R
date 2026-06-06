@@ -304,21 +304,12 @@ buzz_all.1 %>%
     n_na_zero = sum(is.na(sp) & auto_buzz_count == 0, na.rm = TRUE)
   )
 
-# # i will remove the nas and zeros for sp and autobuzzcouts.
-# buzz_all.1 <- buzz_all.1 %>%
-#     filter(!(is.na(sp) & auto_buzz_count == 0))
-# 
-# # now we remove the instances where sp is na and autobuzz is na. 
-# buzz_all.1 <- buzz_all.1 %>%
-#   filter(!(is.na(sp) & is.na(auto_buzz_count)))
-
-# remove rows with noise, noid and inf for the call/sec column  
-# the code below removes rows where sp=NA and calls_sec is inf. 
+# removes the rows with noise, noid and inf for the call/sec column where NAs for sp.  
 
 buzz_all.1 <- buzz_all.1 %>%
   filter(
     !(is.na(sp) & calls_sec == "Inf"),
-    !str_to_lower(sp) %in% c("noise", "noid") 
+    is.na(sp) | !str_to_lower(sp) %in% c("noise", "noid")
   )
 
 # we are going to remove NAs for sp about 116 rows
@@ -329,7 +320,7 @@ sum(is.na(buzz_all.1$sp))
 buzz_all.1 <- buzz_all.1 %>%
   filter(!is.na(sp))
 
-# rules for simplifying multi IDs -----------------------------------------
+# rules for simplifying multiple IDs -----------------------------------------
 
 
 # we have tags in the sp column that correspond to instances where the software id several calls as mixed species. I will first count those and then I will assign the first option. For example if it is myvo/myci/myca then I will assign it as mysp. If it is lano/epfu then I will assign it as lof.any other combination it will be assigned as the first species ID for example coto/epfu/myth/anpa will be assigned as coto.
@@ -375,7 +366,7 @@ str(buzz_all.1)
 
 unique(buzz_all.1$sp_clean)
 
-## i looks like the rules for multi species work so we replace sp with sp_clean
+## it looks like the rules for multi species work so we replace sp with sp_clean
 buzz_all.1 <- buzz_all.1 %>%
   mutate(sp = sp_clean) %>%
   select(-sp_clean)
@@ -489,7 +480,7 @@ glimpse(buzz_all.1)
 
 # I need to check what files are duplicated in the buzz_all.1 data frame because I will be merging it with the amplitude data frame and I want to make sure I am not merging multiple rows with the same file name.
 
-# cehck for duplicate files 
+# check for duplicate files 
 buzz_dup <- buzz_all.1 %>%
   count(filename, name = "n_buzz_rows") %>%
   filter(n_buzz_rows > 1) %>%
@@ -508,7 +499,7 @@ buzz_dup_norm <- buzz_all.1 %>%
 
 buzz_dup_norm
 
-
+# there is no exact duplicates 
 buzz_exact_dups <- buzz_all.1 %>%
   group_by(across(everything())) %>%
   filter(n() > 1) %>%
@@ -516,7 +507,6 @@ buzz_exact_dups <- buzz_all.1 %>%
 
 buzz_exact_dups
 
-# the buzz files don't have any duplicated files. 
 # # -------------------------------------------------------------------------
 # Handle duplicated audio files
 # Rule:
@@ -529,7 +519,7 @@ buzz_all.1 <- buzz_all.1 %>%
     filename_norm = str_to_lower(str_trim(basename(filename)))
   )
 
-buzz_all.2 <- buzz_all.1 %>%
+buzz_all.2 <- buzz_all.1 %>% # removes duplicate whe sp and file name are the same. 
   distinct(
     filename_norm,
     sp,
@@ -537,7 +527,9 @@ buzz_all.2 <- buzz_all.1 %>%
   )
 
 # amplitude  --------------------------------------------------------------
-
+# here we load the amplitude files that are the result of the script :  G:/PioneerLights_2022/scripts/rms_calculator.R
+# we just do 2022 and 2023 because those are the years we focus for this analysis. 
+# 
 # paths to folders with amplitude csv files
 amp_path_2022_robo <- "G:/PioneerLights_2022/part2/robomoth/buzz_out"
 amp_path_2023_robo <- "F:/pioneer_2023/robomoth_2023_all/buzz_out/"
@@ -568,6 +560,8 @@ amp_files_robo
 
 # Check which amplitude files have RMS column
 # -------------------------------------------------------------------------
+# there are several files that don't have rms column. That is because whe exported I just focused on the dbfs. If required we can either backwards calculate the rms or re run the script on each of the site,year files. 
+
 
 check_amp_columns <- function(file) {
   
@@ -662,11 +656,13 @@ amp_robo_all <- amp_files_robo %>%
 
 glimpse(amp_robo_all)
 unique(amp_robo_all$site)
+summary(amp_robo_all)
 
 amp_robo_all %>%
   count(year, site) #There's a mistake with the year on iron 04 22 or 23 files. 
 
 # check misssing values of dbfs. 
+# no missing values 
 amp_robo_all %>%
   summarise(
     n_rows = n(),
@@ -676,6 +672,7 @@ amp_robo_all %>%
   )
 
 # check duplicated rows
+# no duplicated
 amp_dups <- amp_robo_all %>%
   mutate(
     filename_norm = str_to_lower(str_trim(basename(filename)))
@@ -688,8 +685,7 @@ amp_dups
 
 # now I want to merge buzz_all.1 with the amplitude data frame. I will merge by filename 
 
-# I have more than 29K observations that I need to add amplitude data by merging it with the amp_robo_all data frame. I will do a left join to keep all the observations in buzz_all.1 and add the amplitude data where available.
-
+# I have more than 29K observations that I need to add amplitude data by merging it with the amp_robo_all data frame.
 head(buzz_all.2$filename) #buzz.all.2 has the duplicated files removed 
 head(amp_robo_all$filename)
 
@@ -737,6 +733,7 @@ buzz_all.2_amp <- buzz_all.2 %>%
 
 
 # how many matched 
+# 4k obs missing amp but many are from 2021 that we will not analyze.
 buzz_all.2_amp %>%
   summarise(
     n_rows = n(),
@@ -755,33 +752,66 @@ missing<-buzz_all.2_amp %>%
 # the file buzz_all.2_amp is the one that should be exported and analyzed. 
 # graph the number of observations at each dbfs bin and sp dat for 2022 and 2023
 
-ggplot(buzz_all.2_amp, aes(x = avg_dbfs)) +
-  geom_histogram(binwidth = 1, fill = "blue", color = "black") +
-  labs(title = "Distribution of Average dBFS", x = "Average dBFS", y = "Count") +
-  theme_minimal()
-
-
-buzz_all.2_amp %>%
-  filter(
-    year %in% c(2022, 2023),
-    !is.na(avg_dbfs),
-    !is.na(sp)
-  ) %>%
-  ggplot(aes(x = avg_dbfs)) +
-  geom_histogram(binwidth = 1, fill = "blue", color = "black") +
-  facet_wrap(~ sp, scales = "free_y") +
-  labs(
-    title = "Distribution of Average dBFS by Species",
-    x = "Average dB",
-    y = "Count"
+ggplot(
+  buzz_all.2_amp %>%
+    filter(!is.na(avg_dbfs), !is.na(treatmt)),
+  aes(x = avg_dbfs, fill = treatmt)
+) +
+  geom_histogram(binwidth = 1, color = "black") +
+  geom_vline(
+    xintercept = -20,
+    linetype = "dashed",
+    linewidth = 0.8
   ) +
-  theme_minimal()
+  facet_wrap(~ treatmt) +
+  labs(
+    title = "Distribution of Average Recording Amplitude by Treatment",
+    subtitle = "Dashed line marks proposed faint-call threshold: ≤ -20 dBFS",
+    x = "Average amplitude (dBFS)",
+    y = "Number of bat-call files",
+    fill = "Treatment",
+    caption = paste(
+      "dBFS = decibels relative to digital full scale.,
+      For each audio file, average dBFS was calculated from the RMS amplitude of the waveform:
+      20 × log10(RMS / 32767), where 32767 is the maximum positive value for 16-bit audio.,
+      Values closer to 0 dBFS are louder; more negative values indicate fainter recordings.
+      RMS was calcuated with seewave package"
+    )
+  ) +
+  theme_minimal() +
+  theme(
+    plot.caption = element_text(hjust = 0, size = 9),
+    plot.subtitle = element_text(size = 11)
+  )
+
+faint_summary <- buzz_all.2_amp %>%
+  filter(!is.na(avg_dbfs), !is.na(treatmt)) %>%
+  mutate(
+    faint_call = avg_dbfs <= -20
+  ) %>%
+  group_by(treatmt) %>%
+  summarise(
+    n_files = n(),
+    n_faint_files = sum(faint_call),
+    prop_faint_files = n_faint_files / n_files,
+    .groups = "drop"
+  )
+
+faint_summary
+
+# the previous graph and summary is to show to Jesse and discuss the choice I have made to select faint or not-loud calls. 
+
+#############################################################################################################
+#############################################################################################################
+#############################################################################################################
+
+
 
 
 # speaker data ------------------------------------------------------------
 
-path_2022 <- "F:/pioneer_2022/bat_speakers/speaker_organized" # folder
-path_2023 <- "G:/PioneerLights_2023/speaker"             # folder
+path_2022 <- "F:/pioneer_2022/bat_speakers/speaker_organized/buzz" # folder
+path_2023 <- "G:/PioneerLights_2023/speaker/buzz"             # folder
 
 files_2022 <- list.files(path_2022, pattern = "\\.txt$", full.names = TRUE)
 files_2023 <- list.files(path_2023, pattern = "\\.txt$", full.names = TRUE)
@@ -923,6 +953,28 @@ spkr_all <- spkr_all %>%
 unique(spkr_all$sp)
 
 
+# we still have to remove noid and noise from the sp column.
+
+spkr_all <- spkr_all %>%
+  filter(
+    !str_to_lower(sp) %in% c("noise", "noid")
+  )
+
+# re-code myth, myca, myyu as mysp while we code euma as lof. 
+
+spkr_all <- spkr_all %>%
+  mutate(
+    sp = case_when(
+      sp %in% c("myth", "myca", "myyu") ~ "mysp",
+      sp == "euma" ~ "lof",
+      TRUE ~ sp
+    )
+  )
+
+spkr_all%>%
+  count(sp, sort = TRUE)
+
+
 # now we add the treatment column.
 
 
@@ -960,7 +1012,7 @@ spkr_all %>%
     n_na_zero = sum(is.na(sp) & auto_buzz_count == 0, na.rm = TRUE)
   )
 
-# remove rows with noise, noid and inf for the call/sec column  
+# remove rows with noise, noid and inf for the call/sec column when there's no sp ID. 
 
 spkr_all <- spkr_all %>%
   filter(
@@ -1016,7 +1068,7 @@ summary(spkr_all)
 
 # keep just necessary columns
 
-keep<- c("date_time", "time", "sp", "site", "treatmt", "trmt_bin", "auto_buzz_count", "manual_buzz_count", "c_buzz","year", "noche", "hi_f", "lo_f")
+# keep<- c("date_time", "time", "sp", "site", "treatmt", "trmt_bin", "auto_buzz_count", "manual_buzz_count", "c_buzz","year", "noche", "hi_f", "lo_f") we will use the same as robomoth data 
 
 spkr_all <- spkr_all %>%
   select(all_of(keep))
@@ -1024,6 +1076,214 @@ spkr_all <- spkr_all %>%
 
 unique(spkr_all$site)
 summary(spkr_all)
+
+
+
+# amplitude spkr ----------------------------------------------------------
+
+# here we load the amplitude files for spkrs that are the result of the script :  G:/PioneerLights_2022/scripts/rms_calculator.R
+# we just do 2022 and 2023 because those are the years we focus for this analysis. 
+# 
+# paths to folders with amplitude csv files
+amp_path_2022_spkr <- "F:/pioneer_2022/bat_speakers/speaker_organized/buzz"
+amp_path_2023_spkr <- "G:/PioneerLights_2023/speaker/buzz"
+
+
+
+# list amplitude files from both folders
+amp_files_2022_spkr <- list.files(
+  path = amp_path_2022_spkr,
+  pattern = "_Amp\\.csv$",
+  full.names = TRUE
+)
+
+amp_files_2023_spkr <- list.files(
+  path = amp_path_2023_spkr,
+  pattern = "_Amp\\.csv$",
+  full.names = TRUE
+)
+
+# combine both file lists
+amp_files_spkr <- c(
+  amp_files_2022_spkr,
+  amp_files_2023_spkr
+)
+
+# check how many files were found and see them
+length(amp_files_spkr)
+amp_files_spkr
+
+
+# Check which amplitude files have RMS column
+# -------------------------------------------------------------------------
+# there are several files that did'nt have rms column for the robomoth.However, it seems like we have the rms for all the speakers. 
+
+amp_column_check <- map_dfr(amp_files_spkr, check_amp_columns)
+
+# Summary of RMS availability
+amp_column_check %>%
+  count(has_any_rms)
+
+# Files that DO have RMS
+amp_column_check %>%
+  filter(has_any_rms) %>%
+  select(source_amp_file, has_rms_value, has_rms, has_rms_val)
+
+# Files that DO NOT have RMS
+amp_files_missing_rms <- amp_column_check %>%
+  filter(!has_any_rms)
+
+amp_files_missing_rms %>%
+  select(source_amp_file, full_path, column_names) %>%
+  print(n = Inf)
+
+
+
+
+# now we read them and combine them 
+
+amp_spkr_all <- amp_files_spkr %>%
+  map_dfr(function(file) {
+    
+    read_csv(
+      file,
+      show_col_types = FALSE,
+      col_types = cols(.default = col_character())
+    ) %>%
+      clean_names() %>%
+      select(
+        filename,
+        max_d_bfs,
+        avg_d_bfs
+      ) %>%
+      mutate(
+        source_amp_file = basename(file),
+        amp_folder = dirname(file),
+        # Extract only the site code, even if filename has year
+        site = str_to_lower(str_extract(source_amp_file, "^[A-Za-z]{3,4}[0-9]{2}"))
+      )
+  }) %>%
+  mutate(
+    max_dbfs = as.numeric(max_d_bfs),
+    avg_dbfs = as.numeric(avg_d_bfs),
+    filename_norm = str_to_lower(basename(filename)),
+    
+    # extract year from the filename, e.g. iron01-20220707_230159.wav
+    year = as.integer(str_extract(filename_norm, "20\\d{2}"))
+  ) %>%
+  select(
+    filename,
+    filename_norm,
+    max_dbfs,
+    avg_dbfs,
+    site,
+    year,
+    source_amp_file,
+    amp_folder
+  )
+
+
+# let's check the output
+
+glimpse(amp_spkr_all)
+unique(amp_spkr_all$site)
+summary(amp_spkr_all)
+
+amp_spkr_all %>%
+  count(year, site) #There's a mistake with the year on iron 04 22 or 23 files. 
+
+# sites need to be standardize
+
+# standardize site names
+
+site_key <- c(
+  "viz01" = "vizc01",
+  "viz02" = "vizc02",
+  "viz03" = "vizc03",
+  "viz04" = "vizc04"
+)
+
+amp_spkr_all <- amp_spkr_all %>%
+  mutate(
+    site = recode(site, !!!site_key)
+  )
+
+# check sites again
+
+unique(buzz_all.1$site)
+
+
+# check missing values of dbfs. 
+# 3 obs have missing values 
+amp_spkr_all %>%
+  summarise(
+    n_rows = n(),
+    n_files = n_distinct(filename_norm),
+    n_missing_avg_dbfs = sum(is.na(avg_dbfs)),
+    n_missing_max_dbfs = sum(is.na(max_dbfs))
+  )
+
+# check duplicated rows
+# there are several duplicates becasue alot of the files don't have a site prefix. the site comes from the folder. 
+amp_dups_spkr <- amp_spkr_all %>%
+  mutate(
+    filename_norm = str_to_lower(str_trim(basename(filename)))
+  ) %>%
+  count(filename_norm, name = "n_amp_rows") %>%
+  filter(n_amp_rows > 1) %>%
+  arrange(desc(n_amp_rows))
+
+amp_dups_spkr
+
+# now I want to merge buzz_all.1 with the amplitude data frame. I will merge by filename 
+
+# I have more than 29K observations that I need to add amplitude data by merging it with the amp_robo_all data frame.
+head(buzz_all.2$filename) #buzz.all.2 has the duplicated files removed 
+head(amp_robo_all$filename)
+
+# filenames differ so we need to standardize to merge properly.
+
+buzz_all.2 <- buzz_all.2 %>%
+  mutate(
+    filename_norm = filename %>%
+      str_to_lower() %>%
+      str_replace("_", "-") %>%              # convert IRON03_20210729 to iron03-20210729
+      str_remove("-[a-z]+(?=\\.wav$)") %>%   # remove species suffix like -myvo.wav
+      str_trim()
+  )
+glimpse(buzz_all.2)
+
+amp_robo_all <- amp_robo_all %>%
+  mutate(
+    filename_norm = filename %>%
+      str_to_lower() %>%
+      str_replace("_", "-") %>%
+      str_trim()
+  )
+
+glimpse(amp_robo_all)
+
+# remove nas and duplicates from the amplitude data frame before merging.
+# there is no duplicates but just to be sure
+amp_robo_clean <- amp_robo_all %>%
+  group_by(filename_norm) %>%
+  summarise(
+    max_dbfs = mean(max_dbfs, na.rm = TRUE),
+    avg_dbfs = mean(avg_dbfs, na.rm = TRUE),
+    n_amp_rows = n(),
+    amp_sources = paste(unique(source_amp_file), collapse = "; "),
+    .groups = "drop"
+  )
+
+# merge buzz data and amplitude (dbfs)
+buzz_all.2_amp <- buzz_all.2 %>%
+  left_join(
+    amp_robo_clean,
+    by = "filename_norm",
+    relationship = "many-to-one"
+  )
+
+
 
 
 # explore data ------------------------------------------------------------
