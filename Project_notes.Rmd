@@ -1037,6 +1037,15 @@ step 1 : remove unecessary folder.
 
 step 2: reproduce the buzz vetting table
 
-step 3: reproduce the amplitude data. \
+step 3: reproduce the amplitude data.\
 \
 for the sm3 data and the buzz counts, I have encounter a great deal or trouble as the ID data seems to be missing and other files are taking long to run. I have decided to focus ont he buzzes later on R merge the buzz data witht he consolidated observations I already have.
+
+------------------------------------------------------------------------
+
+6/06/2026
+
+I have removed the unnecessary folders and reproduce the buzz vetting tables for sites iron 4 and 5 on 2023 speaker data. \
+\
+reviewing the amp files it seems like we have another problem. We have data for the iron 05 site doubled. we have the same dates twice meaning there's a mistake or a recorder was labelled incorrectly. I think I am inclining to remove this site from the analysis. \
+an alternative is to remove add an additional column as identifier to the amp data to be able to merge them without problem. an extra alternative is to just chose one set of data and rerun the amp and reexport the buzz.

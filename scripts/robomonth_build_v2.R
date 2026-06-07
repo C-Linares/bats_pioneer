@@ -1124,19 +1124,6 @@ amp_column_check <- map_dfr(amp_files_spkr, check_amp_columns)
 amp_column_check %>%
   count(has_any_rms)
 
-# Files that DO have RMS
-amp_column_check %>%
-  filter(has_any_rms) %>%
-  select(source_amp_file, has_rms_value, has_rms, has_rms_val)
-
-# Files that DO NOT have RMS
-amp_files_missing_rms <- amp_column_check %>%
-  filter(!has_any_rms)
-
-amp_files_missing_rms %>%
-  select(source_amp_file, full_path, column_names) %>%
-  print(n = Inf)
-
 
 
 
