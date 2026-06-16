@@ -1078,6 +1078,32 @@ unique(spkr_all$site)
 summary(spkr_all)
 
 
+# it seems like there are some robomoth files that might be inside the speaker data. I will try to find this out
+# -------------------------------------------------------------------------
+# Diagnose robomoth files inside speaker data
+# -------------------------------------------------------------------------
+
+spkr_diag <- spkr_all %>%
+  mutate(
+    filename_norm = str_to_lower(str_trim(basename(filename))),
+    site = str_to_lower(str_trim(site)),
+    filename_year = as.integer(str_extract(filename_norm, "20\\d{2}")),
+    file_type = case_when(
+      str_detect(filename_norm, "robomoth|robo") ~ "robomoth",
+      str_detect(filename_norm, "spkr") ~ "speaker",
+      TRUE ~ "other"
+    )
+  )
+
+# Count file types
+spkr_diag %>%
+  count(file_type, sort = TRUE)
+
+# Show robomoth rows accidentally present in speaker data. Update: non so this is fixed. 
+spkr_diag %>%
+  filter(file_type == "robomoth") %>%
+  count(year, filename_year, site, source_file, sort = TRUE)
+
 
 # amplitude spkr ----------------------------------------------------------
 
@@ -1177,8 +1203,7 @@ unique(amp_spkr_all$site)
 summary(amp_spkr_all)
 
 amp_spkr_all %>%
-  count(year, site) #There's a mistake with the year on iron 04 22 or 23 files. 
-
+  count(year, site) 
 # sites need to be standardize
 
 # standardize site names
@@ -1225,55 +1250,200 @@ amp_dups_spkr
 # now I want to merge buzz_all.1 with the amplitude data frame. I will merge by filename 
 
 # I have more than 29K observations that I need to add amplitude data by merging it with the amp_robo_all data frame.
-head(buzz_all.2$filename) #buzz.all.2 has the duplicated files removed 
+head(spkr_all$filename) #buzz.all.2 has the duplicated files removed 
 head(amp_robo_all$filename)
 
 # filenames differ so we need to standardize to merge properly.
 
-buzz_all.2 <- buzz_all.2 %>%
+spkr_check <- spkr_all %>% 
   mutate(
-    filename_norm = filename %>%
-      str_to_lower() %>%
-      str_replace("_", "-") %>%              # convert IRON03_20210729 to iron03-20210729
-      str_remove("-[a-z]+(?=\\.wav$)") %>%   # remove species suffix like -myvo.wav
-      str_trim()
-  )
-glimpse(buzz_all.2)
+    site= str_to_lower(str_trim(site)),
+    filename_norm = str_to_lower(str_trim(basename(filename)))
+  ) %>% 
+  filter(site != "iron05") # we remove iron 05 because it has duplicate data and it can't be reconcile 
 
-amp_robo_all <- amp_robo_all %>%
+
+amp_spkr_check <- amp_spkr_all %>% 
   mutate(
-    filename_norm = filename %>%
-      str_to_lower() %>%
-      str_replace("_", "-") %>%
-      str_trim()
-  )
+    site = str_to_lower(str_trim(site)),
+    filename_norm = str_to_lower(str_trim(basename(filename)))
+  ) %>%
+  filter(site != "iron05")
 
-glimpse(amp_robo_all)
+# check if the amp data has duplicate rows after we removed iron 05 that was creating issues. 
 
-# remove nas and duplicates from the amplitude data frame before merging.
-# there is no duplicates but just to be sure
-amp_robo_clean <- amp_robo_all %>%
-  group_by(filename_norm) %>%
+amp_spkr_dups_no_iron05<-  amp_spkr_check %>% 
+  count(site, filename_norm, name = "n_amp_rows") %>%
+  filter(n_amp_rows > 1) %>%
+  arrange(desc(n_amp_rows), site, filename_norm)
+
+
+amp_spkr_dups_no_iron05 # there are zero rows so no data for iron05 in 2023
+
+# now we collapse amplitude to one row per site + filename
+# nothing really change because we already have one row per filename and site
+
+amp_spkr_clean <- amp_spkr_check %>%
+  group_by(site, filename_norm) %>%
   summarise(
     max_dbfs = mean(max_dbfs, na.rm = TRUE),
     avg_dbfs = mean(avg_dbfs, na.rm = TRUE),
     n_amp_rows = n(),
-    amp_sources = paste(unique(source_amp_file), collapse = "; "),
+    source_amp_files = paste(unique(source_amp_file), collapse = "; "),
+    amp_folders = paste(unique(amp_folder), collapse = "; "),
     .groups = "drop"
   )
 
-# merge buzz data and amplitude (dbfs)
-buzz_all.2_amp <- buzz_all.2 %>%
+# now we find speaker buzz rows/ files missing amplitude data 
+
+missing_amp_before_join <- spkr_check %>% 
+  distinct(
+    site,
+    year,
+    filename,
+    filename_norm, 
+    date_time, 
+    sp, 
+    auto_buzz_count, 
+    manual_buzz_count,
+    c_buzz
+    ) %>% 
+  anti_join(
+    amp_spkr_clean %>% 
+      distinct(site, filename_norm),
+    by= c("site", "filename_norm")
+  )
+
+missing_amp_before_join
+
+# here we finally join the amp data with the speakr observations. 
+# possibly the data to export. 
+spkr_all_amp <- spkr_check %>%
   left_join(
-    amp_robo_clean,
-    by = "filename_norm",
+    amp_spkr_clean,
+    by = c("site", "filename_norm"),
     relationship = "many-to-one"
+  )
+
+stopifnot(nrow(spkr_check) == nrow(spkr_all_amp))
+
+# in the following output it seems we have a proper data set with all spk obs having amp data. 
+# it is ready to export. 
+spkr_all_amp %>%
+  summarise(
+    n_rows = n(),
+    n_files = n_distinct(paste(site, filename_norm)),
+    n_rows_with_amp = sum(!is.na(avg_dbfs)),
+    n_rows_missing_amp = sum(is.na(avg_dbfs)),
+    prop_rows_with_amp = mean(!is.na(avg_dbfs)),
+    n_files_missing_amp = n_distinct(paste(site[is.na(avg_dbfs)], filename_norm[is.na(avg_dbfs)]))
+  )
+
+# it seems there are no extra rows so the merge did not add extra rows. 
+nrow(spkr_check)
+nrow(spkr_all_amp)
+
+stopifnot(nrow(spkr_check) == nrow(spkr_all_amp))
+
+# explore data ------------------------------------------------------------
+
+
+# -------------------------------------------------------------------------
+# Speaker data: distribution of average dBFS by treatment
+# -------------------------------------------------------------------------
+
+ggplot(
+  spkr_all_amp %>%
+    filter(
+      year %in% c(2022, 2023),
+      !is.na(avg_dbfs),
+      !is.na(treatmt)
+    ),
+  aes(x = avg_dbfs, fill = treatmt)
+) +
+  geom_histogram(binwidth = 1, color = "black") +
+  geom_vline(
+    xintercept = -20,
+    linetype = "dashed",
+    linewidth = 0.8
+  ) +
+  facet_wrap(~ treatmt) +
+  labs(
+    title = "Distribution of Average Recording Amplitude by Treatment: Speaker Data",
+    subtitle = "Dashed line marks proposed faint-call threshold: ≤ -20 dBFS",
+    x = "Average amplitude (dBFS)",
+    y = "Number of bat-call files",
+    fill = "Treatment",
+    caption = paste(
+      "dBFS = decibels relative to digital full scale.",
+      "For each audio file, average dBFS was calculated from the RMS amplitude of the waveform:",
+      "20 × log10(RMS / 32767), where 32767 is the maximum positive value for 16-bit audio.",
+      "Values closer to 0 dBFS are louder; more negative values indicate fainter recordings.",
+      "RMS was calculated using the seewave package."
+    )
+  ) +
+  theme_minimal() +
+  theme(
+    plot.caption = element_text(hjust = 0, size = 9),
+    plot.subtitle = element_text(size = 11)
   )
 
 
 
 
-# explore data ------------------------------------------------------------
+
+
+# dir.create("data_for_analysis/prep_for_glm", showWarnings = FALSE) # just run if the dir is abscent
+
+write.csv(buzz_all.2_amp, file = 'data_for_analysis/robomoth_build/bat_robomoth_amp.csv', row.names = F) # raw combine data 
+write.csv(spkr_all_amp, file = 'data_for_analysis/robomoth_build/spkr_all_amp.csv', row.names = F) # raw combine data
+
+
+# Create a README file with information about the script
+readme_content <- "Carlos Linares 6/22/2026 
+this folde contains the raw combined data for the robomoth and speaker data. The data is cleaned and ready for analysis The data are as follows:
+
+buzz_all.2_amp: this is the combined data frame for the robomoth data. It contains data from 2021, 2022 and 2023. The data has been cleaned and ready for analysis. we added amplitude data. 
+
+the columns are as follows
+date_time: the date and time of the recording
+time: the time of the recording
+noche: the monitoring night of the recording
+sp: the species ID of the recording composed of sp_accp, manual id and spp columns. We created this column to recover as much species ID as possible.
+site: the site of the recording
+treatmt: the treatment of the site (lit or dark)
+c_buzz: the corrected buzz count. We give priority to the manual buzz count but if this is missing then we use the auto buzz count. We are no longer interested in this variable for the subsequent analysis but we still make it available. We are now interested in the number of passes. 
+max_dbfs: the maximum amplitude of the recording in decibels relative to full scale (dBFS). This is a measure of how loud the recording is, with values closer to 0 being louder and more negative values being fainter.
+avg_dbfs : similar to max_dbfs but it is the average amplitude of the recording in decibels relative to full scale (dBFS). This is a measure of how loud the recording is, with values closer to 0 being louder and more negative values being fainter. We will use this variable to determine if a call is faint or not. We will use a threshold of -20 dBFS to determine if a call is faint or not. This threshold was chosen based on the distribution of avg_dbfs values and visual inspection of the recordings.These variables we calculated using the a custom script: 
+G:/PioneerLights_2022/scripts/rms_calculator.R. We calculated the RMS amplitude of the waveform using the seewave package and then converted it to dBFS using the formula: 20 × log10(RMS / 32767), where 32767 is the maximum positive value for 16-bit audio.
+
+------------------------------------------------------------------------------------------------------------------------------------------------
+spkr_all_amp: this is the combined data frame for the speaker data. It contains data from 2022 and 2023. The data has been cleaned and ready for analysis.We added amplitude data. 
+
+the columns are as follows:
+date_time: the date and time of the recording
+time: the time of the recording
+noche: the monitoring night of the recording
+sp: the species ID of the recording composed of sp_accp, manual id and spp columns
+site: the site of the recording
+treatmt: the treatment of the site (lit or dark)
+c_buzz: the corrected buzz count. We give priority to the manual, same as robomoth, if this is missing then we use the auto buzz count. We no longer need this variable. 
+max_dbfs: the maximum amplitude of the recording in decibels relative to full scale (dBFS). This is a measure of how loud the recording is, with values closer to 0 being louder and more negative values being fainter.
+avg_dbfs: the average amplitude of the recording in decibels relative to full scale (dBFS). This is a measure of how loud the recording is, with values closer to 0 being louder and more negative values being fainter. We will use this variable to determine if a call is faint or not. We will use a threshold of -20 dBFS to determine if a call is faint or not. This threshold was chosen based on the distribution of avg_dbfs values and visual inspection of the recordings.These variables we calculated using the a custom script: in robomoth data. 
+
+"
+
+# Write the README content to a file
+writeLines(readme_content, "data_for_analysis/robomoth_build/README.txt")
+
+
+
+
+
+
+
+
+# junk --------------------------------------------------------------------
 
 
 # I want a bar graph of species in the x axis and buzz counts by treatment in the y axis.
@@ -1378,52 +1548,6 @@ buzz_all.1 %>%
 
 # I am a little counfuse about how to analyze this section. should I model the proportions of zeros too? in the model 
 
-
-# dir.create("data_for_analysis/prep_for_glm", showWarnings = FALSE) # just run if the dir is abscent
-
-write.csv(buzz_all.1, file = 'data_for_analysis/robomoth_build/bat_robomoth.csv', row.names = F) # raw combine data 
-write.csv(spkr_all, file = 'data_for_analysis/robomoth_build/spkr_all.csv', row.names = F) # raw combine data
-
-
-# Create a README file with information about the script
-readme_content <- "Carlos Linares 3/22/2026 
-this folde contains the raw combined data for the robomoth and speaker data. The data is cleaned and ready for analysis The data are as follows:
-
-buzz_all.1: this is the combined data frame for the robomoth data. It contains data from 2021, 2022 and 2023. The data has been cleaned and ready for analysis. 
-
-the columns are as follows
-date_time: the date and time of the recording
-time: the time of the recording
-noche: the monitoring night of the recording
-sp: the species ID of the recording composed of sp_accp, manual id and spp columns. We created this column to recover as much species ID as possible.
-site: the site of the recording
-treatmt: the treatment of the site (lit or dark)
-c_buzz: the corrected buzz count. We give priority to the manual buzz count but if this is missing then we use the auto buzz count
-zero_buzz: created for graph the zero proportion probably unneccessary for analysis.
-
-spkr_all: this is the combined data frame for the speaker data. It contains data from 2022 and 2023. The data has been cleaned and ready for analysis.
-
-the columns are as follows:
-date_time: the date and time of the recording
-time: the time of the recording
-noche: the monitoring night of the recording
-sp: the species ID of the recording composed of sp_accp, manual id and spp columns
-site: the site of the recording
-treatmt: the treatment of the site (lit or dark)
-c_buzz: the corrected buzz count. We give priority to the manual, same as robomoth, if this is missing then we use the auto buzz count
-
-"
-# Write the README content to a file
-writeLines(readme_content, "data_for_analysis/robomoth_build/README.txt")
-
-
-
-
-
-
-
-
-# junk --------------------------------------------------------------------
 
 
 buzz_all.1 <- buzz_all.1 %>%
