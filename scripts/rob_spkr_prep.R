@@ -1,23 +1,25 @@
 
 # =======================================================================
-# Script Title:    rob_spkr_prep.R
+# Script Title:    rob_spkr_prep_v2.R
 # Project:         robomoth and speaker data analysis
 # =======================================================================
 
 # Description:
-# this script helps prep the data for analysis, standardize, addpredictors, etc. 
+# this script helps prep the data for analysis, standardize, add predictors, etc. 
+# We updated the robomoth and speaker data to add an amplitude measurement. 
+# 
 
 # Author: Carlos Linares
-# Date:   2026-03-3
+# Date:   2026-17-06
 # Contact: carlosgarcialina@u.boisestate.edu
 
 # =======================================================================
 # Inputs:
-# - bat_robomoth.csv (home/r/bats_pioneer/data_for_analysis/bat_robomoth.csv)
-# - bat_speakr.csv (home/r/bats_pioneer/data_for_analysis/bat_speakr.csv)
+# - bat_robomoth.csv (home/r/bats_pioneer/data_for_analysis/robomoth_build/bat_robomoth_amp.csv)
+# - bat_speakr.csv (home/r/bats_pioneer/data_for_analysis/robomoth_build/bat_speakr_amp.csv)
 
 #  Outputs:
-#  - ready to analyze data base ("data_for_analysis/rob_spkr_prep/rob_db.csv")
+#  - ready to analyze data base ("data_for_analysis/rob_spkr_prep/rob_db_v2.csv") this is tentative. 
 #  
 #  
 # =======================================================================
@@ -92,11 +94,11 @@ scale_by_2sd_tidy <- function(data, variables_to_scale) {
 # load data ---------------------------------------------------------------
 
 
-robomoth <- read_csv("data_for_analysis/robomoth_build/bat_robomoth.csv") %>% 
+robomoth <- read_csv("data_for_analysis/robomoth_build/bat_robomoth_amp.csv") %>% 
   clean_names()
 
 str(robomoth)
-colSums(is.na(robomoth)) # no missing data in robomoth
+colSums(is.na(robomoth)) # there are many NAs in the max-dbfs and avg_dbfs becaue we have not filter out 2021 data 
 
 # remove 2021 data 
 
@@ -105,6 +107,7 @@ colSums(is.na(robomoth)) # no missing data in robomoth
 robomoth <- robomoth %>% # we will do this in the prep script 
   filter(year != 2021)
 
+colSums(is.na(robomoth)) # there's still 1661 NAs in the amplitude. some files are missing. I need to figure out why. we will proceed as this for now. 
 
 
 # predictors --------------------------------------------------------------
@@ -203,7 +206,7 @@ summary(rob_db)
 rob_db <- rob_db %>%
   left_join(moon_daily_avg, by = "noche") 
 
-summary(rob_db) #there is just one NA I can keep it that way. 
+summary(rob_db) #
 
 # merge with insects
 # I calculate week for insects to merge with robomot data. 
@@ -214,7 +217,7 @@ rob_db <- rob_db %>%
   left_join(ins_bm, by = c("site", "wk", "year"= "yr")) # merge
 
 # check for NAs
-summary(rob_db)  #lots of NAs 6240 fro the t_leps column. 
+summary(rob_db)  #lots of NAs 13 columns for the t_leps column. there are many days where there's no data for insects.  
 
 # we remove the some of the nas from insects by adding the average year insect count by site 
 
@@ -264,11 +267,6 @@ names(rob_db)
 
 summary(rob_db)
 
-# remoe the zero_buzz column
-
-rob_db <- rob_db %>%
-  select(-zero_buzz)
-
 
 # standardize -------------------------------------------------------------
 
@@ -278,6 +276,9 @@ rob_db<-rob_db %>%
     jday = lubridate::yday(noche),  # Calculate Julian day from 'noche'
   )
 
+# check there's no NAs for jday
+sum(is.na(rob_db$jday)) # no NAs for jday)
+
 variables_to_scale <- c(
   "avg_moonlight",
   "avg_twilight",
@@ -286,7 +287,9 @@ variables_to_scale <- c(
   "nit_avg_wspm_s",
   "t_leps",
   "jday",
-  "elev_max"
+  "elev_max",
+  "max_dbfs",
+  "avg_dbfs"
 )
 
 rob_db <- rob_db %>%
@@ -337,7 +340,7 @@ species <- species %>%
     sp_code = (tolower(substr(genus, 1, 2)) %>% paste0(substr(species, 1,2 )))
   )
 
-# merge the ps_label with the rob_db and by sp_code
+# merge the rob_db and by sp_code
 
 rob_db <- rob_db %>%
   left_join(species %>% select(sp_code, sp_label), by = c("sp" = "sp_code") )
@@ -352,11 +355,11 @@ glimpse(rob_db)
 # there's an error in the tags for sites on vizcaine. this needs to be fixed on robomoth_build.R script. (fixed)
 
 
-speakr <- read_csv("data_for_analysis/robomoth_build/spkr_all.csv") %>% 
+speakr <- read_csv("data_for_analysis/robomoth_build/spkr_all_amp.csv") %>% 
   clean_names()
 
 str(speakr)
-colSums(is.na(speakr)) # some missing data in speakr, but not many.
+colSums(is.na(speakr)) # no missing data for the amplitude columns in this data. 
 
 unique(speakr$site) # check the unique sites in speakr
 
@@ -432,6 +435,10 @@ spkr_db<-spkr_db %>%
     jday = lubridate::yday(noche),  # Calculate Julian day from 'noche'
   )
 
+# check there's no NAs in the jday column 
+
+sum(is.na(spkr_db$jday)) # no NAs in jday column, good to go
+
 variables_to_scale <- c(
   "avg_moonlight",
   "avg_twilight",
@@ -440,7 +447,9 @@ variables_to_scale <- c(
   "nit_avg_wspm_s",
   "t_leps",
   "jday",
-  "elev_max"
+  "elev_max",
+  "max_dbfs",
+  "avg_dbfs"
 )
 
 spkr_db <- spkr_db %>%
@@ -485,7 +494,7 @@ summary(spkr_db)
 
 
 # Create a README file with information about the script
-readme_content <- "Carlos Linares 3/23/2026 
+readme_content <- "Carlos Linares 6/17/2026 
 this folde contains the database for robomoth and speaker with predictors ready to run models with. 
 the columns are as follow:
 
@@ -502,6 +511,8 @@ treatment : treatment of the site, either lit or dark.
 c_buzz: corrected buzz counts taking in consideration both manually vetted buzz and auto_buzz counts. 
 avg_illuminatio: both twilight and moon illumination
 avf_moonlight: moonlight model prediction for that night. from the moonlit package (Kayba)
+avg_dbfs: has the amplitude data calculated with custom script. 
+max_dbfs: same amplitude data in dbfs - larger negative numbers means lower in amplitude while 0 measn highest.
 
 
 "
@@ -510,8 +521,8 @@ writeLines(readme_content, "data_for_analysis/rob_spkr_prep/README.txt")
 
 
 # write data
-write.csv(rob_db, file = 'data_for_analysis/rob_spkr_prep/rob_db.csv', row.names = F) 
-write.csv(spkr_db, file = 'data_for_analysis/rob_spkr_prep/spkr_db', row.names = F)
+write.csv(rob_db, file = 'data_for_analysis/rob_spkr_prep/rob_db_amp.csv', row.names = F) 
+write.csv(spkr_db, file = 'data_for_analysis/rob_spkr_prep/spkr_db_amp', row.names = F)
 
 
 

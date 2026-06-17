@@ -1054,12 +1054,12 @@ an alternative is to remove add an additional column as identifier to the amp da
 
 6/15/2026
 
-I think I am going to opt for keeping iron05 2023 out for the moment. \
+I think I am going to opt for keeping iron05 2023 out for the moment.\
 \
 observation: it seems like there are more bat passes with higher amplitude at lit sites than dark sites. I wonder if this is something to consider. It could be they are just calling closer to the mics at lit site because they are close to the lights and tripods where the microphones are deployed.
 
-I discover some issues with the sonobat out put tables where the files were not properly aligned. I had 2023 tables in 2022 folders. \
-I am looking at path \
+I discover some issues with the sonobat out put tables where the files were not properly aligned. I had 2023 tables in 2022 folders.\
+I am looking at path\
 \
 F:\pioneer\_2022\bat\_speakers\speaker\_organized\
 
@@ -1069,6 +1069,21 @@ iron03
 
 iron04
 
-those sites need sonobat output tables rexported. I fixed this issue. \
+those sites need sonobat output tables rexported. I fixed this issue.\
 \
 now we have new files for the speaker and robomoth data. We can now test the idea that there might be less faint calls/passes at lit sites vs dark sites.
+
+------------------------------------------------------------------------
+
+6/17/2026
+
+the objective right now is to get the robomoth and speaker files loaded so I can start analyzing them after I filter out the ones with amp more that -20 dbfs
+
+- load files\
+  load predictors
+
+- filter out loud calls
+
+I will use the robo_spkr_prep as a template for analysis\
+\
+I produced the spkr_db_amp and rob_db_amp csv files. These I will use in the analysis section.
