@@ -1087,3 +1087,5 @@ the objective right now is to get the robomoth and speaker files loaded so I can
 I will use the robo_spkr_prep as a template for analysis\
 \
 I produced the spkr_db_amp and rob_db_amp csv files. These I will use in the analysis section.
+
+I created data base for analysis for the robomoth and speaker data. However, I when adding the zeros there's some issues with the effort. apparently theres several site in 2023 for viz04 and viz03 that don't have effort or are not present in the
