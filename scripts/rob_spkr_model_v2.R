@@ -14,8 +14,8 @@
 
 # =======================================================================
 # Inputs:
-# - robomoth data 'data_for_analysis/rob_spkr_prep/rob_db_amp.csv' 
-# - speakr data 'data_for_analysis/rob_spkr_prep/spkr_db_amp.csv'
+# - robomoth data 'data_for_analysis/rob_spkr_prep/rob_db_v2.csv' 
+# - speakr data 'data_for_analysis/rob_spkr_prep/spkr_db_v2.csv'
 
 #  Outputs:
 # - Marginal effects plots for the robomoth and speaker data showing the effect of light on bat calls/passes under an amplitude threshold. 
@@ -62,73 +62,18 @@ calculate_c_hat <- function(model) {
 
 # load data 
 
-rob_db <- fread('data_for_analysis/rob_spkr_prep/rob_db_amp.csv') %>% 
+rob_db <- fread('data_for_analysis/rob_spkr_prep/rob_db_v2.csv') %>% 
   clean_names()
-spkr_db <- fread('data_for_analysis/rob_spkr_prep/spkr_db_amp') %>% # spkr needs to be resaved because is missing the .csv and might not be read correctly. 
+
+
+spkr_db <- fread('data_for_analysis/rob_spkr_prep/spkr_db_v2.csv') %>% # spkr needs to be resaved because is missing the .csv and might not be read correctly. 
   clean_names()
 
 glimpse(rob_db)
 glimpse(spkr_db)
 
 
-# correct treatment binomial form 0,1 to -1 = dark, 1 = lit
 
-rob_db <- rob_db %>%
-  mutate(
-    trmt_bin = if_else(treatmt == "dark", -1, 1)
-  )
-
-glimpse(rob_db)
-
-spkr_db <- spkr_db %>%
-  mutate(
-    trmt_bin = if_else(treatmt == "dark", -1, 1)
-  )
-
-# filter calls to faint calls below -20 dB using the average dbfs column and drop no-species ID.
-drop_ids<- c("hif", "mysp", "lof", "hilo")
-
-rob_db_faint <- rob_db %>%
-  filter(!is.na(avg_dbfs), avg_dbfs <= -20,!sp %in% drop_ids) # this removes dbfs NA and -20 dbfs observations. 
-
-spkr_db_faint <- spkr_db %>% 
-  filter(!is.na(avg_dbfs), avg_dbfs <= -20, !sp %in% drop_ids) # same filter as for robomoths. 
-
-
-# now we do some kind of summary by observation site, noche, sp 
-# the currently sampling unit I will use is site night and species. We also have to drop certain ID
-
-
-rob_faint_counts <- rob_db_faint %>%
-  count(
-    site,
-    noche,
-    year,
-    trmt_bin,
-    sp,
-    name = "n_calls" # this is the response variable 
-  )
-
-spkr_faint_counts <- spkr_db_faint %>% 
-  count(
-    site,
-    noche,
-    year,
-    trmt_bin,
-    sp,
-    name = "n_calls"
-  )
-
-# I might have to add zeros, because as it is the data just represents hits. The questions might change this way to "when bats are detected, is there more or less calls/passes in lit sites"
-# to add zeros we have to take in consideration the effort. we will do that using the amp all files created in the robomoth_build_v2.R script. 
-
-#amp data 
-
-amp_robo_all<-read.csv(file = "data_for_analysis/robomoth_build/amp_only/amp_robo_all.csv") %>% 
-  clean_names()
-glimpse(amp_robo_all)
-
-# ok I managed to get the zeros into the data. 
 
 # models -------------------------------------------------------------------------
 
@@ -143,46 +88,29 @@ glimpse(amp_robo_all)
 # leaving zeros or including zeros
 
 m0 <- glmmTMB(
-  c_buzz ~ trmt_bin + (1 | site),
+  n_calls ~ trmt_bin + (1 | site),
   family = poisson(link = "log"),
-  data = rob_db %>% filter(c_buzz > 0) # leaving zeros out
+  data = rob_db
 )
 
 # check model
 check_singularity(m0)
-check_zeroinflation(m0)
+check_zeroinflation(m0) # probably zero inflated. 
 calculate_c_hat(m0)  # indicates the is overdispersion we need to try negative binomial. 
 performance_mae(m0)
-range(rob_db$c_buzz)
-hist(rob_db$c_buzz, breaks = 500)
+range(rob_db$n_calls)
+hist(rob_db$n_calls, breaks = 50)
 performance::r2(m0)
 DHARMa::simulateResiduals(m0, n = 1000, plot = TRUE)
 
 # including zeros 
 
 
-m0 <- glmmTMB(
-  c_buzz ~ trmt_bin + (1 | site),
-  family = poisson(link = "log"),
-  data = rob_db  # leaving zeros in
-)
 
-# check model
-check_singularity(m0)
-check_zeroinflation(m0)
-calculate_c_hat(m0)  # indicates the is overdispersion we need to try negative binomial. 
-performance_mae(m0)
-range(rob_db$c_buzz)
-hist(rob_db$c_buzz, breaks = 500)
-performance::r2(m0)
-DHARMa::simulateResiduals(m0, n = 1000, plot = TRUE)
-
-summary(m0)
-
-# given the c_hat is 1.2 it indicates overdisperssion. let's try negative binomial. 
+# given the c_hat is big 80.025 it indicates overdisperssion. let's try negative binomial. 
 
 m1 <- glmmTMB(
-  c_buzz ~ trmt_bin + (1 | site),
+  n_calls ~ trmt_bin + (1 | site),
   family = nbinom2,
   data = rob_db
 )
@@ -192,11 +120,9 @@ m1 <- glmmTMB(
 check_singularity(m1)
 m1$sdr$pdHess
 m1$fit$message
-check_zeroinflation(m1)
-calculate_c_hat(m1)    
+check_zeroinflation(m1) # not zero inflated.
+calculate_c_hat(m1)    # no overdispersion, c_hat is 1.08 which is good.
 performance_mae(m1)
-range(rob_db$c_buzz)
-hist(rob_db$c_buzz, breaks = 100 )
 performance::r2(m1)
 DHARMa::simulateResiduals(m1, n = 1000, plot = TRUE)
 summary(m1)
@@ -205,7 +131,7 @@ summary(m1)
 # now we add seasonality. 
 
 m2 <- glmmTMB(
-  c_buzz ~ trmt_bin + jday_s + I(jday_s^2) + (1 | site),
+  n_calls ~ trmt_bin + jday_s + I(jday_s^2) + (1 | site),
   family = nbinom2,
   data = rob_db
 )
@@ -218,18 +144,17 @@ m2$fit$message
 check_zeroinflation(m2)
 calculate_c_hat(m2)    
 performance_mae(m2)
-range(rob_db$c_buzz)
-hist(rob_db$c_buzz, breaks = 100 )
 performance::r2(m2)
 DHARMa::simulateResiduals(m2, n = 1000, plot = TRUE)
 summary(m2)
 
+anova(m0, m1, m2) # the model with seasonality is better than the model without seasonality.
 
 #phase 3
 # now we add environmental variables. 
 
 m3 <- glmmTMB(
-  c_buzz ~ trmt_bin + jday_s + I(jday_s^2) + nit_avg_wspm_s_s + nit_avg_temp_c_s + avg_moonlight_s + elev_max_s + yr_s +
+  n_calls ~ trmt_bin + jday_s + I(jday_s^2) + nit_avg_wspm_s_s + avg_moonlight_s + elev_max_s + yr_s +
     (1 | site),
   family = nbinom2,
   data = rob_db
@@ -243,8 +168,6 @@ m3$fit$message
 check_zeroinflation(m3)
 calculate_c_hat(m3)  # indicates the is overdispersion we need to try negative binomial.  
 performance_mae(m3)
-range(rob_db$c_buzz)
-hist(rob_db$c_buzz, breaks = 100 )
 performance::r2(m3)
 DHARMa::simulateResiduals(m3, n = 1000, plot = TRUE)
 summary(m3)
@@ -252,7 +175,7 @@ summary(m3)
 # phase 4 we add the insect data 
 
 m4 <- glmmTMB(
-  c_buzz ~ trmt_bin + jday_s + I(jday_s^2) + nit_avg_wspm_s_s + nit_avg_temp_c_s + avg_moonlight_s + elev_max + yr_s +
+  n_calls ~ trmt_bin + jday_s + I(jday_s^2) + nit_avg_wspm_s_s  + avg_moonlight_s + elev_max_s + yr_s +
      + t_leps_s +
     (1 | site),
   family = nbinom2,
@@ -265,8 +188,6 @@ m4$fit$message
 check_zeroinflation(m4)
 calculate_c_hat(m4)  # indicates the is overdispersion we need to try negative binomial.  
 performance_mae(m4)
-range(rob_db$c_buzz)
-hist(rob_db$c_buzz, breaks = 100 )
 performance::r2(m4)
 DHARMa::simulateResiduals(m4, n = 1000, plot = TRUE)
 summary(m4)
@@ -278,7 +199,7 @@ anova(m0, m1, m2, m3, m4)
 # 
 
 m5 <- glmmTMB(
-  c_buzz ~ trmt_bin + jday_s + I(jday_s^2) + nit_avg_wspm_s_s + nit_avg_temp_c_s + avg_moonlight_s + elev_max_s + yr_s +
+  n_calls ~ trmt_bin + jday_s + I(jday_s^2) + nit_avg_wspm_s_s  + avg_moonlight_s + elev_max_s + yr_s 
     + t_leps_s +
     (1 | site)+
   #interactions
@@ -292,8 +213,6 @@ m5$fit$message
 check_zeroinflation(m5)
 calculate_c_hat(m5)  #  
 performance_mae(m5)
-range(rob_db$c_buzz)
-hist(rob_db$c_buzz, breaks = 100 )
 performance::r2(m5)
 DHARMa::simulateResiduals(m5, n = 1000, plot = TRUE)
 summary(m5)
@@ -304,8 +223,7 @@ anova(m0, m1, m2, m3, m4, m5)
 # Phase 6 lets add random slopes by species
 
 m6 <- glmmTMB(
-  c_buzz ~ trmt_bin + jday_s + I(jday_s^2) + nit_avg_wspm_s_s + nit_avg_temp_c_s + avg_moonlight_s + elev_max_s + yr_s +
-    + t_leps_s +
+  n_calls ~ trmt_bin + jday_s + I(jday_s^2) + nit_avg_wspm_s_s  + avg_moonlight_s + elev_max_s + yr_s + t_leps_s +
     (1 | site)+ (1 | sp) +
     #interactions
     trmt_bin*t_leps_s,
@@ -319,8 +237,6 @@ m6$fit$message
 check_zeroinflation(m6)
 calculate_c_hat(m6)  #  
 performance_mae(m6)
-range(rob_db$c_buzz)
-hist(rob_db$c_buzz, breaks = 100 )
 performance::r2(m6)
 DHARMa::simulateResiduals(m6, n = 1000, plot = TRUE)
 summary(m6)
@@ -330,7 +246,7 @@ anova(m0, m1, m2, m3, m4, m5, m6)
 
 # phase 7 lets add random slopes by species and site
 m7 <- glmmTMB(
-  c_buzz ~ trmt_bin + jday_s + I(jday_s^2) + nit_avg_wspm_s_s + nit_avg_temp_c_s + avg_moonlight_s + elev_max_s + yr_s +
+  n_calls ~ trmt_bin + jday_s + I(jday_s^2) + nit_avg_wspm_s_s  + avg_moonlight_s + elev_max_s + yr_s
     + t_leps_s +
     (1 | site)+ (1 + trmt_bin | sp) +
     #interactions
@@ -346,8 +262,6 @@ m7$fit$message
 check_zeroinflation(m7)
 calculate_c_hat(m7)   
 performance_mae(m7)
-range(rob_db$c_buzz)
-hist(rob_db$c_buzz, breaks = 100 )
 performance::r2(m7)
 DHARMa::simulateResiduals(m7, n = 1000, plot = TRUE)
 performance::check_collinearity(m7)
@@ -361,7 +275,7 @@ anova(m0, m1, m2, m3, m4, m5, m6, m7)
 # the model breaks if we add seasonality inside the random slopes this.
 # 
 # m8<- glmmTMB(
-#   c_buzz ~ trmt_bin + jday_s + I(jday_s^2) + nit_avg_wspm_s_s + nit_avg_temp_c_s + avg_moonlight_s + elev_max_s + yr_s +
+#   n_calls ~ trmt_bin + jday_s + I(jday_s^2) + nit_avg_wspm_s_s + nit_avg_temp_c_s + avg_moonlight_s + elev_max_s + yr_s +
 #     + t_leps_s +
 #     (1 | site)+ (1 + trmt_bin + jday_s + I(jday_s^2)| sp) +
 #     #interactions
@@ -369,7 +283,7 @@ anova(m0, m1, m2, m3, m4, m5, m6, m7)
 #   family = nbinom2,
 #   data = rob_db
 # )
-# #
+# # #
 # check_singularity(m8)
 # m8$sdr$pdHess
 # m8$fit$message
@@ -384,10 +298,10 @@ anova(m0, m1, m2, m3, m4, m5, m6, m7)
 # 
 # anova(m0, m1, m2, m3, m4, m5, m6, m7, m8)
 
-# let's check what happens if we check for interaction between treatment and seasonality
+# let's check what happens if we check for interaction between treatment and seasonality. It seems model 9 is not better than m8 and m7
 
 m9 <- glmmTMB(
-  c_buzz ~ trmt_bin + jday_s + I(jday_s^2) + nit_avg_wspm_s_s + nit_avg_temp_c_s + avg_moonlight_s + elev_max_s + yr_s +
+  n_calls ~ trmt_bin + jday_s + I(jday_s^2) + nit_avg_wspm_s_s  + avg_moonlight_s + elev_max_s + yr_s +
     + t_leps_s +
     (1 | site)+ (1 + trmt_bin | sp) +
     #interactions
@@ -403,8 +317,6 @@ m9$fit$message
 check_zeroinflation(m9)
 calculate_c_hat(m9)   
 performance_mae(m9)
-range(rob_db$c_buzz)
-hist(rob_db$c_buzz, breaks = 100 )
 performance::r2(m9)
 DHARMa::simulateResiduals(m9, n = 1000, plot = TRUE)
 performance::check_collinearity(m9)
@@ -416,7 +328,7 @@ anova( m1, m2, m3, m4, m5, m6, m7, m9)
 #now we add the moon interaction with treatment 
 
 m10<- glmmTMB(
-  c_buzz ~ trmt_bin + jday_s + I(jday_s^2) + nit_avg_wspm_s_s + nit_avg_temp_c_s + avg_moonlight_s + elev_max_s + yr_s +
+  n_calls ~ trmt_bin + jday_s + I(jday_s^2) + nit_avg_wspm_s_s  + avg_moonlight_s + elev_max_s + yr_s +
     + t_leps_s +
     (1 | site)+ (1 + trmt_bin | sp) +
     #interactions
@@ -431,8 +343,6 @@ m10$fit$message
 check_zeroinflation(m10)
 calculate_c_hat(m10)   
 performance_mae(m10)
-range(rob_db$c_buzz)
-hist(rob_db$c_buzz, breaks = 100 )
 performance::r2(m10)
 DHARMa::simulateResiduals(m10, n = 1000, plot = TRUE)
 performance::check_collinearity(m10)
@@ -445,7 +355,7 @@ anova( m1, m2, m3, m4, m5, m6, m7, m9, m10)
 # 
 
 m11 <- glmmTMB(
-  c_buzz ~ trmt_bin + jday_s + I(jday_s^2) + nit_avg_wspm_s_s  + nit_avg_temp_c_s + avg_moonlight_s + elev_max_s + yr_s   + t_leps_s +
+  n_calls ~ trmt_bin + jday_s + I(jday_s^2) + nit_avg_wspm_s_s   + avg_moonlight_s + elev_max_s + yr_s   + t_leps_s +
     (1 | site) + (1 + trmt_bin | sp) +
     #interactions
     trmt_bin * jday_s + trmt_bin * I(jday_s^2) + trmt_bin * avg_moonlight_s,
@@ -466,7 +376,7 @@ performance::r2(m11)
 DHARMa::simulateResiduals(m11, n = 1000, plot = TRUE)
 performance::check_collinearity(m11)
 summary(m11)
-anova( m1, m2, m3, m4, m5, m6, m7, m9, m10, m11) # results indicate that the model m11 is the best model for now 
+anova( m1, m2, m3, m4, m5, m6, m7,m8, m9, m10, m11) # results indicate that the model m11 is the best model for now 
 
 
 # Marginal effects  -------------------------------------------------------
