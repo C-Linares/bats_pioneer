@@ -371,17 +371,695 @@ check_zeroinflation(m11)
 calculate_c_hat(m11)   
 performance_mae(m11)
 range(rob_db$c_buzz)
-hist(rob_db$c_buzz, breaks = 100 )
 performance::r2(m11)
 DHARMa::simulateResiduals(m11, n = 1000, plot = TRUE)
 performance::check_collinearity(m11)
 summary(m11)
-anova( m1, m2, m3, m4, m5, m6, m7,m8, m9, m10, m11) # results indicate that the model m11 is the best model for now 
+anova( m1, m2, m3, m4, m5, m6, m7,m8, m9, m10, m11) # after testing AIC shos m10 is could be better candidate but If I want to keep it simple and focus only in the answer. then the model m11 works as well
+
+# we have been suggested to test a model with an offset lets see how it changes. 
+
+m12 <- glmmTMB(
+  n_calls ~ trmt_bin + jday_s + I(jday_s^2) +
+    nit_avg_wspm_s_s + avg_moonlight_s + elev_max_s +
+    yr_s + t_leps_s +
+    offset(log(effort_hours)) +
+    (1 | site) +
+    (1 + trmt_bin | sp) +
+    trmt_bin * jday_s +
+    trmt_bin * I(jday_s^2) +
+    trmt_bin * avg_moonlight_s,
+  family = nbinom2,
+  data = rob_db
+)
+
+check_singularity(m12)
+m12$sdr$pdHess
+m12$fit$message
+check_zeroinflation(m12)
+calculate_c_hat(m12)   
+performance_mae(m12)
+performance::r2(m12)
+DHARMa::simulateResiduals(m12, n = 1000, plot = TRUE)
+performance::check_collinearity(m12)
+summary(m12)
+anova( m10, m11, m12)
 
 
-# Marginal effects  -------------------------------------------------------
+####################################
+####################################
+####################################
+# Marginal effects robomoth -------------------------------------------------------
+
+# we are using the m11 model to produce marginal effects plots for the robomoth data.
+
+# Treatment colors used in your previous figures
+trt_cols <- c(
+  "Dark" = "grey10",
+  "Lit"  = "grey"
+)
+
+# Species order
+rob_species <- rob_db %>%
+  filter(!is.na(sp)) %>%
+  distinct(sp) %>%
+  arrange(sp) %>%
+  pull(sp)
+
+# -------------------------------------------------------------------------
+# Species-specific prediction grid
+# -------------------------------------------------------------------------
+
+pred_grid_species <- tidyr::expand_grid(
+  sp = rob_species,
+  trmt_bin = c(-1, 1)
+) %>%
+  mutate(
+    site = NA,                 # removes site-specific random intercept
+    jday_s = 0,
+    nit_avg_wspm_s_s = 0,
+    avg_moonlight_s = 0,
+    elev_max_s = 0,
+    yr_s = 0,
+    t_leps_s = 0
+  )
+
+is.factor(rob_db$site)
+is.factor(rob_db$sp)
+
+# -------------------------------------------------------------------------
+# Species-specific predictions
+# -------------------------------------------------------------------------
+
+pred_species <- predictions(
+  m11,
+  newdata = pred_grid_species,
+  type = "response",
+  re.form = NULL,
+  allow.new.levels = TRUE
+) %>%
+  as_tibble() %>%
+  mutate(
+    treatment = factor(
+      if_else(trmt_bin == -1, "Dark", "Lit"),
+      levels = c("Dark", "Lit")
+    ),
+    panel = as.character(sp)
+  )
+
+# -------------------------------------------------------------------------
+# Community-average predictions across species
+# -------------------------------------------------------------------------
+
+pred_community <- avg_predictions(
+  m11,
+  newdata = pred_grid_species,
+  by = "trmt_bin",
+  type = "response",
+  re.form = NULL,
+  allow.new.levels = TRUE
+) %>%
+  as_tibble() %>%
+  mutate(
+    treatment = factor(
+      if_else(trmt_bin == -1, "Dark", "Lit"),
+      levels = c("Dark", "Lit")
+    ),
+    panel = "Community"
+  )
+
+# -------------------------------------------------------------------------
+# Combine species-specific and community predictions
+# -------------------------------------------------------------------------
+
+pred_treatment_all <- bind_rows(
+  pred_community,
+  pred_species
+) %>%
+  mutate(
+    panel = factor(panel, levels = c("Community", rob_species))
+  )
+
+# -------------------------------------------------------------------------
+# Marginal predictions plot: treatment effect by species
+# -------------------------------------------------------------------------
+
+p_1 <- ggplot(
+  pred_treatment_all,
+  aes(x = treatment, y = estimate)
+) +
+  geom_line(
+    aes(group = panel),
+    color = "black",
+    linewidth = 0.7
+  ) +
+  geom_pointrange(
+    aes(
+      ymin = conf.low,
+      ymax = conf.high,
+      color = treatment
+    ),
+    linewidth = 0.7,
+    fatten = 2.3
+  ) +
+  facet_wrap(
+    ~ panel,
+    scales = "free_y"
+  ) +
+  scale_color_manual(values = trt_cols) +
+  labs(
+    title = "Predicted faint robomoth passes by treatment",
+    subtitle = "Predictions from m11; covariates held at mean scaled values",
+    x = "Treatment",
+    y = "Predicted number of faint bat passes",
+    color = "Treatment"
+  ) +
+  theme_minimal(base_size = 15) +
+  theme(
+    legend.position = "bottom",
+    strip.text = element_text(face = "bold"),
+    panel.grid.minor = element_blank(),
+    plot.title = element_text(face = "bold"),
+    plot.subtitle = element_text(size = 12)
+  )
+
+p_1
 
 
+
+# jday robomot marginal  --------------------------------------------------
+
+# Treatment colors
+trt_cols <- c(
+  "Dark" = "grey35",
+  "Lit"  = "goldenrod2"
+)
+
+# Get scaling values from your data
+# This assumes jday_s was scaled as: (jday - mean(jday)) / (2 * sd(jday))
+jday_mean <- mean(rob_db$jday, na.rm = TRUE)
+jday_sd   <- sd(rob_db$jday, na.rm = TRUE)
+
+# Raw Julian day sequence for plotting
+jday_seq <- seq(
+  min(rob_db$jday, na.rm = TRUE),
+  max(rob_db$jday, na.rm = TRUE),
+  length.out = 100
+)
+
+# Species included in model/data
+rob_species <- rob_db %>%
+  filter(!is.na(sp)) %>%
+  distinct(sp) %>%
+  arrange(sp) %>%
+  pull(sp)
+
+# Prediction grid
+pred_grid_jday <- tidyr::expand_grid(
+  jday = jday_seq,
+  trmt_bin = c(-1, 1),
+  sp = rob_species
+) %>%
+  mutate(
+    jday_s = (jday - jday_mean) / (2 * jday_sd),
+    site = NA,
+    nit_avg_wspm_s_s = 0,
+    avg_moonlight_s = 0,
+    elev_max_s = 0,
+    yr_s = 0,
+    t_leps_s = 0
+  )
+
+
+pred_jday_comm <- avg_predictions(
+  m11,
+  newdata = pred_grid_jday,
+  by = c("jday", "jday_s", "trmt_bin"),
+  type = "response",
+  re.form = NULL,
+  allow.new.levels = TRUE
+) %>%
+  as_tibble() %>%
+  mutate(
+    treatment = factor(
+      if_else(trmt_bin == -1, "Dark", "Lit"),
+      levels = c("Dark", "Lit")
+    )
+  )
+
+
+p_jday_comm <- ggplot(
+  pred_jday_comm,
+  aes(x = jday, y = estimate, color = treatment, fill = treatment)
+) +
+  geom_ribbon(
+    aes(ymin = conf.low, ymax = conf.high),
+    alpha = 0.20,
+    color = NA
+  ) +
+  geom_line(linewidth = 1.2) +
+  scale_color_manual(values = trt_cols) +
+  scale_fill_manual(values = trt_cols) +
+  labs(
+    title = "Seasonal pattern of faint robomoth bat passes by treatment",
+    subtitle = "Predictions from m11; non-focal covariates held at mean scaled values",
+    x = "Julian day",
+    y = "Predicted number of faint bat passes",
+    color = "Treatment",
+    fill = "Treatment"
+  ) +
+  theme_minimal(base_size = 15) +
+  theme(
+    legend.position = "bottom",
+    panel.grid.minor = element_blank(),
+    plot.title = element_text(face = "bold"),
+    plot.subtitle = element_text(size = 12)
+  )
+
+p_jday_comm
+
+
+raw_jday_summary <- rob_db %>%
+  group_by(treatmt, trmt_bin, jday) %>%
+  summarise(
+    mean_calls = mean(n_calls, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  mutate(
+    treatment = factor(
+      if_else(trmt_bin == -1, "Dark", "Lit"),
+      levels = c("Dark", "Lit")
+    )
+  )
+
+
+
+p_jday_comm_raw <- ggplot(
+  pred_jday_comm,
+  aes(x = jday, y = estimate, color = treatment, fill = treatment)
+) +
+  geom_point(
+    data = raw_jday_summary,
+    aes(x = jday, y = mean_calls, color = treatment),
+    alpha = 0.25,
+    size = 1.4,
+    inherit.aes = FALSE
+  ) +
+  geom_ribbon(
+    aes(ymin = conf.low, ymax = conf.high),
+    alpha = 0.20,
+    color = NA
+  ) +
+  geom_line(linewidth = 1.2) +
+  scale_color_manual(values = trt_cols) +
+  scale_fill_manual(values = trt_cols) +
+  labs(
+    title = "Seasonal pattern of faint robomoth bat passes by treatment",
+    subtitle = "Points are observed treatment-level means; lines are model predictions from m11",
+    x = "Julian day",
+    y = "Predicted number of faint bat passes",
+    color = "Treatment",
+    fill = "Treatment"
+  ) +
+  theme_minimal(base_size = 15) +
+  theme(
+    legend.position = "bottom",
+    panel.grid.minor = element_blank(),
+    plot.title = element_text(face = "bold"),
+    plot.subtitle = element_text(size = 12)
+  )
+
+p_jday_comm_raw
+
+
+
+# year robomoth --------------------------------------------------------------------
+
+
+
+# Treatment colors
+trt_cols <- c(
+  "Dark" = "grey35",
+  "Lit"  = "goldenrod2"
+)
+
+# Extract the real year-to-yr_s mapping from your model data
+year_lookup <- rob_db %>%
+  filter(!is.na(year), !is.na(yr_s)) %>%
+  distinct(year, yr_s) %>%
+  arrange(year)
+
+year_lookup
+
+
+# Species included in the model
+rob_species <- rob_db %>%
+  filter(!is.na(sp)) %>%
+  distinct(sp) %>%
+  arrange(sp) %>%
+  pull(sp)
+
+# Prediction grid
+pred_grid_year <- tidyr::expand_grid(
+  year = year_lookup$year,
+  trmt_bin = c(-1, 1),
+  sp = rob_species
+) %>%
+  left_join(year_lookup, by = "year") %>%
+  mutate(
+    site = NA,
+    jday_s = 0,
+    nit_avg_wspm_s_s = 0,
+    avg_moonlight_s = 0,
+    elev_max_s = 0,
+    t_leps_s = 0
+  )
+
+
+# -------------------------------------------------------------------------
+# Community-level year predictions by treatment
+# -------------------------------------------------------------------------
+
+pred_year_trt <- avg_predictions(
+  m11,
+  newdata = pred_grid_year,
+  by = c("year", "trmt_bin"),
+  type = "response",
+  re.form = NULL,
+  allow.new.levels = TRUE
+) %>%
+  as_tibble() %>%
+  mutate(
+    treatment = factor(
+      if_else(trmt_bin == -1, "Dark", "Lit"),
+      levels = c("Dark", "Lit")
+    )
+  )
+
+pred_year_trt
+
+
+p_year_trt <- ggplot(
+  pred_year_trt,
+  aes(x = year, y = estimate, color = treatment, fill = treatment)
+) +
+  geom_line(linewidth = 1.1) +
+  geom_pointrange(
+    aes(ymin = conf.low, ymax = conf.high),
+    linewidth = 0.7,
+    fatten = 2.3
+  ) +
+  scale_color_manual(values = trt_cols) +
+  scale_fill_manual(values = trt_cols) +
+  scale_x_continuous(
+    breaks = year_lookup$year
+  ) +
+  labs(
+    title = "Predicted faint robomoth bat passes by year and treatment",
+    subtitle = "Predictions from m11; non-focal covariates held at mean scaled values",
+    x = "Year",
+    y = "Predicted number of faint bat passes",
+    color = "Treatment",
+    fill = "Treatment"
+  ) +
+  theme_minimal(base_size = 15) +
+  theme(
+    legend.position = "bottom",
+    panel.grid.minor = element_blank(),
+    plot.title = element_text(face = "bold"),
+    plot.subtitle = element_text(size = 12)
+  )
+
+p_year_trt
+
+
+
+# -------------------------------------------------------------------------
+# Community-level year predictions averaged across treatment and species
+# -------------------------------------------------------------------------
+
+pred_year_comm <- avg_predictions(
+  m11,
+  newdata = pred_grid_year,
+  by = "year",
+  type = "response",
+  re.form = NULL,
+  allow.new.levels = TRUE
+) %>%
+  as_tibble()
+
+p_year_comm <- ggplot(
+  pred_year_comm,
+  aes(x = year, y = estimate)
+) +
+  geom_line(linewidth = 1.1, color = "black") +
+  geom_pointrange(
+    aes(ymin = conf.low, ymax = conf.high),
+    linewidth = 0.7,
+    fatten = 2.3,
+    color = "black"
+  ) +
+  scale_x_continuous(
+    breaks = year_lookup$year
+  ) +
+  labs(
+    title = "Predicted faint robomoth bat passes by year",
+    subtitle = "Community-level predictions from m11 averaged across treatments and species",
+    x = "Year",
+    y = "Predicted number of faint bat passes"
+  ) +
+  theme_minimal(base_size = 15) +
+  theme(
+    panel.grid.minor = element_blank(),
+    plot.title = element_text(face = "bold"),
+    plot.subtitle = element_text(size = 12)
+  )
+
+p_year_comm
+
+
+
+# moon robmoth marginal  --------------------------------------------------
+
+
+# Treatment colors
+trt_cols <- c(
+  "Dark" = "grey35",
+  "Lit"  = "goldenrod2"
+)
+
+# Species included in the model
+rob_species <- rob_db %>%
+  filter(!is.na(sp)) %>%
+  distinct(sp) %>%
+  arrange(sp) %>%
+  pull(sp)
+
+# Sequence of observed moonlight values on the scaled scale
+moon_seq <- seq(
+  min(rob_db$avg_moonlight_s, na.rm = TRUE),
+  max(rob_db$avg_moonlight_s, na.rm = TRUE),
+  length.out = 100
+)
+
+# Prediction grid
+pred_grid_moon <- tidyr::expand_grid(
+  avg_moonlight_s = moon_seq,
+  trmt_bin = c(-1, 1),
+  sp = rob_species
+) %>%
+  mutate(
+    site = NA,
+    jday_s = 0,
+    nit_avg_wspm_s_s = 0,
+    elev_max_s = 0,
+    yr_s = 0,
+    t_leps_s = 0
+  )
+
+
+
+pred_moon_comm <- avg_predictions(
+  m11,
+  newdata = pred_grid_moon,
+  by = c("avg_moonlight_s", "trmt_bin"),
+  type = "response",
+  re.form = NULL,
+  allow.new.levels = TRUE
+) %>%
+  as_tibble() %>%
+  mutate(
+    treatment = factor(
+      if_else(trmt_bin == -1, "Dark", "Lit"),
+      levels = c("Dark", "Lit")
+    )
+  )
+
+
+p_moon_comm <- ggplot(
+  pred_moon_comm,
+  aes(x = avg_moonlight_s, y = estimate, color = treatment, fill = treatment)
+) +
+  geom_ribbon(
+    aes(ymin = conf.low, ymax = conf.high),
+    alpha = 0.20,
+    color = NA
+  ) +
+  geom_line(linewidth = 1.2) +
+  scale_color_manual(values = trt_cols) +
+  scale_fill_manual(values = trt_cols) +
+  labs(
+    title = "Moonlight modifies the effect of artificial light on faint robomoth passes",
+    subtitle = "Predictions from m11; non-focal covariates held at mean scaled values",
+    x = "Moonlight intensity (scaled)",
+    y = "Predicted number of faint bat passes",
+    color = "Treatment",
+    fill = "Treatment"
+  ) +
+  theme_minimal(base_size = 15) +
+  theme(
+    legend.position = "bottom",
+    panel.grid.minor = element_blank(),
+    plot.title = element_text(face = "bold"),
+    plot.subtitle = element_text(size = 12)
+  )
+
+p_moon_comm
+
+
+low moon  = 10th percentile
+mean moon = 50th percentile / median
+high moon = 90th percentile
+
+
+moon_levels <- quantile(
+  rob_db$avg_moonlight_s,
+  probs = c(0.10, 0.50, 0.90),
+  na.rm = TRUE
+)
+
+moon_level_df <- tibble(
+  moon_level = c("Low moonlight", "Average moonlight", "High moonlight"),
+  avg_moonlight_s = as.numeric(moon_levels)
+)
+
+moon_level_df
+
+pred_grid_moon_levels <- tidyr::expand_grid(
+  moon_level = moon_level_df$moon_level,
+  trmt_bin = c(-1, 1),
+  sp = rob_species
+) %>%
+  left_join(moon_level_df, by = "moon_level") %>%
+  mutate(
+    moon_level = factor(
+      moon_level,
+      levels = c("Low moonlight", "Average moonlight", "High moonlight")
+    ),
+    site = NA,
+    jday_s = 0,
+    nit_avg_wspm_s_s = 0,
+    elev_max_s = 0,
+    yr_s = 0,
+    t_leps_s = 0
+  )
+
+pred_moon_levels <- avg_predictions(
+  m11,
+  newdata = pred_grid_moon_levels,
+  by = c("moon_level", "avg_moonlight_s", "trmt_bin"),
+  type = "response",
+  re.form = NULL,
+  allow.new.levels = TRUE
+) %>%
+  as_tibble() %>%
+  mutate(
+    treatment = factor(
+      if_else(trmt_bin == -1, "Dark", "Lit"),
+      levels = c("Dark", "Lit")
+    ),
+    moon_level = factor(
+      moon_level,
+      levels = c("Low moonlight", "Average moonlight", "High moonlight")
+    )
+  )
+
+p_moon_levels <- ggplot(
+  pred_moon_levels,
+  aes(x = moon_level, y = estimate, color = treatment, group = treatment)
+) +
+  geom_line(linewidth = 1.1, position = position_dodge(width = 0.25)) +
+  geom_pointrange(
+    aes(ymin = conf.low, ymax = conf.high),
+    linewidth = 0.7,
+    fatten = 2.3,
+    position = position_dodge(width = 0.25)
+  ) +
+  scale_color_manual(values = trt_cols) +
+  labs(
+    title = "Predicted faint robomoth passes at low and high moonlight",
+    subtitle = "Predictions from m11; moonlight set to 10th, 50th, and 90th percentiles",
+    x = "Moonlight level",
+    y = "Predicted number of faint bat passes",
+    color = "Treatment"
+  ) +
+  theme_minimal(base_size = 15) +
+  theme(
+    legend.position = "bottom",
+    panel.grid.minor = element_blank(),
+    plot.title = element_text(face = "bold"),
+    plot.subtitle = element_text(size = 12),
+    axis.text.x = element_text(angle = 20, hjust = 1)
+  )
+
+p_moon_levels
+
+# treatment marginal effects  ---------------------------------------------
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# old graphs
+# 
 # model m11 --------------------------------------------------------------
 
 
