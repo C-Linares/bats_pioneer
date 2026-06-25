@@ -1603,6 +1603,160 @@ spkr_species_trt_effects %>%
 
 
 
+# speaker Jday marginal effects  ------------------------------------------
+
+# Treatment colors
+trt_cols <- c(
+  "Dark" = "grey35",
+  "Lit"  = "goldenrod2"
+)
+
+# Get scaling values from your data
+# This assumes jday_s was scaled as: (jday - mean(jday)) / (2 * sd(jday))
+jday_mean <- mean(spkr_db$jday, na.rm = TRUE)
+jday_sd   <- sd(spkr_db$jday, na.rm = TRUE)
+
+# Raw Julian day sequence for plotting
+jday_seq <- seq(
+  min(spkr_db$jday, na.rm = TRUE),
+  max(spkr_db$jday, na.rm = TRUE),
+  length.out = 100
+)
+
+# Species included in model/data
+rob_species <- spkr_db %>%
+  filter(!is.na(sp)) %>%
+  distinct(sp) %>%
+  arrange(sp) %>%
+  pull(sp)
+
+# Prediction grid
+pred_grid_jday <- tidyr::expand_grid(
+  jday = jday_seq,
+  trmt_bin = c(-1, 1),
+  sp = rob_species
+) %>%
+  mutate(
+    jday_s = (jday - jday_mean) / (2 * jday_sd),
+    site = NA,
+    nit_avg_wspm_s_s = 0,
+    avg_moonlight_s = 0,
+    elev_max_s = 0,
+    yr_s = 0,
+    t_leps_s = 0
+  )
+
+
+pred_jday_comm <- avg_predictions(
+  m11_s,
+  newdata = pred_grid_jday,
+  by = c("jday", "jday_s", "trmt_bin"),
+  type = "response",
+  re.form = NULL,
+  allow.new.levels = TRUE
+) %>%
+  as_tibble() %>%
+  mutate(
+    treatment = factor(
+      if_else(trmt_bin == -1, "Dark", "Lit"),
+      levels = c("Dark", "Lit")
+    )
+  )
+
+
+p_jday_comm <- ggplot(
+  pred_jday_comm,
+  aes(x = jday, y = estimate, color = treatment, fill = treatment)
+) +
+  geom_ribbon(
+    aes(ymin = conf.low, ymax = conf.high),
+    alpha = 0.20,
+    color = NA
+  ) +
+  geom_line(linewidth = 1.2) +
+  scale_color_manual(values = trt_cols) +
+  scale_fill_manual(values = trt_cols) +
+  labs(
+    title = "Seasonal pattern of faint robomoth bat passes by treatment",
+    subtitle = "Predictions from m11; non-focal covariates held at mean scaled values",
+    x = "Julian day",
+    y = "Predicted number of faint bat passes",
+    color = "Treatment",
+    fill = "Treatment"
+  ) +
+  theme_minimal(base_size = 15) +
+  theme(
+    legend.position = "bottom",
+    panel.grid.minor = element_blank(),
+    plot.title = element_text(face = "bold"),
+    plot.subtitle = element_text(size = 12)
+  )
+
+p_jday_comm
+
+
+raw_jday_summary <- spkr_db %>%
+  group_by(treatmt, trmt_bin, jday) %>%
+  summarise(
+    mean_calls = mean(n_calls, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  mutate(
+    treatment = factor(
+      if_else(trmt_bin == -1, "Dark", "Lit"),
+      levels = c("Dark", "Lit")
+    )
+  )
+
+
+
+p_jday_comm_raw_spkr <- ggplot(
+  pred_jday_comm,
+  aes(x = jday, y = estimate, color = treatment, fill = treatment)
+) +
+  geom_point(
+    data = raw_jday_summary,
+    aes(x = jday, y = mean_calls, color = treatment),
+    alpha = 0.25,
+    size = 1.4,
+    inherit.aes = FALSE
+  ) +
+  geom_ribbon(
+    aes(ymin = conf.low, ymax = conf.high),
+    alpha = 0.20,
+    color = NA
+  ) +
+  geom_line(linewidth = 1.2) +
+  scale_color_manual(values = trt_cols) +
+  scale_fill_manual(values = trt_cols) +
+  labs(
+    title = "Seasonal pattern of faint acoustic lure bat passes by treatment",
+    subtitle = "Points are observed treatment-level means; lines are model predictions from m11_s",
+    x = "Julian day",
+    y = "Predicted number of faint bat passes",
+    color = "Treatment",
+    fill = "Treatment"
+  ) +
+  theme_minimal(base_size = 15) +
+  theme(
+    legend.position = "bottom",
+    panel.grid.minor = element_blank(),
+    plot.title = element_text(face = "bold"),
+    plot.subtitle = element_text(size = 12)
+  )
+
+p_jday_comm_raw_spkr
+
+ggsave(
+  p_jday_comm_raw_spkr,
+  filename = "figures/rob_spkr_model/v2/spkr_jday_marginal_effects.png",
+  width = 8,
+  height = 6,
+  dpi = 300
+)
+
+
+
 # both robomoth and speaker data ------------------------------------------
 
 # Colors similar to Gomes-style contrast
@@ -1932,6 +2086,9 @@ p_gomes_style_treatment
 
 ggsave(
   filename = "figures/rob_spkr_model/v2/gomes_style_treatment.tiff",)
+
+
+
 
 # Old graphs. 
 
