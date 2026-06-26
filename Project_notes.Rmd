@@ -1114,5 +1114,12 @@ m11 for robomoth
 
 m11_s for spkr
 
-I spend some time discussing the results. \
+I spend some time discussing the results.
+
+------------------------------------------------------------------------
+
+6/24/2026
+
+I started working with the sm3 data for bats and making the rules for what to keep and what to take. \
+Next step is to merge the sm3 data iD from kpro with the sonobat buzz counts. \
 \

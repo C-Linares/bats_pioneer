@@ -1752,8 +1752,7 @@ ggsave(
   filename = "figures/rob_spkr_model/v2/spkr_jday_marginal_effects.png",
   width = 8,
   height = 6,
-  dpi = 300
-)
+  dpi = 300)
 
 
 

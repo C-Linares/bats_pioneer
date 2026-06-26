@@ -114,7 +114,7 @@ sum(is.na(bat_combined$date)) # check for NAs.
 
 # noche/night
 # this variable assigns the same date to calls that belong to a single night. If a call happened on July 6 at 3 am it assigns it to July 5. 
-# update on this. I realized that sometimes when I do this the correct date is not input. However, the date.12 column in Kaleidocope does the right thing. Sow we updated this sectio to use the date.12 insetead of the following lines. 
+# update on this. I realized that sometimes when I do this the correct date is not input. However, the date.12 column in Kaleidocope does the right thing. Sow we updated this section to use the date.12 instead of the following lines. 
 
 # bat_combined$noche <-
 #   if_else(bat_combined$HOUR < 9, # if it is less than 9 put the date of the previous day
@@ -193,10 +193,7 @@ species_table
 
 
 
-# remove noise and NoID
-bat_clean <- bat_clean %>%
-  filter(
-    !str_to_upper(auto_id) %in% c("NOISE", "NOID"))
+
 
 # remove large objcets to keep memory free
 rm(kpro_2021_bat)
@@ -209,9 +206,13 @@ gc()
 
 # rules for anpa 
 
+# first remove noise and NoID
+bat_clean <- bat_combined %>%
+  filter(
+    !str_to_upper(auto_id) %in% c("NOISE", "NOID")) 
 
 # make all species tags into small caps 
-bat_clean <- bat_combined %>%
+bat_clean <- bat_clean %>%
   mutate(
     auto_id = str_to_lower(auto_id),
     alternate_1 = str_to_lower(alternate_1),
@@ -222,7 +223,7 @@ bat_clean <- bat_combined %>%
 bat_clean <- bat_clean %>%
   mutate(sp = auto_id)
 
-# standadize empty spaces as NAs for alternate columns. 
+# standardize empty spaces as NAs for alternate columns. 
 bat_clean <- bat_clean %>%
   mutate(
     alternate_1 = na_if(alternate_1, ""),
@@ -252,7 +253,7 @@ bat_clean <- bat_clean %>%
       auto_id == "antpal" &
         alternate_1 == "cortow" &
         dur < 5 &
-        fc >= 24 & fc <= 35 ~ "anpa_coto",
+        fc >= 24 & fc <= 35 ~ "anpa",
       
       # ANTPAL label, but alternate suggests MYOEVO and call has higher frequency
       auto_id == "antpal" &
@@ -261,14 +262,14 @@ bat_clean <- bat_clean %>%
       
       # ANTPAL label, but alternative suggests MYOTHY we don't have myothy in sites so lof
       auto_id == "antpal" &
-        alternate_1 == "myothy" ~ "lof",
+        alternate_1 == "myothy" ~ "antpal",
       
       # ANTPAL with EPTFUS alternative but not strong ANTPAL metrics
       auto_id == "antpal" &
-        alternate_1 == "eptfus" ~ "anpa_epfu",
+        alternate_1 == "eptfus" ~ "anpa",
       
       # All other ANTPAL rows are low-frequency uncertain
-      auto_id == "antpal" ~ "lof",
+      auto_id == "antpal" ~ "antpal",
       
       # Everything else remains as originally labeled
       TRUE ~ auto_id
@@ -359,7 +360,7 @@ bat_clean <- bat_clean %>%
         fc >= 24 & fc <= 30 ~ "antpal",
       
       auto_id == "cortow" &
-        alternate_1 == "antpal" ~ "cortow_antpal",
+        alternate_1 == "antpal" ~ "cortow",
       
       # ------------------------------------------------------------
       # 3. CORTOW with LASNOC alternative
@@ -504,6 +505,8 @@ cortow_inspect <- bat_clean %>%
 
 cortow_inspect # this are all the rows that need to be inspected. 
 
+table(bat_clean$sp)
+
 
 # rule for EUDMAC
 # this batspecies is not likely at our sites. It is in idaho just not likely at our site. 
@@ -554,6 +557,7 @@ eudmac_inspect <- bat_clean %>%
 
 eudmac_inspect
 
+table(bat_clean$sp)
 
 # MYCA rule ---------------------------------------------------------------
 
@@ -648,25 +652,25 @@ bat_clean <- bat_clean %>%
       auto_id == "myocal" &
         (alternate_1 == "myoyum" | alternate_2 == "myoyum") &
         !(alternate_1 %in% likely_myotis_alt) &
-        !(alternate_2 %in% likely_myotis_alt) ~ "mysp",
+        !(alternate_2 %in% likely_myotis_alt) ~ "myocal",
       
       # ------------------------------------------------------------
       # 9. Short Myotis calls are weak for species-level ID
       # ------------------------------------------------------------
       auto_id == "myocal" &
-        dur < 3.5 ~ "mysp",
+        dur < 3.5 ~ "myocal",
       
       # ------------------------------------------------------------
       # 10. Lower-frequency 40 kHz Myotis metrics without a supported
       # target alternative
       # ------------------------------------------------------------
       auto_id == "myocal" &
-        fc >= 39 & fc <= 45 ~ "mysp",
+        fc >= 39 & fc <= 45 ~ "myocal",
       
       # ------------------------------------------------------------
       # 11. Any remaining MYOCAL rows
       # ------------------------------------------------------------
-      auto_id == "myocal" ~ "mysp",
+      auto_id == "myocal" ~ "myocal",
       
       TRUE ~ sp
     ),
@@ -752,7 +756,7 @@ bat_clean <- bat_clean %>%
 
 bat_clean %>%
   filter(auto_id == "myocal") %>%
-  count(alternate_1, alternate_2, sp, inspect, rule_used, sort = TRUE)
+  count(auto_id, alternate_1, alternate_2, sp, inspect, rule_used, sort = TRUE)
 
 bat_clean %>%
   filter(auto_id == "myocal") %>%
@@ -775,6 +779,173 @@ myocal_inspect <- bat_clean %>%
     sp, inspect, rule_used,
     pulses, fc, dur, fmax, fmin, fmean, qual
   )
+
+table(bat_clean$sp)
+
+
+# 
+
+# rules for parhes --------------------------------------------------------
+# this species hasn't been reported in the area according to the idaho department of fish and game. We should reconsider many of othe calls. It often gets confused with myotis but at the frequency range where it calls it is hard to distinguish. 
+
+
+parhes<-bat_clean %>% 
+  filter(auto_id == "parhes")
+
+bat_clean <- bat_clean %>%
+  mutate(
+    
+    sp = case_when(
+      
+      # ------------------------------------------------------------
+      # 1. Stronger PARHES-like calls
+      # PARHES tends to have higher fc and low frequency near/above 39–45 kHz.
+      # ------------------------------------------------------------
+      auto_id == "parhes" &
+        fc >= 44 & fc <= 50 &
+        fmin >= 39 &
+        fmax >= 48 & fmax <= 75 &
+        dur >= 3.5 & dur <= 7.5 ~ "parhes",
+      
+      # ------------------------------------------------------------
+      # 2. PARHES auto_id but alternate supports MYOLUC
+      # MYOLUC is lower-frequency 40 kHz Myotis and tends to have longer duration.
+      # ------------------------------------------------------------
+      auto_id == "parhes" &
+        alternate_1 == "myoluc" &
+        fc >= 38 & fc <= 44 &
+        dur >= 5.0 ~ "myoluc",
+      
+      auto_id == "parhes" &
+        alternate_2 == "myoluc" &
+        fc >= 38 & fc <= 44 &
+        dur >= 5.0 ~ "myoluc",
+      
+      # ------------------------------------------------------------
+      # 3. PARHES auto_id but alternate supports MYOVOL
+      # MYOVOL is also around 40–43 kHz but often shorter/steeper than MYOLUC.
+      # ------------------------------------------------------------
+      auto_id == "parhes" &
+        alternate_1 == "myovol" &
+        fc >= 40 & fc <= 45 &
+        dur >= 3.0 & dur <= 5.5 ~ "myovol",
+      
+      auto_id == "parhes" &
+        alternate_2 == "myovol" &
+        fc >= 40 & fc <= 45 &
+        dur >= 3.0 & dur <= 5.5 ~ "myovol",
+      
+      # ------------------------------------------------------------
+      # 4. PARHES auto_id but alternate supports MYOCAL
+      # MYOCAL is a higher-frequency Myotis; use only with higher fc/fmin.
+      # ------------------------------------------------------------
+      auto_id == "parhes" &
+        alternate_1 == "myocal" &
+        fc >= 47 & fc <= 53 &
+        fmin >= 40 &
+        fmax >= 60 ~ "myocal",
+      
+      auto_id == "parhes" &
+        alternate_2 == "myocal" &
+        fc >= 47 & fc <= 53 &
+        fmin >= 40 &
+        fmax >= 60 ~ "myocal",
+      
+      # ------------------------------------------------------------
+      # 5. Low-frequency Myotis-like calls without strong species support
+      # ------------------------------------------------------------
+      auto_id == "parhes" &
+        fc >= 38 & fc <= 44 &
+        dur >= 4.0 ~ "mysp",
+      
+      # ------------------------------------------------------------
+      # 6. Very short or weak PARHES rows: insufficient for species-level ID
+      # ------------------------------------------------------------
+      auto_id == "parhes" &
+        dur < 3.5 ~ "hif",
+      
+      # ------------------------------------------------------------
+      # 7. Any remaining PARHES rows
+      # ------------------------------------------------------------
+      auto_id == "parhes" ~ "hif",
+      
+      TRUE ~ sp
+    ),
+    
+    inspect = case_when(
+      auto_id == "parhes" ~ "yes",
+      TRUE ~ inspect
+    ),
+    
+    rule_used = case_when(
+      
+      auto_id == "parhes" &
+        fc >= 44 & fc <= 50 &
+        fmin >= 39 &
+        fmax >= 48 & fmax <= 75 &
+        dur >= 3.5 & dur <= 7.5 ~
+        "PARHES retained: metrics broadly consistent with PARHES high-frequency call; flagged for inspection",
+      
+      auto_id == "parhes" &
+        alternate_1 == "myoluc" &
+        fc >= 38 & fc <= 44 &
+        dur >= 5.0 ~
+        "PARHES recoded to MYOLUC: alternate_1 supports MYOLUC and metrics fit lower-frequency longer Myotis",
+      
+      auto_id == "parhes" &
+        alternate_2 == "myoluc" &
+        fc >= 38 & fc <= 44 &
+        dur >= 5.0 ~
+        "PARHES recoded to MYOLUC: alternate_2 supports MYOLUC and metrics fit lower-frequency longer Myotis",
+      
+      auto_id == "parhes" &
+        alternate_1 == "myovol" &
+        fc >= 40 & fc <= 45 &
+        dur >= 3.0 & dur <= 5.5 ~
+        "PARHES recoded to MYOVOL: alternate_1 supports MYOVOL and metrics fit 40 kHz Myotis",
+      
+      auto_id == "parhes" &
+        alternate_2 == "myovol" &
+        fc >= 40 & fc <= 45 &
+        dur >= 3.0 & dur <= 5.5 ~
+        "PARHES recoded to MYOVOL: alternate_2 supports MYOVOL and metrics fit 40 kHz Myotis",
+      
+      auto_id == "parhes" &
+        alternate_1 == "myocal" &
+        fc >= 47 & fc <= 53 &
+        fmin >= 40 &
+        fmax >= 60 ~
+        "PARHES recoded to MYOCAL: alternate_1 supports MYOCAL and metrics fit higher-frequency Myotis",
+      
+      auto_id == "parhes" &
+        alternate_2 == "myocal" &
+        fc >= 47 & fc <= 53 &
+        fmin >= 40 &
+        fmax >= 60 ~
+        "PARHES recoded to MYOCAL: alternate_2 supports MYOCAL and metrics fit higher-frequency Myotis",
+      
+      auto_id == "parhes" &
+        fc >= 38 & fc <= 44 &
+        dur >= 4.0 ~
+        "PARHES recoded as MYSP: lower-frequency 40 kHz Myotis-like metrics but no supported species-level alternative",
+      
+      auto_id == "parhes" &
+        dur < 3.5 ~
+        "PARHES recoded as HIF: short call, insufficient for species-level ID",
+      
+      auto_id == "parhes" ~
+        "PARHES recoded as HIF: PARHES auto_id not strongly supported by metrics or alternatives",
+      
+      TRUE ~ rule_used
+    )
+  )
+
+bat_clean %>%
+  filter(auto_id == "parhes") %>%
+  count( auto_id, alternate_1, alternate_2, sp, inspect, rule_used, sort = TRUE)
+
+table(bat_clean$sp) # it went from 5000 to 600 
+
 # effort ------------------------------------------------------------------
 
 
@@ -824,6 +995,8 @@ bm_summary <- bm %>%
   group_by(sp) %>%
   summarise(total_calls = sum(n)) %>%
   arrange(desc(total_calls))
+
+
 # miller matrix -----------------------------------------------------------
 
 
