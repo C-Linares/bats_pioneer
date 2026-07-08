@@ -90,9 +90,11 @@ keep <- c(
 bat_combined <- bat_combined %>% select(all_of(keep)) # keeps variables of interest
 
 
-# site 
 
-bat_combined$site<-str_extract(bat_combined$OUTDIR, "[A-Za-z]{3,4}\\d{2}")
+# site --------------------------------------------------------------------
+
+
+bat_combined$site<-str_extract(bat_combined$outdir, "[A-Za-z]{3,4}\\d{2}")
 
 unique(bat_combined$site) # site labels need correction
 
@@ -177,6 +179,22 @@ bat_combined$jday<-lubridate::yday(bat_combined$noche) # julian day
 
 summary(bat_combined)
 
+# effort -------------------------------------------------------------------
+
+# we have to calculate effort before fitering becaue we don't have the noise and noID calls. 
+
+effort_days <- bat_combined %>%
+  group_by(site, yr) %>%
+  summarise(
+    stard = min(noche),
+    endd = max(noche),
+    eff.days = as.numeric(difftime(max(noche), min(noche), units = "days"))
+  )
+
+effort_hrs <- bat_combined %>%
+  group_by(site, noche, jday, yr) %>%
+  summarise(stard = min(datetime), endd = max(datetime)) %>%
+  mutate(eff.hrs = time_length(endd - stard, unit = "hours"))
 
 # species rules  ----------------------------------------------------------
 
@@ -233,6 +251,12 @@ bat_clean <- bat_clean %>%
 # step one ANPA make "anpaepfu" when empfu is first alternative. 
 # we need to update it to make all anpa when alternate_1 = Myevo into myoevo 
 
+# first how many ANPA we have 
+unique(bat_clean$auto_id)
+
+antpal<-bat_clean %>% 
+  filter(auto_id == "antpal") # we have 3821 antpal 
+
 bat_clean <- bat_clean %>%
   mutate(
     auto_id = str_to_lower(auto_id),
@@ -253,7 +277,7 @@ bat_clean <- bat_clean %>%
       auto_id == "antpal" &
         alternate_1 == "cortow" &
         dur < 5 &
-        fc >= 24 & fc <= 35 ~ "anpa",
+        fc >= 24 & fc <= 35 ~ "cortow",
       
       # ANTPAL label, but alternate suggests MYOEVO and call has higher frequency
       auto_id == "antpal" &
@@ -266,9 +290,9 @@ bat_clean <- bat_clean %>%
       
       # ANTPAL with EPTFUS alternative but not strong ANTPAL metrics
       auto_id == "antpal" &
-        alternate_1 == "eptfus" ~ "anpa",
+        alternate_1 == "eptfus" ~ "eptfus",
       
-      # All other ANTPAL rows are low-frequency uncertain
+      # All other ANTPAL rows are low-frequency uncertain, but for now we keep them as antpal 
       auto_id == "antpal" ~ "antpal",
       
       # Everything else remains as originally labeled
@@ -310,7 +334,7 @@ bat_clean %>%
   filter(auto_id == "antpal") %>%
   count(auto_id, sp, alternate_1, inspect, rule_used, sort = TRUE)
 
-table(bat_clean$sp)
+table(bat_clean$sp) # after filtering it went from 3821 to 282 antpal. 
 
 # rows to inspect 
 antpal_inspect <- bat_clean %>%
@@ -326,7 +350,7 @@ antpal_inspect <- bat_clean %>%
 
 # CORTOW is often confused with ANPA, LANO, LACI, MYEV, also with Myca and MYth but whit these two cases it should remain as COTO. 
 
-# we have about 1116 calls. 
+# we have about 1116 calls for coto
 
 coto<-bat_clean %>% 
   filter(auto_id == "cortow")
@@ -372,7 +396,7 @@ bat_clean <- bat_clean %>%
         fc >= 24 & fc <= 29 ~ "lasnoc",
       
       auto_id == "cortow" &
-        alternate_1 == "lasnoc" ~ "cortow_lasnoc",
+        alternate_1 == "lasnoc" ~ "cortow",
       
       # ------------------------------------------------------------
       # 4. CORTOW with LASCIN alternative
@@ -384,7 +408,7 @@ bat_clean <- bat_clean %>%
         dur >= 7 ~ "lascin",
       
       auto_id == "cortow" &
-        alternate_1 == "lascin" ~ "cortow_lascin",
+        alternate_1 == "lascin" ~ "cortow",
       
       # ------------------------------------------------------------
       # 5. CORTOW with MYOEVO alternative
@@ -395,7 +419,7 @@ bat_clean <- bat_clean %>%
         fc >= 33 ~ "myoevo",
       
       auto_id == "cortow" &
-        alternate_1 == "myoevo" ~ "cortow_myoevo",
+        alternate_1 == "myoevo" ~ "cortow",
       
       # ------------------------------------------------------------
       # 6. CORTOW with MYOCAL or MYOTHY alternative
@@ -505,7 +529,7 @@ cortow_inspect <- bat_clean %>%
 
 cortow_inspect # this are all the rows that need to be inspected. 
 
-table(bat_clean$sp)
+table(bat_clean$sp) # after filter we went from 1116 to 2271 is more I don't know why. 
 
 
 # rule for EUDMAC
@@ -557,7 +581,7 @@ eudmac_inspect <- bat_clean %>%
 
 eudmac_inspect
 
-table(bat_clean$sp)
+table(bat_clean$sp) # eudmac was recoded or marke as lof
 
 # MYCA rule ---------------------------------------------------------------
 
@@ -780,7 +804,7 @@ myocal_inspect <- bat_clean %>%
     pulses, fc, dur, fmax, fmin, fmean, qual
   )
 
-table(bat_clean$sp)
+table(bat_clean$sp) #it just went from 3447 to 3029 after the filtering. needs extra work might need to be fiter out.  
 
 
 # 
@@ -790,7 +814,7 @@ table(bat_clean$sp)
 
 
 parhes<-bat_clean %>% 
-  filter(auto_id == "parhes")
+  filter(auto_id == "parhes") # we have about 5541 observations. 
 
 bat_clean <- bat_clean %>%
   mutate(
@@ -944,23 +968,23 @@ bat_clean %>%
   filter(auto_id == "parhes") %>%
   count( auto_id, alternate_1, alternate_2, sp, inspect, rule_used, sort = TRUE)
 
-table(bat_clean$sp) # it went from 5000 to 600 
+table(bat_clean$sp) # it went from 5000 to 638 taht we can easily filter out. 
 
 # effort ------------------------------------------------------------------
-
-
-effort_days <- bat_combined %>%
-  group_by(site, yr) %>%
-  summarise(
-    stard = min(noche),
-    endd = max(noche),
-    eff.days = as.numeric(difftime(max(noche), min(noche), units = "days"))
-  )
-
-effort_hrs <- bat_combined %>%
-  group_by(site, noche, jday, yr) %>%
-  summarise(stard = min(datetime), endd = max(datetime)) %>%
-  mutate(eff.hrs = time_length(endd - stard, unit = "hours"))
+# # we have to calculate effort before filtering because we don't have the noise and noID calls. te following section was sent up the script
+# 
+# effort_days <- bat_combined %>%
+#   group_by(site, yr) %>%
+#   summarise(
+#     stard = min(noche),
+#     endd = max(noche),
+#     eff.days = as.numeric(difftime(max(noche), min(noche), units = "days"))
+#   )
+# 
+# effort_hrs <- bat_combined %>%
+#   group_by(site, noche, jday, yr) %>%
+#   summarise(stard = min(datetime), endd = max(datetime)) %>%
+#   mutate(eff.hrs = time_length(endd - stard, unit = "hours"))
 
 # merge effort with bat combined 
 

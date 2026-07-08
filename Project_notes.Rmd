@@ -1120,6 +1120,26 @@ I spend some time discussing the results.
 
 6/24/2026
 
-I started working with the sm3 data for bats and making the rules for what to keep and what to take. \
-Next step is to merge the sm3 data iD from kpro with the sonobat buzz counts. \
+I started working with the sm3 data for bats and making the rules for what to keep and what to take.\
+Next step is to merge the sm3 data iD from kpro with the sonobat buzz counts.\
+
+------------------------------------------------------------------------
+
+7/7/2026
+
+- I exported the sm3 buzz data to paste to with the bat combined and make a data set to assess if there's more or less calls at lit sites.
+
+- I modified the effort calculation in the prep_for_glmm_v2 script
+
+- I change the species that needed recoding using a series of rules and these should be ready to go.
+
+- Now:
+
+  - merge effort with bat_combines
+
+  - merge sm3 buzz data with bat combined to get sp level and buzz together
+
+  - analyze both data sets.
+
+\
 \
