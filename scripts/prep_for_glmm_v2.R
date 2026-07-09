@@ -1013,18 +1013,65 @@ bat_clean<- left_join(bat_clean, effort_hrs, by=c("site", "jday", "yr", "noche")
 bat_clean<- left_join(bat_clean, effort_days, by=c("site", "yr"))
 summary(bat_clean)
 
+
+# bat_clean_v2 ------------------------------------------------------------
+
+
 keep<- c("in_file", "date", "time","noche","datetime","auto_id","manual_id","site","noche", "datetime", "yr", "treatmt","trmt_bin", "jday","sp","eff.hrs","eff.days" ) # cols to keep
 
 bat_clean_v2 <- bat_clean %>% select(all_of(keep))
 
+# it seems we have acoustic files in the bat_clean_v2 that might need to be removed
 
+bat_clean_v2 %>%
+  mutate(
+    file_type = case_when(
+      str_detect(in_file, "__0__") ~ "acoustic",
+      str_detect(in_file, "__1__") ~ "ultrasonic",
+      TRUE ~ "other_or_unknown"
+    )
+  ) %>%
+  count(file_type, sort = TRUE) 
 
+bat_clean_v2 %>%
+  filter(str_detect(in_file, "__0__")) %>% # see acousticfiles. 
+  count(in_file, sort = TRUE) %>%
+  head(20)
+
+# we filter and keep only the ultrasnic files. 
+bat_clean_v2 <- bat_clean_v2 %>%
+  filter(str_detect(in_file, "__1__"))
 
 summary(bat_clean_v2)
 glimpse(bat_clean_v2)
 
-# next step is to merge this with the buzz from sm3 to have that data ready for analysis. 
 
+# now we want to see how many files are duplicated. 
+
+x<-bat_clean_v2 %>%
+  count(in_file, sort = TRUE) %>%
+  filter(n > 1)
+
+x
+
+dup_rows <- bat_clean_v2 %>%
+  semi_join(x, by = "in_file") %>%
+  arrange(in_file, datetime)
+
+View(dup_rows)
+
+# after inspection the duplicate rows in the file. It seem we can safely merge
+# them into one row as they share the species and everything else
+
+bat_clean_v3 <- bat_clean_v2 %>%
+  distinct(in_file, sp, .keep_all = TRUE)
+
+# how many rows we removed from one to another version (about 6244)
+
+nrow(bat_clean_v2)
+nrow(bat_clean_v3)
+
+nrow(bat_clean_v2) - nrow(bat_clean_v3)
 
 # count matrix ------------------------------------------------------------
 # # this is a matrix where we create a n column that tells us how many calls for each bat are there.
@@ -1040,7 +1087,7 @@ glimpse(bat_clean_v2)
 # we updated the previews section because it did not accounted for zeros. in other words when the species was not detected at a site but the site was sampled.
 
 # 1. Summarize observed bat detections
-bat_counts <- bat_clean_v2 %>%
+bat_counts <- bat_clean_v3 %>%
   group_by(site, yr, jday, noche, sp) %>%
   summarise(
     n = n(),
@@ -1056,11 +1103,9 @@ effort_grid <- effort_hrs %>%
   distinct(site, yr, jday, noche, eff.hrs)
 
 # 3. Species list
-species_list <- bat_clean_v2 %>%
+species_list <- bat_clean_v3 %>%
   distinct(sp)
-# remove hif lof mysp. I was thinking to remove these but I will filter before the analysis so we have the full list of hits. 
-# species_list <- species_list %>%
-#   filter(!sp %in% c("hif", "lof", "mysp"))
+
 
 # 4. Create full site-night-species grid
 bat_zero_db <- effort_grid %>%
@@ -1092,12 +1137,12 @@ bm_summary <- bat_zero_db %>%
 # minutes activity 
 # in here we calculate the minutes of activity insipired by Miller 2001 paper. 
 
-bat_clean_v2 <- bat_clean_v2 %>%
+bat_clean_v3 <- bat_clean_v3 %>%
   mutate(
     rmins = floor_date(datetime, unit = "minute")
   ) #rounds to the nearest min
 
-bm_miller <- bat_clean_v2 %>%
+bm_miller <- bat_clean_v3 %>%
   distinct(site, sp, noche, rmins) %>%
   group_by(site, sp, noche) %>%
   summarise(
@@ -1135,6 +1180,37 @@ bm_miller <- bat_clean_v2 %>%
 
 # here we create a section to merge the sm3 buzz data with the bat_clean_v2 data. 
 
+# load the sm3_buzz data. 
+
+sm3_buzz <- read.csv("data_for_analysis/sm3_buzz_build/sm3_buzz_all.csv") 
+glimpse(sm3_buzz)  
+
+sm3_buzz <- sm3_buzz %>%
+mutate(
+    noche = as.Date(monitoring_night),
+  )
+
+glimpse(sm3_buzz)
+
+# I believe the best idea is to merge the bat data witht e sm3_buzz data by file. however, I am wondering if this would 
+# actually answer the question is there more bat buzzes at lit sites. 
+
+# look up table for mergin 
+
+sp_lookup <- bat_clean_v3 %>%
+  group_by(in_file) %>%
+  summarise(
+    n_sp = n_distinct(sp),
+    sp = if_else(n_sp == 1, first(sp), NA_character_),
+    species_found = paste(sort(unique(sp)), collapse = ", "),
+    .groups = "drop"
+  )
+
+sm3_buzz_sp <- sm3_buzz %>%
+  left_join(
+    sp_lookup,
+    by = c("filename" = "in_file")
+  )
 
 
 # outputs -----------------------------------------------------------------
@@ -1145,7 +1221,7 @@ bm_miller <- bat_clean_v2 %>%
 write.csv(bat_combined, file = 'data_for_analysis/prep_for_glmm_v2//bat_combined.csv', row.names = F) # raw combine data 
 write.csv(bat_zero_db, file = 'data_for_analysis/prep_for_glmm_v2/bat_zero_db.csv', row.names = F) #daily counts
 write.csv(bm_miller, file = "data_for_analysis/prep_for_glmm_v2/bm_miller.csv") # miller Ai index data
-# write.csv(normalized_bm, file = "data_for_analysis/prep_for_glmm/normalized_bm.csv") # this is unecessary
+# write.csv(sm3_buzz_sp, file = "data_for_analysis/prep_for_glmm/sm3_buzz_sp.csv") # this is not ready to write 
 
 
 # Create a README file with information about the script
