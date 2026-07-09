@@ -41,7 +41,7 @@ library(janitor)
 
 # load
 # 
-load("working_env/prep_for_glm.RData")
+# load("working_env/prep_for_glm.RData")
 
 
 kpro_2021_bat <- fread(file = 'data_for_analysis/2021_kpro_raw/bats2021_kpro_v1.csv', header = T)
@@ -155,7 +155,7 @@ midnight_times <- bat_combined$datetime %>%
   filter(hour(value) == 0 & minute(value) == 0 & second(value) == 10)
 
 # View the rows that match
-midnight_rows
+midnight_times
 
 
 #year
@@ -988,34 +988,98 @@ table(bat_clean$sp) # it went from 5000 to 638 taht we can easily filter out.
 
 # merge effort with bat combined 
 
-bat_combined<- left_join(bat_combined, effort_hrs, by=c("site", "jday", "yr", "noche"))
+# but first these need to be tibble or the same class of object. 
+
+bat_clean <- bat_clean %>%
+  as_tibble() %>%
+  mutate(
+    site = as.character(site),
+    jday = as.integer(jday),
+    yr = as.integer(yr),
+    noche = as.Date(noche)
+  )
+
+effort_hrs <- effort_hrs %>%
+  ungroup() %>%
+  as_tibble() %>%
+  mutate(
+    site = as.character(site),
+    jday = as.integer(jday),
+    yr = as.integer(yr),
+    noche = as.Date(noche)
+  )
+
+bat_clean<- left_join(bat_clean, effort_hrs, by=c("site", "jday", "yr", "noche"))
+bat_clean<- left_join(bat_clean, effort_days, by=c("site", "yr"))
+summary(bat_clean)
+
+keep<- c("in_file", "date", "time","noche","datetime","auto_id","manual_id","site","noche", "datetime", "yr", "treatmt","trmt_bin", "jday","sp","eff.hrs","eff.days" ) # cols to keep
+
+bat_clean_v2 <- bat_clean %>% select(all_of(keep))
 
 
-keep<- c("AUTO.ID.", "PULSES", "site","noche","datetime", "yr","treatmt","trmt_bin","jday","eff.hrs") # cols to keep
-
-bat_combined <- bat_combined %>% select(all_of(keep))
-
-bat_combined <- bat_combined %>% rename(sp = AUTO.ID.)# change the auto.id to sp 
 
 
+summary(bat_clean_v2)
+glimpse(bat_clean_v2)
 
-summary(bat_combined)
-
-
+# next step is to merge this with the buzz from sm3 to have that data ready for analysis. 
 
 
 # count matrix ------------------------------------------------------------
-# this is a matrix where we create a n column that tells us how many calls for each bat are there.
-# daily counts
+# # this is a matrix where we create a n column that tells us how many calls for each bat are there.
+# # daily counts
+# 
+# bm <- bat_clean_v2 %>% # 
+#   group_by(noche, sp, site,yr, treatmt, trmt_bin, eff.hrs) %>% 
+#   summarise(n = n(), .groups = 'drop') 
+# 
+# summary(bm)
+# head(bm)
 
-bm <- bat_combined %>% # 
-  group_by(noche, sp, site,yr, treatmt, trmt_bin, eff.hrs) %>% 
-  summarise(n = n(), .groups = 'drop') 
+# we updated the previews section because it did not accounted for zeros. in other words when the species was not detected at a site but the site was sampled.
 
-summary(bm)
-head(bm)
+# 1. Summarize observed bat detections
+bat_counts <- bat_clean_v2 %>%
+  group_by(site, yr, jday, noche, sp) %>%
+  summarise(
+    n = n(),
+    .groups = "drop"
+  )
+
+# 2. Build effort grid
+# Use effort_hrs if it contains all sampled site-nights.
+# If not, use bat_clean_v2, but that only keeps nights where bats were detected.
+
+effort_grid <- effort_hrs %>%
+  ungroup() %>%
+  distinct(site, yr, jday, noche, eff.hrs)
+
+# 3. Species list
+species_list <- bat_clean_v2 %>%
+  distinct(sp)
+# remove hif lof mysp. I was thinking to remove these but I will filter before the analysis so we have the full list of hits. 
+# species_list <- species_list %>%
+#   filter(!sp %in% c("hif", "lof", "mysp"))
+
+# 4. Create full site-night-species grid
+bat_zero_db <- effort_grid %>%
+  crossing(species_list)
+
+# 5. Join observed counts and replace missing counts with zero
+bat_zero_db <- bat_zero_db %>%
+  left_join(
+    bat_counts,
+    by = c("site", "yr", "jday", "noche", "sp")
+  ) %>%
+  mutate(
+    n = replace_na(n, 0)
+  )
+
+
+
 # here we calculate the total calls per species to report in the results 
-bm_summary <- bm %>%
+bm_summary <- bat_zero_db %>%
   group_by(sp) %>%
   summarise(total_calls = sum(n)) %>%
   arrange(desc(total_calls))
@@ -1028,123 +1092,48 @@ bm_summary <- bm %>%
 # minutes activity 
 # in here we calculate the minutes of activity insipired by Miller 2001 paper. 
 
-bat_combined$rmins<-round(bat_combined$date_time, units="mins") #rounds to the nearest min
-
-bm.miller<-bat_combined %>% #min of activity 
-  group_by(site, AUTO.ID., noche, rmins) %>% 
-  summarize(activity_min= n()) %>%  #calculate the num of min activity
-  ungroup()
-
-
-bm.miller.day <- bm.miller %>% # number of minutes active  by night. 
-  group_by(site, noche, AUTO.ID.) %>%
-  summarize(activity_min = sum(activity_min))
-
-summary(bm.miller.day)
-
-
-bm.miller<- bat_combined %>%
-  # Extract the relevant columns and round to minute level
-  mutate(rmins = round(date_time, units = "mins")) %>%
-  # Remove duplicate entries for the same site, date, and minute
-  distinct(site, sp, noche, rmins, .keep_all = TRUE) %>%
-  # Group by site, date, and minute
-  group_by(site,sp, noche, rmins) %>%
-  # Summarize to count the number of unique minutes
-  summarize(activity_min = n_distinct(rmins), .groups = 'drop')
-
-bm.miller.day <- bm.miller %>% # number of minutes active  by night. 
-  group_by(site, noche, sp) %>%
-  summarize(activity_min = sum(activity_min))
-
-head(bm.miller.day)
-summary(bm.miller.day)
-
-
-
-# correcting for abundance ------------------------------------------------
-
-# This code maps sites into defined pairs, groups data by night, site pair, and species, calculates normalized bat activity by dividing experimental activity (lit treatment) by the mean control activity (dark treatment), and filters out noise and unidentified species. It also adds a Julian day column to the resulting dataset.
-
-# Define the pairs
-site_pairs <- list(
-  c("long01", "long02"),
-  c("long03", "long04"),
-  c("iron01", "iron02"),
-  c("iron03", "iron04"),
-  c("iron05", "iron06")
-)
-
-# Add a column to map pairs
-bm <- bm %>%
+bat_clean_v2 <- bat_clean_v2 %>%
   mutate(
-    pair_group = case_when(
-      site %in% c("long01", "long02") ~ "long01:long02",
-      site %in% c("long03", "long04") ~ "long03:long04",
-      # site %in% c("long05") ~ "long05",
-      site %in% c("iron01", "iron02") ~ "iron01:iron02",
-      site %in% c("iron03", "iron04") ~ "iron03:iron04",
-      site %in% c("iron05", "iron06") ~ "iron05:iron06",
-      TRUE ~ NA_character_
-    )
+    rmins = floor_date(datetime, unit = "minute")
+  ) #rounds to the nearest min
+
+bm_miller <- bat_clean_v2 %>%
+  distinct(site, sp, noche, rmins) %>%
+  group_by(site, sp, noche) %>%
+  summarise(
+    activity_min = n(),
+    .groups = "drop"
   )
 
-normalized_bm <- bm %>%
-  group_by(noche, pair_group, sp) %>%  # Add species (sp) to the grouping
-  summarize(
-    control_mean = ifelse(all(is.na(n[treatmt == "dark"])), 
-                          .01,  # Replace NaN with .01 when no data exists for control
-                          mean(n[treatmt == "dark"], na.rm = TRUE)),  # Average control activity per species,  # Average control activity per species
-    control_activity = sum(n[treatmt == "dark"], na.rm = TRUE),  # Total control activity per species
-    experimental_activity = sum(n[treatmt == "lit"], na.rm = TRUE),  # Total experimental activity per species
-    .groups = "drop"
-  ) %>%
-  mutate(
-    normalized_activity = experimental_activity / (control_mean+ experimental_activity)  # Calculate normalized activity
-  ) %>% 
-  mutate(
-    bin_act = ifelse(experimental_activity>=control_mean, 1, 0)
-  ) %>% 
-  mutate(
-  j_diff= experimental_activity - control_activity) # difference between experimental and control activity.
-  
-  
+# bm_miller.day <- bm_miller %>% # number of minutes active  by night.  redundant might erase later. 
+#   group_by(site, noche, sp) %>%
+#   summarize(activity_min = sum(activity_min))
+# 
+# summary(bm_miller.day)
+
+# 
+# bm.miller<- bat_combined %>%
+#   # Extract the relevant columns and round to minute level
+#   mutate(rmins = round(date_time, units = "mins")) %>%
+#   # Remove duplicate entries for the same site, date, and minute
+#   distinct(site, sp, noche, rmins, .keep_all = TRUE) %>%
+#   # Group by site, date, and minute
+#   group_by(site,sp, noche, rmins) %>%
+#   # Summarize to count the number of unique minutes
+#   summarize(activity_min = n_distinct(rmins), .groups = 'drop')
+# 
+# bm.miller.day <- bm.miller %>% # number of minutes active  by night. 
+#   group_by(site, noche, sp) %>%
+#   summarize(activity_min = sum(activity_min))
+# 
+# head(bm.miller.day)
+# summary(bm.miller.day)
 
 
-# View the result
-normalized_bm
 
-summary(normalized_bm) # check for NAs
-head(normalized_bm,100)
+# sm3 _buzz  --------------------------------------------------------------
 
-normalized_bm$jday<-yday(normalized_bm$noche)
-normalized_bm$year<-year(normalized_bm$noche)
-
-# View the result
-normalized_bm
-# there are some rows that have NAs. that come from control sites not paired with any experimental site.we remove them. 
-rows_with_na <- normalized_bm %>% filter(if_any(everything(), is.na)) 
-normalized_bm<- normalized_bm %>% drop_na()
-normalized_bm <- normalized_bm[!(normalized_bm$sp %in% c("Noise","NoID")), ]# filter out Noise and NoID rows. 
-#remove all rows for long05
-normalized_bm <- normalized_bm %>% filter(!pair_group %in% "long05")
-
-summary(normalized_bm)
-head(normalized_bm,100)
-
-hist(normalized_bm$j_diff)
-range(normalized_bm$j_diff) 
-
-# show rows with 20 largest j_diff 
-rowlarge<- normalized_bm %>%
-  arrange(desc(j_diff)) %>%
-  slice_head(n = 20)
-
-print(rowlarge)
-# save rowlarge as .csv
-rowlarge <- rowlarge %>% select(-c(control_mean, control_activity, experimental_activity)) # remove unwanted columns
-
-write.csv(rowlarge, file = 'data_for_analysis/prep_for_glmm/rowlarge.csv', row.names = F) # raw combine data 
+# here we create a section to merge the sm3 buzz data with the bat_clean_v2 data. 
 
 
 
@@ -1153,20 +1142,28 @@ write.csv(rowlarge, file = 'data_for_analysis/prep_for_glmm/rowlarge.csv', row.n
 
 # dir.create("data_for_analysis/prep_for_glm", showWarnings = FALSE) # just run if the dir is abscent
 
-write.csv(bat_combined, file = 'data_for_analysis/prep_for_glmm/bat_combined.csv', row.names = F) # raw combine data 
-write.csv(bm, file = 'data_for_analysis/prep_for_glmm/bm.csv', row.names = F) #daily counts
-write.csv(bm.miller.day, file = "data_for_analysis/prep_for_glmm/bm.miller.day.csv") # miller Ai index data
-write.csv(normalized_bm, file = "data_for_analysis/prep_for_glmm/normalized_bm.csv")
+write.csv(bat_combined, file = 'data_for_analysis/prep_for_glmm_v2//bat_combined.csv', row.names = F) # raw combine data 
+write.csv(bat_zero_db, file = 'data_for_analysis/prep_for_glmm_v2/bat_zero_db.csv', row.names = F) #daily counts
+write.csv(bm_miller, file = "data_for_analysis/prep_for_glmm_v2/bm_miller.csv") # miller Ai index data
+# write.csv(normalized_bm, file = "data_for_analysis/prep_for_glmm/normalized_bm.csv") # this is unecessary
 
 
 # Create a README file with information about the script
-readme_content <- "Carlos Linares 8/01/2024, 12/12/2024 
-This directory contains the bat_combined.csv file which was created using the script prep_for_glmm.R combines bat species call abundance data. This script merges 2021-23 data that was previously scanned with Kaleidoscope pro
+readme_content <- "
 
-bat_combined.csv - process data no counts (Update: 12/2/2024 some modifications to date time column.) 
-bm.csv - counts of bat calls by day from 2021 to 2023 all sites
-bm.miller.day - number of minutes of activity by day  for 2021-2023 data all sites (last update 9/23/2024)
-normalized_bm.csv - normalized bat activity by dividing experimental activity (lit treatment) by the mean control activity (dark treatment) by species and noche(date) "
+Carlos Linares 8/01/2024, 12/12/2024, 7/8/2025 
+This directory contains the bat_combined.csv file which was created using the script prep_for_glmm_v2.R combines bat species call abundance data. This script merges 2021-23 data that was previously scanned with Kaleidoscope pro. but in this new version we created a series of rules to re-code and flagg species that are not likely to be found in the study area (bat_clean_v2). 
+
+- The script also creates a count matrix bat_zero_db taht has the summary of calls by species with zeros added. These represent times when a bat was not detected but the site was monitored. 
+
+the script also produces a Miller 2001 index of activity matrix bm_miller.
+
+bat_combined.csv - process data no counts (Update: 7/8/2026 rules for bat species) 
+bat_zero_db.csv - counts of bat calls by day from 2021 to 2023 all sites
+bm_miller.csv - number of minutes of activity by day  for 2021-2023 data all sites (last update 7/8/2026)
+
+
+"
 # Write the README content to a file
 writeLines(readme_content, "data_for_analysis/prep_for_glmm/README.txt")
 
@@ -1349,6 +1346,91 @@ save.image("working_env/prep_for_glm.RData")
 
 
 # --------------------------- trash ----------------
+# correcting for abundance ------------------------------------------------
+
+# This code maps sites into defined pairs, groups data by night, site pair, and species, calculates normalized bat activity by dividing experimental activity (lit treatment) by the mean control activity (dark treatment), and filters out noise and unidentified species. It also adds a Julian day column to the resulting dataset.
+
+# Define the pairs
+site_pairs <- list(
+  c("long01", "long02"),
+  c("long03", "long04"),
+  c("iron01", "iron02"),
+  c("iron03", "iron04"),
+  c("iron05", "iron06")
+)
+
+# Add a column to map pairs
+bm <- bm %>%
+  mutate(
+    pair_group = case_when(
+      site %in% c("long01", "long02") ~ "long01:long02",
+      site %in% c("long03", "long04") ~ "long03:long04",
+      # site %in% c("long05") ~ "long05",
+      site %in% c("iron01", "iron02") ~ "iron01:iron02",
+      site %in% c("iron03", "iron04") ~ "iron03:iron04",
+      site %in% c("iron05", "iron06") ~ "iron05:iron06",
+      TRUE ~ NA_character_
+    )
+  )
+
+normalized_bm <- bm %>%
+  group_by(noche, pair_group, sp) %>%  # Add species (sp) to the grouping
+  summarize(
+    control_mean = ifelse(all(is.na(n[treatmt == "dark"])), 
+                          .01,  # Replace NaN with .01 when no data exists for control
+                          mean(n[treatmt == "dark"], na.rm = TRUE)),  # Average control activity per species,  # Average control activity per species
+    control_activity = sum(n[treatmt == "dark"], na.rm = TRUE),  # Total control activity per species
+    experimental_activity = sum(n[treatmt == "lit"], na.rm = TRUE),  # Total experimental activity per species
+    .groups = "drop"
+  ) %>%
+  mutate(
+    normalized_activity = experimental_activity / (control_mean+ experimental_activity)  # Calculate normalized activity
+  ) %>% 
+  mutate(
+    bin_act = ifelse(experimental_activity>=control_mean, 1, 0)
+  ) %>% 
+  mutate(
+    j_diff= experimental_activity - control_activity) # difference between experimental and control activity.
+
+
+
+
+# View the result
+normalized_bm
+
+summary(normalized_bm) # check for NAs
+head(normalized_bm,100)
+
+normalized_bm$jday<-yday(normalized_bm$noche)
+normalized_bm$year<-year(normalized_bm$noche)
+
+# View the result
+normalized_bm
+# there are some rows that have NAs. that come from control sites not paired with any experimental site.we remove them. 
+rows_with_na <- normalized_bm %>% filter(if_any(everything(), is.na)) 
+normalized_bm<- normalized_bm %>% drop_na()
+normalized_bm <- normalized_bm[!(normalized_bm$sp %in% c("Noise","NoID")), ]# filter out Noise and NoID rows. 
+#remove all rows for long05
+normalized_bm <- normalized_bm %>% filter(!pair_group %in% "long05")
+
+summary(normalized_bm)
+head(normalized_bm,100)
+
+hist(normalized_bm$j_diff)
+range(normalized_bm$j_diff) 
+
+# show rows with 20 largest j_diff 
+rowlarge<- normalized_bm %>%
+  arrange(desc(j_diff)) %>%
+  slice_head(n = 20)
+
+print(rowlarge)
+# save rowlarge as .csv
+rowlarge <- rowlarge %>% select(-c(control_mean, control_activity, experimental_activity)) # remove unwanted columns
+
+write.csv(rowlarge, file = 'data_for_analysis/prep_for_glmm/rowlarge.csv', row.names = F) # raw combine data 
+
+
 
 
 

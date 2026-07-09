@@ -1131,7 +1131,7 @@ Next step is to merge the sm3 data iD from kpro with the sonobat buzz counts.\
 
 - I modified the effort calculation in the prep_for_glmm_v2 script
 
-- I change the species that needed recoding using a series of rules and these should be ready to go.
+- I change the species that needed re-coding using a series of rules in the prep_for_glmm_v2 script and these should be ready to go.
 
 - Now:
 
@@ -1140,6 +1140,18 @@ Next step is to merge the sm3 data iD from kpro with the sonobat buzz counts.\
   - merge sm3 buzz data with bat combined to get sp level and buzz together
 
   - analyze both data sets.
+
+- I created the bat_zero_db. It has corrected zeros for when a bat was not recorded but the site was monitored. this should be ready to analyze with the glmm_v4 and this will be updated to v5.
+
+- need to create the sm3 buzz file to merge the ids from the bmzero into the buzz data set.
+
+- I updated the miller data set and this might be use to see if the patters of the glmmv4 hold.
+
+- also created the sm3_buzz_sp but I don't thin it is workng yet. I need to find a way to merge the column sp from the the bat_clean_v3 file to the sm3 buzz.
+
+to do: add the predictors, standardize, run correlation for the bat_zero_db
+
+fix sm3 database
 
 \
 \
