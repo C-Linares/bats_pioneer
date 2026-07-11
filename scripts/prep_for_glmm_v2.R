@@ -1016,6 +1016,7 @@ summary(bat_clean)
 
 # bat_clean_v2 ------------------------------------------------------------
 
+# here we filter out unnecessary columns and keep only the ones we need for the analysis.
 
 keep<- c("in_file", "date", "time","noche","datetime","auto_id","manual_id","site","noche", "datetime", "yr", "treatmt","trmt_bin", "jday","sp","eff.hrs","eff.days" ) # cols to keep
 
@@ -1121,7 +1122,7 @@ bat_zero_db <- bat_zero_db %>%
     n = replace_na(n, 0)
   )
 
-
+summary(bat_zero_db)
 
 # here we calculate the total calls per species to report in the results 
 bm_summary <- bat_zero_db %>%
@@ -1185,32 +1186,187 @@ bm_miller <- bat_clean_v3 %>%
 sm3_buzz <- read.csv("data_for_analysis/sm3_buzz_build/sm3_buzz_all.csv") 
 glimpse(sm3_buzz)  
 
-sm3_buzz <- sm3_buzz %>%
-mutate(
-    noche = as.Date(monitoring_night),
+# standardize site.
+
+unique(sm3_buzz$site)
+
+sm3_buzz$site = ifelse(sm3_buzz$site %in% "lon03","long03", sm3_buzz$site)
+sm3_buzz$site = ifelse(sm3_buzz$site %in% "viz02","vizc02", sm3_buzz$site)
+sm3_buzz$site = ifelse(sm3_buzz$site %in% "viz04","vizc04", sm3_buzz$site)
+
+unique(sm3_buzz$site)
+# we can't trust monitoring night because there are a many missing from the sm3_buzz file. I have to review the script that created it firts to figure it out. For now we are going to create the noche column using the date time column 
+
+# first we make date_time into a date and time column 
+sm3_buzz<-sm3_buzz %>% mutate(
+datetime = ymd_hms(date_time, tz = "America/Denver")
+) %>% 
+select(-c(date_time, monitoring_night)) # we don't need the date_time column anymore.
+
+# now we create using the datetime column 
+# we will use a noon-to noon boundary for the day. 
+
+sm3_buzz<- sm3_buzz %>% 
+  mutate(
+    noche = as.Date(datetime - hours(12))
   )
 
+
+summary(sm3_buzz)
+# I believe the best idea is to merge the bat data with the sm3_buzz data by file.
+
+# Keep the filename and species information from bat_clean_v3
+bat_species_lookup <- bat_clean_v3 %>%
+  select(filename = in_file, sp) %>%
+  distinct()
+
+# Add sp to sm3_buzz by matching filenames
+sm3_buzz <- sm3_buzz %>%
+  left_join(
+    bat_species_lookup,
+    by = "filename",
+    relationship = "many-to-one"
+  )
+
+summary(sm3_buzz)
+
+# how many sp were succesfully added
+sm3_buzz %>%
+  summarise(
+    total_rows = n(),
+    sp_added = sum(!is.na(sp)),
+    sp_not_added = sum(is.na(sp)),
+    percent_added = round(mean(!is.na(sp)) * 100, 2)
+  )
+
+summary(sm3_buzz)
+
+
+
+# how many column have species information now
+names(sm3_buzz)
+# spp has all the posibble id we won't use it 
+# spp_accp has all species that were accepted by the sonobat 
+# species_manual_id has the vetted ones 
+# sp the species ID with Kpro that  were added to the sm3_buzz data in the previous step. 
+
+# clean up and create un single species column sp_clen 
+
+# we create the sp_clean column where the priority is as follows sp_clean = species_manual_id > sp_accp > sp
+# # now there's still some rows that have sp id in the spp column but this is composed of several option separated by slash myvol/myoluc/myocal. I want to take the firs option only. 
+
+sm3_buzz <- sm3_buzz %>%
+  mutate(
+    sp_clean = case_when(
+      !is.na(species_manual_id) ~ species_manual_id,
+      !is.na(spp_accp)          ~ spp_accp,
+      !is.na(sp)                ~ sp,
+      !is.na(spp)               ~ sub("/.*$", "", spp),
+      TRUE                      ~ NA_character_
+    )
+  )
+
+
+summary(sm3_buzz)
+
+# I check and this worked. Now the sp_clean column has the species ID that we can use for analysis, but needs to be cleaned first from 6code ID to 4 code so myovol should become myvo.
+
+sm3_buzz %>%
+  select(species_manual_id, spp_accp, sp, spp, sp_clean) %>%
+  head(30)
+
+# fix the sp_name in sp_clean to be 4 letter code instead of 6 letter code.
+sm3_buzz <- sm3_buzz %>%
+  mutate(
+    sp_clean = tolower(sp_clean),
+    
+    sp_clean = if_else(
+      nchar(sp_clean) == 6,
+      paste0(
+        substr(sp_clean, 1, 2),  # first 2 genus letters
+        substr(sp_clean, 4, 5)   # first 2 species letters
+      ),
+      sp_clean
+    )
+  )
+
+# now we have to decide what observations we keep, zeros with sp ID or any zeros. I will keep zeros associated with species. I also want to see how many feeding buzz above zero have no species ID associated to them 
+
+# first I want to know what species have buzzes but no ID. the opposite. 
+
+buzz_id_summary <- sm3_buzz %>%
+  mutate(
+    category = case_when(
+      is.na(sp_clean) & c_buzz > 0  ~ "Buzzes but no species ID",
+      !is.na(sp_clean) & c_buzz == 0 ~ "Species ID but no buzzes",
+      !is.na(sp_clean) & c_buzz > 0  ~ "Species ID and buzzes",
+      is.na(sp_clean) & c_buzz == 0  ~ "No species ID and no buzzes",
+      is.na(c_buzz)                  ~ "Missing buzz count"
+    )
+  ) %>%
+  count(category, name = "observations") %>%
+  mutate(
+    percent = round(100 * observations / sum(observations), 2)
+  )
+
+buzz_id_summary
+
+# we filter out the rows with NA in sp_clen and c_buzz. 
+sm3_buzz<- sm3_buzz %>%
+  filter(
+    !is.na(sp_clean),
+    sp_clean != "", # possibly unnecessary
+    !is.na(c_buzz)
+  )
+
+# tally/count
+sm3_buzz %>%
+  count(sp_clean, sort = TRUE)
+
+summary(sm3_buzz)
 glimpse(sm3_buzz)
 
-# I believe the best idea is to merge the bat data witht e sm3_buzz data by file. however, I am wondering if this would 
-# actually answer the question is there more bat buzzes at lit sites. 
-
-# look up table for mergin 
-
-sp_lookup <- bat_clean_v3 %>%
-  group_by(in_file) %>%
+# now we summarize bat buzzes by species site and monitoring night and year. If we don't do this then we have several buzzes counted for the same species in a site on a given monitoring night. 
+# 
+sm3_buzz <- sm3_buzz %>%
+  group_by(
+    site,
+    noche,# we can't use monitoring night thus noche
+    year,
+    sp_clean
+  ) %>%
   summarise(
-    n_sp = n_distinct(sp),
-    sp = if_else(n_sp == 1, first(sp), NA_character_),
-    species_found = paste(sort(unique(sp)), collapse = ", "),
+    t_buzzes = sum(c_buzz),
+    identified_files = n(),
     .groups = "drop"
   )
 
-sm3_buzz_sp <- sm3_buzz %>%
+summary(sm3_buzz)
+
+
+# now we want to add the effort from the table 
+
+# # join effort with sm3_buzz. effort is leaving several NAs and I think we have some issues with this. 
+# 
+
+
+
+sm3_buzz <- sm3_buzz %>% 
   left_join(
-    sp_lookup,
-    by = c("filename" = "in_file")
+    effort_lookup,
+    by = c("site", "year", "noche")  )
+summary(sm3_buzz) # as it stands there's 32 sites that do not have effort data. I will need to check this ones for now, I will give them the minimum effort of 1 hour.
+
+sm3_buzz <- sm3_buzz %>%
+  mutate(
+    eff.hrs = if_else(is.na(eff.hrs), 1, eff.hrs),
+    eff.days = if_else(is.na(eff.days), 1, eff.days)
   )
+
+summary(sm3_buzz) # now we have no NAs in the effort column.
+
+# now we add the zeros 
+
 
 
 # outputs -----------------------------------------------------------------
@@ -1221,7 +1377,7 @@ sm3_buzz_sp <- sm3_buzz %>%
 write.csv(bat_combined, file = 'data_for_analysis/prep_for_glmm_v2//bat_combined.csv', row.names = F) # raw combine data 
 write.csv(bat_zero_db, file = 'data_for_analysis/prep_for_glmm_v2/bat_zero_db.csv', row.names = F) #daily counts
 write.csv(bm_miller, file = "data_for_analysis/prep_for_glmm_v2/bm_miller.csv") # miller Ai index data
-# write.csv(sm3_buzz_sp, file = "data_for_analysis/prep_for_glmm/sm3_buzz_sp.csv") # this is not ready to write 
+# write.csv(sm3_buzz, file = "data_for_analysis/prep_for_glmm/sm3_buzz_sp.csv") # this is not ready to write 
 
 
 # Create a README file with information about the script
