@@ -1157,7 +1157,15 @@ fix sm3 database
 
 7/13/2026
 
-I worked the effort data. Now we have calculations for effort done with the actual SM3 recordings. \
-these live in the data_for_analysis\>effort folder. \
+I worked the effort data. Now we have calculations for effort done with the actual SM3 recordings.\
+these live in the data_for_analysis\>effort folder.\
+
+------------------------------------------------------------------------
+
+7/15/2026
+
+I ran some model for the sm3 data without the buzzes. I even have some graphs now. However the moon predictor need to be reran with extended dates and I also need to add the miller data. \
+other than that it is good for describing. \
+\
 \
 \

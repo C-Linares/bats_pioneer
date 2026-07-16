@@ -35,6 +35,28 @@ library(beepr)
 library(lubridate)
 library(data.table)
 library(janitor)
+library(corrplot)
+
+
+# functions ---------------------------------------------------------------
+
+# funtion to scale. 
+scale_by_2sd_tidy <- function(data, variables_to_scale) {
+  # Keep only variables that exist and are numeric
+  valid_vars <- variables_to_scale[variables_to_scale %in% names(data) & sapply(data[variables_to_scale], is.numeric)]
+  
+  if (length(valid_vars) == 0) {
+    warning("No valid numeric variables found to scale.")
+    return(data)
+  }
+  
+  data <- data %>%
+    mutate(across(all_of(valid_vars),
+                  ~ (. - mean(., na.rm = TRUE)) / (2 * sd(., na.rm = TRUE)),
+                  .names = "{.col}_s"))
+  
+  return(data)
+}
 
 
 # kpro_data --------------------------------------------------------------
@@ -88,6 +110,7 @@ keep <- c(
 ) # cols to keep
 
 bat_combined <- bat_combined %>% select(all_of(keep)) # keeps variables of interest
+
 
 
 
@@ -181,20 +204,26 @@ summary(bat_combined)
 
 # effort -------------------------------------------------------------------
 
-# we have to calculate effort before fitering becaue we don't have the noise and noID calls. 
+# now when load the effort from the actual files. 
 
-effort_days <- bat_combined %>%
-  group_by(site, yr) %>%
-  summarise(
-    stard = min(noche),
-    endd = max(noche),
-    eff.days = as.numeric(difftime(max(noche), min(noche), units = "days"))
-  )
+effort_days<- read.csv("data_for_analysis/effort/effort_days.csv")
+effort_hrs<- read.csv("data_for_analysis/effort/effort_hrs.csv")
 
-effort_hrs <- bat_combined %>%
-  group_by(site, noche, jday, yr) %>%
-  summarise(stard = min(datetime), endd = max(datetime)) %>%
-  mutate(eff.hrs = time_length(endd - stard, unit = "hours"))
+# below is the old way of calculating effort. 
+# # we have to calculate effort before fitering becaue we don't have the noise and noID calls. 
+# 
+# effort_days <- bat_combined %>%
+#   group_by(site, yr) %>%
+#   summarise(
+#     stard = min(noche),
+#     endd = max(noche),
+#     eff.days = as.numeric(difftime(max(noche), min(noche), units = "days"))
+#   )
+# 
+# effort_hrs <- bat_combined %>%
+#   group_by(site, noche, jday, yr) %>%
+#   summarise(stard = min(datetime), endd = max(datetime)) %>%
+#   mutate(eff.hrs = time_length(endd - stard, unit = "hours"))
 
 # species rules  ----------------------------------------------------------
 
@@ -1005,14 +1034,21 @@ effort_hrs <- effort_hrs %>%
   mutate(
     site = as.character(site),
     jday = as.integer(jday),
-    yr = as.integer(yr),
-    noche = as.Date(noche)
+    yr = as.integer(year),
+    noche = as.Date(monitoring_night)
   )
 
 bat_clean<- left_join(bat_clean, effort_hrs, by=c("site", "jday", "yr", "noche"))
-bat_clean<- left_join(bat_clean, effort_days, by=c("site", "yr"))
+bat_clean<- left_join(bat_clean, effort_days, by=c("site", "year"))
 summary(bat_clean)
 
+effort_na <- bat_clean %>%
+  filter(is.na(eff.hrs) | is.na(eff.days)) # we see the missing information rows come from acoustic files that will be removed later.
+
+
+bat_clean %>%
+  filter(is.na(eff.hrs) | is.na(eff.days)) %>%
+  count(site, noche, year, monitoring_night, sort = TRUE)
 
 # bat_clean_v2 ------------------------------------------------------------
 
@@ -1074,6 +1110,9 @@ nrow(bat_clean_v3)
 
 nrow(bat_clean_v2) - nrow(bat_clean_v3)
 
+bat_clean_v3 # this files has acoustic, duplicates, and species vetted as much as possible. 
+
+
 # count matrix ------------------------------------------------------------
 # # this is a matrix where we create a n column that tells us how many calls for each bat are there.
 # # daily counts
@@ -1097,7 +1136,6 @@ bat_counts <- bat_clean_v3 %>%
 
 # 2. Build effort grid
 # Use effort_hrs if it contains all sampled site-nights.
-# If not, use bat_clean_v2, but that only keeps nights where bats were detected.
 
 effort_grid <- effort_hrs %>%
   ungroup() %>%
@@ -1106,7 +1144,10 @@ effort_grid <- effort_hrs %>%
 # 3. Species list
 species_list <- bat_clean_v3 %>%
   distinct(sp)
+# edit effort list to remove hif, mysp, lof
 
+species_list <- species_list %>%
+  filter(!sp %in% c("hif", "mysp", "lof"))
 
 # 4. Create full site-night-species grid
 bat_zero_db <- effort_grid %>%
@@ -1124,6 +1165,16 @@ bat_zero_db <- bat_zero_db %>%
 
 summary(bat_zero_db)
 
+
+# calculate week for later mergin with insects
+
+bat_zero_db <- bat_zero_db %>%
+  mutate(
+    wk = lubridate::week(noche)
+  )
+
+summary(bat_zero_db)
+
 # here we calculate the total calls per species to report in the results 
 bm_summary <- bat_zero_db %>%
   group_by(sp) %>%
@@ -1131,12 +1182,258 @@ bm_summary <- bat_zero_db %>%
   arrange(desc(total_calls))
 
 
+# predictors --------------------------------------------------------------
+# merge with predictors and standardize and see correlations 
+
+# Craters weather (night)
+crmo.wet.night <- read_csv("data_for_analysis/weather/craters_weater/craters_night.csv") %>% 
+  clean_names() # load craters night weather
+
+# Moon
+moon.int <- read_csv('data_for_analysis/moon_pred/moon.int.csv') %>%
+  clean_names()
+summary(moon.int) # check the structure of the moon data
+
+# convert date times from UTC to Denver/America
+moon.int$denver_time <- with_tz(moon.int$date, tzone = "America/Denver") # Convert to Denver time zone
+attr(moon.int$denver_time, "tzone") # check the timezone is correct
+
+# summarize moonlight by date but conditional moon_alt_degrees > 0
+
+# Step 1: Filter data where the moon is above the horizon
+moon_filtered <- moon.int %>%
+  filter(moon_alt_degrees > 0)
+
+# Step 2: Create a new 'noche' variable (just the date part of the time stamp)
+# but also makes nights any time stamps that are less than 9 am.
+moon_filtered <- moon_filtered %>%
+  mutate(
+    hour = hour(denver_time),  # Extract hour from datetime
+    noche = if_else(hour < 9,
+                    true = as_date(denver_time) - days(1),
+                    false = as_date(denver_time))
+  )
+
+# Step 3: Group by 'noche', then summarize the average values
+moon_daily_avg <- moon_filtered %>%
+  group_by(noche) %>%
+  summarise(
+    avg_moonlight = mean(moonlight_model, na.rm = TRUE),
+    avg_twilight = mean(twilight_model, na.rm = TRUE),
+    avg_illumination = mean(illumination, na.rm = TRUE),
+    n_obs = n()  # optional: number of observations per night
+  )
+
+# insects 
+c_bugs <- read_csv("data_for_analysis/insect_wranglin/c_bugs.csv") %>%  # load insect data
+  clean_names() %>%
+  rename(yr = yrs) # safe rename
+# add treatment. 
+
+litsites<-c("iron01","iron03","iron05","long01","long03")
+
+
+c_bugs$treatmt<-ifelse(c_bugs$site %in% litsites , "lit", "dark") # this makes a treatment variable.
+
+
+# calculate mean by yr, trmt and site. I will use this to substitute the NA valeus from tha appeared when merging the bat data. 
+
+c_bugs_mean <- c_bugs %>%
+  group_by(yr,treatmt, site) %>%
+  summarise(
+    t_insect = mean(t_insect, na.rm = TRUE),
+    t_lepidoptera = mean(t_lepidoptera, na.rm = TRUE)
+  ) %>%
+  ungroup()
+
+
+
+# light
+light <- read_csv("data_for_analysis/lights/lightspectra_pioneer.csv") %>%
+  clean_names() %>%
+  filter(vert_horiz == "Horizontal") %>%                          # Keep only horizontal measures
+  mutate(mwatts = rowMeans(across(c(watts_m1, watts_m2, watts_m3)), na.rm = TRUE)) %>%  # Mean of watts
+  select(site, lux, yr, mwatts)    # Select relevant columns  
+
+# Merge datasets ------------------------------------------------------------
+
+
+# merge weather
+# Merge crmo.wet.night into filtered_bm by matching dates
+bm2 <- bat_zero_db %>%
+  left_join(crmo.wet.night, by = c("noche" = "date"))
+summary(bm2)
+
+# merge with moon
+bm2 <- bm2 %>%
+  left_join(moon_daily_avg, by = "noche") 
+
+summary(bm2) #there is just 78 NA I can keep it that way for now because we have to recalculate the moon predictors 
+
+missing_moon_nights <- bat_zero_db %>%
+  distinct(noche) %>%
+  anti_join(
+    moon_daily_avg %>% distinct(noche),
+    by = "noche"
+  )
+
+missing_moon_nights
+
+# merge with insects
+
+bm2 <- bm2 %>%
+  left_join(c_bugs, by = c("site", "wk", "yr")) # merge
+
+# check for NAs
+summary(bm2)  #lots of NAs in t.insect and t.lepidoptera.
+
+# replace NAs in t.insect and t.lepidoptera with the mean values from c_bugs_mean
+
+
+bm2 <- bm2 %>%
+  left_join(c_bugs_mean, 
+            by = c("yr", "site"),
+            suffix = c("", "_mean")) %>%  # rename mean columns directly
+  mutate(
+    t_insect = coalesce(t_insect, t_insect_mean),
+    t_lepidoptera = coalesce(t_lepidoptera, t_lepidoptera_mean)
+  ) %>%
+  select(-t_insect_mean, -t_lepidoptera_mean)
+
+summary(bm2)
+
+# merge light 
+
+bm2<- bm2 %>%
+  left_join(light, by = c("site", "yr"))
+
+
+# we need to add the treatment
+litsites<-c("iron01","iron03","iron05","long01","long03")
+
+bm2<- bm2 %>%
+  mutate(
+    treatmt = if_else(site %in% litsites, "lit", "dark"),
+    trmt_bin = if_else(treatmt == "lit", 1, -1)
+  )
+
+summary(bm2)
+# note:
+# we are going to write this table to use for the predictors in the dbrda analysis. 
+# write_csv(bm2, "data_for_analysis/dbrda/bm2.csv")
+
+# correlation -------------------------------------------------------------
+
+
+# 1. Select numeric columns, optionally drop unique id/group columns
+numeric_data <- bm2 %>% 
+  select(where(is.numeric)) %>% 
+  select(-any_of(c("yr", "trmt_bin"))) # add/remove columns as needed
+
+# 2. Remove zero-variance columns
+numeric_data <- numeric_data %>% select(where(~sd(., na.rm = TRUE) > 0))
+
+# 3. Compute correlation matrix
+cor_mat <- cor(numeric_data, use = "pairwise.complete.obs")
+
+# 4. Visualize correlation matrix
+corrplot(cor_mat, order = 'AOE', method = 'color', tl.col = 'black', tl.cex = 0.8, addCoef.col = 'black', number.cex = 0.7)
+
+
+# standardize -------------------------------------------------------------
+
+# #calculate Julian day from 'noche' and scale variables
+# bm2<-bm2 %>% 
+#   mutate(
+#     jday = lubridate::yday(noche),  # Calculate Julian day from 'noche'
+#   )
+
+variables_to_scale <- c(
+  "avg_moonlight",
+  "avg_twilight",
+  "avg_illumination",
+  "nit_avg_temp_c",
+  "nit_avg_wspm_s",
+  "t_lepidoptera",
+  "t_insect",
+  "lux",
+  "mwatts",
+  "jday"
+)
+
+bm2 <- bm2 %>%
+  scale_by_2sd_tidy(variables_to_scale)
+
+summary(bm2)
+
+# year standardize. 
+
+# make year between -1:1
+bm2 <- bm2 %>%
+  mutate(yr_s = case_when(
+    yr == 2021 ~ -1,
+    yr == 2022 ~ 0,
+    TRUE ~ 1
+  ))
+
+
+# species names for graphs
+
+species <- data.frame(
+  sp = c("ANTPAL", "CORTOW", "EPTFUS", "EUDMAC", "LASCIN", "LASNOC",
+         "MYOCAL", "MYOCIL", "MYOEVO", "MYOLUC", "MYOTHY", "MYOVOL",
+         "MYOYUM", "PARHES"),
+  species_name = c("Antrozous pallidus", "Corynorhinus townsendii", "Eptesicus fuscus", "Euderma maculatum",
+                   "Lasiurus cinereus", "Lasiurus noctivagans", "Myotis californicus", "Myotis ciliolabrum",
+                   "Myotis evotis", "Myotis lucifugus", "Myotis thysanodes", "Myotis volans",
+                   "Myotis yumanensis", "Parastrellus hesperus")
+)
+
+species <- species %>%
+  mutate(
+    sp = tolower(sp),  # Ensure species codes are lowercase for consistency)
+    genus = word(species_name, 1),
+    species = word(species_name, 2),
+    sp_label = paste0(substr(genus, 1, 1), ".", species)
+  )
+
+# we make treatment bin -1 for dark and 1 for lit. 
+bm2 <- bm2 %>%
+  left_join(species %>% select(sp, sp_label), by = "sp") # add species labels for plotting
+
+glimpse(bm2)
+summary(bm2)
+
+# now we merge the bm_ai with the bm2 data to have both the Miller activity index and the echolocation count data.
+
+t <- bm2 %>%
+  left_join(
+    bm_miller %>%
+      select(site, noche, sp, activity_min),
+    by = c("site", "noche", "sp")
+  ) %>%
+  mutate(
+    activity_min = replace_na(activity_min, 0L)
+  )
+
+summary(bm2)
+# last check before export to the glmm_v5 script. lets see if theres any NA in the activity_min column.and if we need to remove noise or hif observations 
+
+unique(bm2$sp)
+tbm2 <- table(bm2$sp)
+
+
+summary(bm2)
+# check the rows that were removed to see if it is right.
+
+# nrow(bm2) - nrow(t) # we removed  1, 2, and 3 species. we romved abotu 1017 rows that adds to the mysp+hif+lof calls.
+
 # miller matrix -----------------------------------------------------------
 
 
 
 # minutes activity 
-# in here we calculate the minutes of activity insipired by Miller 2001 paper. 
+# in here we calculate the minutes of activity inspired by Miller 2001 paper. 
 
 bat_clean_v3 <- bat_clean_v3 %>%
   mutate(
@@ -1375,7 +1672,7 @@ summary(sm3_buzz) # now we have no NAs in the effort column.
 # dir.create("data_for_analysis/prep_for_glm", showWarnings = FALSE) # just run if the dir is abscent
 
 write.csv(bat_combined, file = 'data_for_analysis/prep_for_glmm_v2//bat_combined.csv', row.names = F) # raw combine data 
-write.csv(bat_zero_db, file = 'data_for_analysis/prep_for_glmm_v2/bat_zero_db.csv', row.names = F) #daily counts
+write.csv(bm2, file = 'data_for_analysis/prep_for_glmm_v2/bm2.csv', row.names = F) #daily counts
 write.csv(bm_miller, file = "data_for_analysis/prep_for_glmm_v2/bm_miller.csv") # miller Ai index data
 # write.csv(sm3_buzz, file = "data_for_analysis/prep_for_glmm/sm3_buzz_sp.csv") # this is not ready to write 
 
@@ -1391,7 +1688,7 @@ This directory contains the bat_combined.csv file which was created using the sc
 the script also produces a Miller 2001 index of activity matrix bm_miller.
 
 bat_combined.csv - process data no counts (Update: 7/8/2026 rules for bat species) 
-bat_zero_db.csv - counts of bat calls by day from 2021 to 2023 all sites
+bm2.csv - bats counts ready for analysis with zero added, predictors and standardized 
 bm_miller.csv - number of minutes of activity by day  for 2021-2023 data all sites (last update 7/8/2026)
 
 
