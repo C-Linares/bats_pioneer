@@ -85,23 +85,12 @@ glimpse(bm2) # check the structure of the data
 # Check for missing values
 colSums(is.na(bm2))
 
-# calculate week with the week function 
+# remove mycal, and parhes 
 
-# bm <- bm %>%
-#   mutate(
-#     wk = lubridate::week(noche)         # Extract week from noche
-#   )
+bm2 <- bm2 %>%
+  filter(!sp %in% c("myocal", "parhes")) # remove species not likely inthe study area
 
-# # here we remove noise and noids. 
-# 
-# filtered_bm <- bm %>%
-#   rename(sp = sp) %>%
-#   filter(!sp %in% c("Noise", "NoID")) # remove noise and noid from the analysis.
-# 
-# # miller activity index
-# bm_ai <- read_csv("data_for_analysis/prep_for_glmm/bm.miller.day.csv") %>% 
-#   clean_names() %>%
-#   filter(!sp %in% c("Noise", "NoID"))
+unique(bm2$sp) # check the unique species after filtering)
 
 # predictors --------------------------------------------------------------
 
@@ -320,15 +309,15 @@ m0<-glmmTMB(n ~ trmt_bin + (1 | site),
 check_singularity(m0)
 check_zeroinflation(m0)
 calculate_c_hat(m0)  # indicates the is overdispersion we need to try negative binomial. 
-performance_mae(m0)
-range(bm2$n)
+# performance_mae(m0)
+# range(bm2$n)
 hist(bm2$n, breaks = 500)
 performance::r2(m0)
 DHARMa::simulateResiduals(m0, n = 1000, plot = TRUE)
 summary(m0)
 
 
-# model with a poisson distribution is overdispersed so we try negative binomial.It also shows zero inflation but this should be an effect of the overdispersion. 
+# model with a poisson distribution is overdispersed c-hat=70 so we try negative binomial.It also shows zero inflation but this should be an effect of the over-dispersion. 
 
 m1<- glmmTMB(
   #fixed effects
@@ -340,8 +329,8 @@ m1<- glmmTMB(
 check_singularity(m1)
 check_zeroinflation(m1)
 calculate_c_hat(m1)  # indicates the is overdispersion we need to try negative binomial. 
-performance_mae(m1)
-range(bm2$n)
+# performance_mae(m1)
+# range(bm2$n)
 hist(bm2$n, breaks = 500)
 performance::r2(m1)
 DHARMa::simulateResiduals(m1, n = 1000, plot = TRUE)
@@ -365,9 +354,9 @@ m1.1<- glmmTMB(
 
 check_singularity(m1.1)
 check_zeroinflation(m1.1)
-calculate_c_hat(m1.1)  # indicates the is overdispersion we need to try negative binomial. 
-performance_mae(m1.1)
-range(bm2$n)
+calculate_c_hat(m1.1)  # 
+# performance_mae(m1.1)
+# range(bm2$n)
 hist(bm2$n, breaks = 500)
 performance::r2(m1.1)
 DHARMa::simulateResiduals(m1.1, n = 1000, plot = TRUE)
@@ -391,10 +380,10 @@ check_singularity(m1.2)
 m1.2$sdr$pdHess
 m1.2$fit$message
 check_zeroinflation(m1.2)
-calculate_c_hat(m1.2)  # indicates the is overdispersion we need to try negative binomial. 
-performance_mae(m1.2)
-range(bm2$n)
-hist(bm2$n, breaks = 500)
+calculate_c_hat(m1.2)  # 
+# performance_mae(m1.2)
+# range(bm2$n)
+# hist(bm2$n, breaks = 500)
 performance::r2(m1.2)
 DHARMa::simulateResiduals(m1.2, n = 1000, plot = TRUE)
 anova(m1,m1.1, m1.2)  
@@ -404,10 +393,8 @@ summary(m1.2)
 # it seems like the model with seasonality is better thatn the model withouth according to AIC m1.1 142153 vs m1.2  141542.
 # chisq is also smaller for model m1.2. 
 # now we try the environmental predictors.
-# currently there are 78 rows with NAs for moon predicotors. I will remove these rows for now and will comeback to this. 
-# remove NAs in moonlight 
 
-bm2<- filter(bm2, !is.na(avg_moonlight_s))
+
 
 m1.3<-glmmTMB(
   #fixed effects
@@ -451,13 +438,14 @@ m1.4$sdr$pdHess
 m1.4$fit$message
 check_zeroinflation(m1.4)
 calculate_c_hat(m1.4) 
-performance_mae(m1.4)
-range(bm2$n)
-hist(bm2$n, breaks = 500)
+# performance_mae(m1.4)
+# range(bm2$n)
+# hist(bm2$n, breaks = 500)
 performance::r2(m1.4)
 DHARMa::simulateResiduals(m1.4, n = 1000, plot = TRUE)
 anova( m1.2, m1.3, m1.4)
 summary(m1.4)
+beep(sound = 4 )
 
 # for model m1.4 aic shows that including treatment inside the random slopes improves the model fit. 
 
@@ -478,14 +466,14 @@ m1.5$sdr$pdHess
 m1.5$fit$message
 check_zeroinflation(m1.5)
 calculate_c_hat(m1.5) 
-performance_mae(m1.5)
-range(bm2$n)
-hist(bm2$n, breaks = 500)
+# performance_mae(m1.5)
+# range(bm2$n)
+# hist(bm2$n, breaks = 500)
 performance::r2(m1.5)
 DHARMa::simulateResiduals(m1.5, n = 1000, plot = TRUE)
 anova( m1.2, m1.3,m1.4,m1.5)
 summary(m1.5)
-
+beep(sound = 4 )
 
 # now let's try for interactions of treatment with seasonalty 
 
@@ -496,7 +484,7 @@ m1.6<-glmmTMB(
     #random effects
     (1 | site) + (1 + trmt_bin + jday_s + I(jday_s^2) | sp) +
     #interactions
-    jday_s * trmt_bin + I(jday_s^2) * trmt_bin,  
+    jday_s * trmt_bin + I(jday_s^2) * trmt_bin,
   data = bm2,
   family = nbinom2(link = "log")
 )
@@ -506,17 +494,19 @@ check_singularity(m1.6)
 m1.6$sdr$pdHess
 m1.6$fit$message
 check_zeroinflation(m1.6)
-calculate_c_hat(m1.6) 
-performance_mae(m1.6)
-range(bm2$n)
-hist(bm2$n, breaks = 500)
+calculate_c_hat(m1.6)
+# performance_mae(m1.6)
+# range(bm2$n)
+# hist(bm2$n, breaks = 500)
 performance::r2(m1.6)
 DHARMa::simulateResiduals(m1.6, n = 1000, plot = TRUE)
 performance::check_collinearity(m1.6)
 anova( m1.2, m1.3,m1.4,m1.5, m1.6)
 summary(m1.6)
+beep(sound=4)
 
-# adding the treatment and light interaction we improve the fit but not as much as adding the seasonality inside the random slopes. 
+
+# adding the treatment and season  interaction we improve the fit but not as much as adding the seasonality inside the random slopes. 
 
 # now we try to add the moon and treatment interaction 
 
@@ -538,15 +528,27 @@ m1.7$sdr$pdHess
 m1.7$fit$message
 check_zeroinflation(m1.7)
 calculate_c_hat(m1.7) 
-performance_mae(m1.7)
-range(bm2$n)
-hist(bm2$n, breaks = 500)
+# performance_mae(m1.7)
+# range(bm2$n)
+# hist(bm2$n, breaks = 500)
 performance::r2(m1.7)
 DHARMa::simulateResiduals(m1.7, n = 1000, plot = TRUE)
 performance::check_collinearity(m1.7)
 anova( m1.2, m1.3,m1.4,m1.5,m1.6,m1.7)
 summary(m1.7)
-beep(sound = 4 )
+beep(sound = 4)
+
+gtsummary::tbl_regression(c(m1.7), exponentiate = TRUE, 
+                          label = list(
+                            trmt_bin = "Treatment (Lit vs Dark)",
+                            jday_s = "Julian Day (scaled)",
+                            # I(jday_s^2)= "Julian Day Squared (scaled)",
+                            avg_moonlight_s = "Average Moonlight (scaled)",
+                            nit_avg_temp_c_s = "Average Temperature (scaled)",
+                            nit_avg_wspm_s_s = "Average Wind Speed (scaled)",
+                            yr_s = "Year (scaled)",
+                            t_lepidoptera_s = "Lepidoptera Abundance (scaled)"
+                          )) 
 
 #now we try the interaction with year
 
@@ -567,16 +569,27 @@ m1.8$sdr$pdHess
 m1.8$fit$message
 check_zeroinflation(m1.8)
 calculate_c_hat(m1.8) 
-performance_mae(m1.8)
-range(bm2$n)
-hist(bm2$n, breaks = 500)
+# performance_mae(m1.8)
+# range(bm2$n)
+# hist(bm2$n, breaks = 500)
 performance::r2(m1.8)
 DHARMa::simulateResiduals(m1.8, n = 1000, plot = TRUE)
 performance::check_collinearity(m1.8)
 anova( m1.2, m1.3,m1.4,m1.5,m1.6,m1.7, m1.8)
 summary(m1.8)
+beep(sound = 4)
 
-gtsummary::tbl_regression(m1.8, exponentiate = TRUE)
+gtsummary::tbl_regression(m1.7, exponentiate = TRUE, 
+                          label = list(
+                            trmt_bin = "Treatment (Lit vs Dark)",
+                            jday_s = "Julian Day (scaled)",
+                            # I(jday_s^2)= "Julian Day Squared (scaled)",
+                            avg_moonlight_s = "Average Moonlight (scaled)",
+                            nit_avg_temp_c_s = "Average Temperature (scaled)",
+                            nit_avg_wspm_s_s = "Average Wind Speed (scaled)",
+                            yr_s = "Year (scaled)",
+                            t_lepidoptera_s = "Lepidoptera Abundance (scaled)"
+                          )) 
 
 # this model seems strong and it show looking at this model there's no much improvemnt adding the interaction with year so we might remove it from the model to keep it simple and keep m1.7 as final 
 
@@ -600,9 +613,9 @@ m1.9$sdr$pdHess
 m1.9$fit$message
 check_zeroinflation(m1.9)
 calculate_c_hat(m1.9) 
-performance_mae(m1.9)
-range(bm2$n)
-hist(bm2$n, breaks = 500)
+# performance_mae(m1.9)
+# range(bm2$n)
+# hist(bm2$n, breaks = 500)
 performance::r2(m1.9)
 DHARMa::simulateResiduals(m1.9, n = 1000, plot = TRUE)
 performance::check_collinearity(m1.9)
@@ -629,9 +642,9 @@ m1.9.1$sdr$pdHess
 m1.9.1$fit$message
 check_zeroinflation(m1.9.1)
 calculate_c_hat(m1.9.1) 
-performance_mae(m1.9.1)
-range(bm2$n)
-hist(bm2$n, breaks = 500)
+# performance_mae(m1.9.1)
+# range(bm2$n)
+# hist(bm2$n, breaks = 500)
 performance::r2(m1.9.1)
 DHARMa::simulateResiduals(m1.9.1, n = 1000, plot = TRUE)
 performance::check_collinearity(m1.9.1)
@@ -639,8 +652,8 @@ anova( m1.2, m1.3,m1.4,m1.5,m1.6, m1.8,m1.9, m1.9.1)
 summary(m1.9.1)
 
 
-# run a model with all the same predictors but with the miller activity index as the response variable. I can't run this because I forgot to add the minutes of activity. 
-
+# run a model with all the same predictors but with the miller activity index as the response variable.the patterns are similar with seasonality, weathr being significant. the interaction between trmt and seasonaly are also significant. however, the model for minutes of activity does show interacton between treatment an moon as significant while the while the one using calls doesn't
+  
 m1.10<- glmmTMB(
   #fixed effects
   activity_min ~ trmt_bin + jday_s + I(jday_s^2) + avg_moonlight_s + nit_avg_temp_c_s +
@@ -658,15 +671,18 @@ m1.10$sdr$pdHess
 m1.10$fit$message
 check_zeroinflation(m1.10)
 calculate_c_hat(m1.10) 
-performance_mae(m1.10)
-range(bm2$n)
-hist(bm2$n, breaks = 500)
+# performance_mae(m1.10)
+# range(bm2$n)
+# hist(bm2$n, breaks = 500)
 performance::r2(m1.10)
 DHARMa::simulateResiduals(m1.10, n = 1000, plot = TRUE)
 performance::check_collinearity(m1.10)
 anova( m1.2, m1.3,m1.4,m1.5,m1.6, m1.8, m1.10)
+anova(m1.7, m1.10)
 summary(m1.10)
 
+
+#============================================================================
 # marginal effects m1.7 ---------------------------------------------------
 
 
@@ -793,6 +809,462 @@ ggsave(
   height = 8,
   dpi = 300
 )
+
+
+# m1.7 treatment marginal -------------------------------------------------
+
+# here we improved the graph above orderign the responses and adding scientific names
+pred_trmt <- pred_trmt %>%
+  mutate(
+    trmt = factor(
+      trmt_bin,
+      levels = c(-1, 1),
+      labels = c("Dark", "Lit")
+    )
+  )
+
+species_effects <- pred_trmt %>%
+  select(sp, trmt, estimate) %>%
+  pivot_wider(
+    names_from = trmt,
+    values_from = estimate
+  ) %>%
+  mutate(
+    response_ratio = Lit / Dark,
+    percent_change = 100 * (response_ratio - 1),
+    
+    direction = case_when(
+      percent_change < 0 ~ "Decreased",
+      percent_change > 0 ~ "Increased",
+      TRUE ~ "No change"
+    )
+  ) %>%
+  arrange(percent_change)
+
+species_effects
+
+species_order <- species_effects %>%
+  pull(sp)
+
+pred_trmt <- pred_trmt %>%
+  left_join(
+    species_effects %>%
+      select(
+        sp,
+        response_ratio,
+        percent_change,
+        direction
+      ),
+    by = "sp"
+  ) %>%
+  mutate(
+    sp = factor(sp, levels = species_order)
+  )
+
+bm_plot <- bm2 %>%
+  mutate(
+    trmt = factor(
+      trmt_bin,
+      levels = c(-1, 1),
+      labels = c("Dark", "Lit")
+    ),
+    sp = factor(sp, levels = species_order)
+  )
+
+# add the percent change to each sp 
+species_labels_effect <- species_effects %>%
+  mutate(
+    sp = as.character(sp),
+    effect_text = sprintf(
+      "%s (%+.1f%%)",
+      species_labels[sp],
+      percent_change
+    )
+  ) %>%
+  select(sp, effect_text) %>%
+  deframe()
+
+# plot the predictions and raw points 
+p_trmt <- ggplot() +
+  
+  # Raw observations
+  geom_jitter(
+    data = bm_plot,
+    aes(
+      x = trmt_bin,
+      y = n
+    ),
+    width = 0.15,
+    alpha = 0.15,
+    size = 0.6,
+    color = "grey40"
+  ) +
+  
+  # # Prediction confidence intervals
+  # geom_errorbar(
+  #   data = pred_trmt,
+  #   aes(
+  #     x = trmt_bin,
+  #     ymin = conf.low,
+  #     ymax = conf.high,
+  #     color = direction
+  #   ),
+  #   width = 0.08,
+  #   linewidth = 0.6
+  # ) +
+  # 
+  # Predicted treatment values
+  geom_point(
+    data = pred_trmt,
+    aes(
+      x = trmt_bin,
+      y = estimate,
+      color = direction
+    ),
+    size = 2.2
+  ) +
+  
+  # Lines connecting dark and lit predictions
+  geom_line(
+    data = pred_trmt,
+    aes(
+      x = trmt_bin,
+      y = estimate,
+      group = sp,
+      color = direction
+    ),
+    linewidth = 0.9
+  ) +
+  
+  facet_wrap(
+    ~ sp,
+    scales = "free_y",
+    labeller = labeller(sp = species_labels_effect)
+  )+
+  
+  scale_color_manual(
+    values = c(
+      "Decreased" = "grey40",
+      "Increased" = "black",
+      "No change" = "grey40"
+    )
+  ) +
+  
+  scale_y_continuous(
+    trans = "log1p"
+  ) +
+  
+  scale_x_continuous(
+    breaks = c(-1, 1),
+    labels = c("Dark", "Lit")
+  ) +
+  
+  labs(
+    x = "Treatment",
+    y = "Predicted bat calls",
+    color = "Estimated response",
+    # title = "Species-specific response of bat activity to artificial light",
+    # subtitle = "Species ordered from the largest estimated decrease to the largest increase"
+  ) +
+  
+  theme_minimal() +
+  
+  theme(
+    strip.text = element_text(
+      size = 11,
+      face = "italic"
+    ),
+    axis.text = element_text(size = 9),
+    axis.title = element_text(size = 11),
+    plot.title = element_text(size = 14),
+    plot.subtitle = element_text(size = 10),
+    legend.text = element_text(size = 9),
+    legend.title = element_text(size = 10),
+    legend.position = "bottom"
+  )
+
+p_trmt
+
+ggsave(
+  filename = "figures/glmm_v5/bat_species_treatment_effect.tiff",
+  plot = p_trmt,
+  width = 12,
+  height = 8,
+  units = "in",
+  dpi = 600,
+  compression = "lzw",
+  bg = "white"
+)
+
+# now we add the conditional uncertainty to see what species show evidence of decrease or increase. 
+# Include conditional uncertainty
+
+random_effects <- ranef(
+  m1.7,
+  condVar = TRUE
+) %>%
+  as.data.frame()
+
+# Show the random effects
+random_effects %>%
+  distinct(component, grpvar, term)
+
+species_random_slopes <- random_effects %>%
+  filter(
+    component == "cond",
+    grpvar == "sp",
+    term == "trmt_bin"
+  ) %>%
+  transmute(
+    sp = grp,
+    random_slope = condval,
+    random_slope_se = condsd
+  )
+
+
+fixed_treatment <- fixef(m1.7)$cond["trmt_bin"]
+
+fixed_treatment_se <- sqrt(
+  vcov(m1.7)$cond[
+    "trmt_bin",
+    "trmt_bin"
+  ]
+)
+
+species_uncertainty <- species_random_slopes %>%
+  mutate(
+    # Species-specific treatment coefficient
+    treatment_beta =
+      fixed_treatment + random_slope,
+    
+    # Approximate SE, ignoring fixed-random covariance
+    treatment_beta_se = sqrt(
+      fixed_treatment_se^2 +
+        random_slope_se^2
+    ),
+    
+    # Treatment changes from -1 to +1, so multiply by 2
+    log_response_ratio =
+      2 * treatment_beta,
+    
+    log_response_ratio_se =
+      2 * treatment_beta_se,
+    
+    # Confidence limits on log-ratio scale
+    log_ratio_low =
+      log_response_ratio -
+      1.96 * log_response_ratio_se,
+    
+    log_ratio_high =
+      log_response_ratio +
+      1.96 * log_response_ratio_se,
+    
+    # Convert to lit-to-dark ratios
+    response_ratio =
+      exp(log_response_ratio),
+    
+    ratio_low =
+      exp(log_ratio_low),
+    
+    ratio_high =
+      exp(log_ratio_high),
+    
+    # Convert ratios to percentages
+    percent_change =
+      100 * (response_ratio - 1),
+    
+    percent_low =
+      100 * (ratio_low - 1),
+    
+    percent_high =
+      100 * (ratio_high - 1),
+    
+    evidence = case_when(
+      ratio_high < 1 ~ "Decrease supported",
+      ratio_low > 1 ~ "Increase supported",
+      TRUE ~ "Uncertain"
+    )
+  ) %>%
+  left_join(species_key, by = "sp") %>%
+  arrange(percent_change)
+
+species_uncertainty %>%
+  select(
+    sp_label,
+    treatment_beta,
+    response_ratio,
+    ratio_low,
+    ratio_high,
+    percent_change,
+    percent_low,
+    percent_high,
+    evidence
+  )
+
+species_uncertainty <- species_uncertainty %>%
+  mutate(
+    sp_label = fct_reorder(
+      sp_label,
+      percent_change
+    )
+  )
+
+p_species_contrast <- ggplot(
+  species_uncertainty,
+  aes(
+    x = percent_change,
+    y = sp_label,
+    color = evidence
+  )
+) +
+  geom_vline(
+    xintercept = 0,
+    linetype = "dashed",
+    color = "grey50"
+  ) +
+  geom_errorbarh(
+    aes(
+      xmin = percent_low,
+      xmax = percent_high
+    ),
+    height = 0.15
+  ) +
+  geom_point(size = 2.5) +
+  scale_color_manual(
+    values = c(
+      "Decrease supported" = "firebrick3",
+      "Increase supported" = "forestgreen",
+      "Uncertain" = "grey50"
+    )
+  ) +
+  labs(
+    x = "Predicted change from dark to lit (%)",
+    y = NULL,
+    color = "Evidence",
+    title = "Species-specific responses to artificial light",
+    subtitle = "Points show conditional estimates; bars show approximate 95% confidence intervals"
+  ) +
+  theme_classic() +
+  theme(
+    axis.text.y = element_text(face = "italic"),
+    legend.position = "bottom"
+  )
+
+p_species_contrast
+
+ggsave(
+  filename = "figures/glmm_v5/species_contrast_evidence.tiff",
+  plot = p_species_contrast,
+  width = 12,
+  height = 8,
+  units = "in",
+  dpi = 600,
+  compression = "lzw",
+  bg = "white"
+)
+
+
+# table for the results 
+
+# 1. Extract predicted activity under each treatment --------------------
+#
+# pred_trmt should contain species-specific predictions from m1.7.
+# Because treatment is coded -1 = Dark and +1 = Lit, we first assign
+# readable treatment labels.
+
+species_predictions <- pred_trmt %>%
+  mutate(
+    treatment = case_when(
+      trmt_bin == -1 ~ "predicted_dark",
+      trmt_bin ==  1 ~ "predicted_lit"
+    )
+  ) %>%
+  select(
+    sp,
+    treatment,
+    estimate
+  ) %>%
+  distinct() %>%
+  pivot_wider(
+    names_from = treatment,
+    values_from = estimate
+  ) %>%
+  mutate(
+    # Absolute difference in predicted calls
+    absolute_change = predicted_lit - predicted_dark
+  )
+
+# 2. Create the complete numerical results table -----------------------
+#
+# Keep this version numeric and unrounded. It is useful for checking
+# results, making figures, and exporting data.
+
+species_results <- species_uncertainty %>%
+  left_join(
+    species_predictions,
+    by = "sp"
+  ) %>%
+  transmute(
+    species_code = sp,
+    species = sp_label,
+    
+    predicted_dark,
+    predicted_lit,
+    absolute_change,
+    
+    treatment_beta,
+    treatment_beta_se,
+    
+    response_ratio,
+    ratio_low,
+    ratio_high,
+    
+    percent_change,
+    percent_low,
+    percent_high,
+    
+    evidence
+  ) %>%
+  arrange(percent_change)
+
+species_results
+
+species_results_manuscript <- species_results %>%
+  transmute(
+    Species = species,
+    
+    `Predicted calls: dark` = predicted_dark,
+    
+    `Predicted calls: lit` = predicted_lit,
+    
+    `Absolute change` = absolute_change,
+    
+    `Lit:dark ratio (95% CI)` = sprintf(
+      "%.2f (%.2f, %.2f)",
+      response_ratio,
+      ratio_low,
+      ratio_high
+    ),
+    
+    `Percent change (95% CI)` = sprintf(
+      "%+.1f%% (%+.1f%%, %+.1f%%)",
+      percent_change,
+      percent_low,
+      percent_high
+    ),
+    
+    Evidence = evidence
+  )
+
+
+species_results_manuscript
+
+flextable(species_results_manuscript) %>%
+  autofit() %>%
+  set_caption(
+    ""
+  )
+
 
 
 

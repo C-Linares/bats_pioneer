@@ -1164,8 +1164,44 @@ these live in the data_for_analysis\>effort folder.\
 
 7/15/2026
 
-I ran some model for the sm3 data without the buzzes. I even have some graphs now. However the moon predictor need to be reran with extended dates and I also need to add the miller data. \
-other than that it is good for describing. \
+I ran some model for the sm3 data without the buzzes. I even have some graphs now. However the moon predictor need to be reran with extended dates and I also need to add the miller data.\
+other than that it is good for describing.
+
+------------------------------------------------------------------------
+
+7/16/2026
+
+I updated the moon_pred. R script and now all the files have the proper moon predictor.\
+I created the moon_pred_v2 to update the moon predictor.\
+Now I should be able to run the model in the glmm_v5\
 \
-\
+
+------------------------------------------------------------------------
+
+7/17/2026
+
+Before doing any analysis we will filter out calls from parhes and mycal
+
+```{r}
+bm_summary
+# A tibble: 13 × 2
+sp     total_calls
+<chr>        <int>
+  1 myoluc      239728
+2 lasnoc      160868
+3 myovol       73437
+4 myocil       25642
+5 eptfus       16835
+6 lascin       15367
+7 myoevo       12369
+8 myocal        3017
+9 cortow        2261
+10 myothy        1153
+11 parhes         608
+12 myoyum         568
+13 antpal         280
+> 
+```
+
+I reran the models and wrote the description of the results in the model. \
 \

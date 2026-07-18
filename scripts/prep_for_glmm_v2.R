@@ -1190,39 +1190,46 @@ crmo.wet.night <- read_csv("data_for_analysis/weather/craters_weater/craters_nig
   clean_names() # load craters night weather
 
 # Moon
-moon.int <- read_csv('data_for_analysis/moon_pred/moon.int.csv') %>%
-  clean_names()
-summary(moon.int) # check the structure of the moon data
+# this code below might be eliminated as it is not updated any more as we have rewordked the code and now we have the outputs from the moon_pred_v2
+# moon.int <- read_csv('data_for_analysis/moon_pred/moon.int.csv') %>%
+#   clean_names()
+# summary(moon.int) # check the structure of the moon data
+# 
+# # convert date times from UTC to Denver/America
+# moon.int$denver_time <- with_tz(moon.int$date, tzone = "America/Denver") # Convert to Denver time zone
+# attr(moon.int$denver_time, "tzone") # check the timezone is correct
+# 
+# # summarize moonlight by date but conditional moon_alt_degrees > 0
+# 
+# # Step 1: Filter data where the moon is above the horizon
+# moon_filtered <- moon.int %>%
+#   filter(moon_alt_degrees > 0)
+# 
+# # Step 2: Create a new 'noche' variable (just the date part of the time stamp)
+# # but also makes nights any time stamps that are less than 9 am.
+# moon_filtered <- moon_filtered %>%
+#   mutate(
+#     hour = hour(denver_time),  # Extract hour from datetime
+#     noche = if_else(hour < 9,
+#                     true = as_date(denver_time) - days(1),
+#                     false = as_date(denver_time))
+#   )
+# 
+# # Step 3: Group by 'noche', then summarize the average values
+# moon_daily_avg <- moon_filtered %>%
+#   group_by(noche) %>%
+#   summarise(
+#     avg_moonlight = mean(moonlight_model, na.rm = TRUE),
+#     avg_twilight = mean(twilight_model, na.rm = TRUE),
+#     avg_illumination = mean(illumination, na.rm = TRUE),
+#     n_obs = n()  # optional: number of observations per night
+#   )
 
-# convert date times from UTC to Denver/America
-moon.int$denver_time <- with_tz(moon.int$date, tzone = "America/Denver") # Convert to Denver time zone
-attr(moon.int$denver_time, "tzone") # check the timezone is correct
+# now we load the moon_daily_avg_complete.csv from the moon_pred_v2 script.
+moon<- read_csv("data_for_analysis/moon_pred_v2/moon_daily_avg_complete.csv") %>%
+  clean_names() 
+  # rename(noche = date) # load moon data and rename the date column to noche for merging
 
-# summarize moonlight by date but conditional moon_alt_degrees > 0
-
-# Step 1: Filter data where the moon is above the horizon
-moon_filtered <- moon.int %>%
-  filter(moon_alt_degrees > 0)
-
-# Step 2: Create a new 'noche' variable (just the date part of the time stamp)
-# but also makes nights any time stamps that are less than 9 am.
-moon_filtered <- moon_filtered %>%
-  mutate(
-    hour = hour(denver_time),  # Extract hour from datetime
-    noche = if_else(hour < 9,
-                    true = as_date(denver_time) - days(1),
-                    false = as_date(denver_time))
-  )
-
-# Step 3: Group by 'noche', then summarize the average values
-moon_daily_avg <- moon_filtered %>%
-  group_by(noche) %>%
-  summarise(
-    avg_moonlight = mean(moonlight_model, na.rm = TRUE),
-    avg_twilight = mean(twilight_model, na.rm = TRUE),
-    avg_illumination = mean(illumination, na.rm = TRUE),
-    n_obs = n()  # optional: number of observations per night
-  )
 
 # insects 
 c_bugs <- read_csv("data_for_analysis/insect_wranglin/c_bugs.csv") %>%  # load insect data
@@ -1266,18 +1273,31 @@ summary(bm2)
 
 # merge with moon
 bm2 <- bm2 %>%
-  left_join(moon_daily_avg, by = "noche") 
+  left_join(moon, by = c("site", "noche")) 
 
-summary(bm2) #there is just 78 NA I can keep it that way for now because we have to recalculate the moon predictors 
+summary(bm2) 
 
 missing_moon_nights <- bat_zero_db %>%
   distinct(noche) %>%
   anti_join(
-    moon_daily_avg %>% distinct(noche),
+    moon %>% distinct(noche),
     by = "noche"
   )
 
-missing_moon_nights
+# missing_moon_nights
+bm2 %>%
+  summarise(
+    across(
+      c(
+        avg_moonlight,
+        avg_twilight,
+        avg_illumination,
+        avg_moon_phase,
+        n_timepoints
+      ),
+      ~ sum(is.na(.))
+    )
+  )
 
 # merge with insects
 
@@ -1406,7 +1426,7 @@ summary(bm2)
 
 # now we merge the bm_ai with the bm2 data to have both the Miller activity index and the echolocation count data.
 
-t <- bm2 %>%
+bm2 <- bm2 %>%
   left_join(
     bm_miller %>%
       select(site, noche, sp, activity_min),
@@ -1419,14 +1439,17 @@ t <- bm2 %>%
 summary(bm2)
 # last check before export to the glmm_v5 script. lets see if theres any NA in the activity_min column.and if we need to remove noise or hif observations 
 
-unique(bm2$sp)
-tbm2 <- table(bm2$sp)
+bm2_summary<-bm2 %>%
+  group_by(sp) %>%
+  summarise(
+    total_calls = sum(n),
+    total_activity_min = sum(activity_min),
+    .groups = "drop"
+  ) %>%
+  arrange(desc(total_calls))
 
+bm2_summary
 
-summary(bm2)
-# check the rows that were removed to see if it is right.
-
-# nrow(bm2) - nrow(t) # we removed  1, 2, and 3 species. we romved abotu 1017 rows that adds to the mysp+hif+lof calls.
 
 # miller matrix -----------------------------------------------------------
 
