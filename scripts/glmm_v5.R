@@ -719,13 +719,13 @@ pred_trmt <- pred_trmt %>%
     trmt = ifelse(trmt_bin == -1, "Dark", "Lit")
   )
 
+# calculate the change in predicted counts between treatments for each species
 pred_trmt <- pred_trmt %>%
   group_by(sp) %>%
   mutate(
     change = estimate[trmt_bin == -1] - estimate[trmt_bin == 1]
   )
 
-library(ggplot2)
 
 p_trmt <- ggplot(pred_trmt, aes(x = trmt_bin, y = estimate, group = sp)) +
   geom_point(size = 2) +
@@ -803,7 +803,7 @@ p_trmt <- ggplot() +
 p_trmt
 
 ggsave(
-  filename = "figures/glmm_v4/trmt_v1.png",
+  filename = "figures/glmm_v5/trmt_v1.png",
   plot = p_trmt,
   width = 10,
   height = 8,
@@ -861,6 +861,9 @@ pred_trmt <- pred_trmt %>%
     sp = factor(sp, levels = species_order)
   )
 
+
+
+
 bm_plot <- bm2 %>%
   mutate(
     trmt = factor(
@@ -871,6 +874,20 @@ bm_plot <- bm2 %>%
     sp = factor(sp, levels = species_order)
   )
 
+
+
+# Create a lookup between species codes and scientific names
+species_key <- bm2 %>%
+  distinct(sp, sp_label) %>%
+  mutate(sp = as.character(sp))
+
+# Convert the lookup table into a named vector
+species_labels <- setNames(
+  species_key$sp_label,
+  species_key$sp
+)
+
+species_labels
 # add the percent change to each sp 
 species_labels_effect <- species_effects %>%
   mutate(
@@ -933,7 +950,7 @@ p_trmt <- ggplot() +
       group = sp,
       color = direction
     ),
-    linewidth = 0.9
+    linewidth = 1
   ) +
   
   facet_wrap(
@@ -944,7 +961,7 @@ p_trmt <- ggplot() +
   
   scale_color_manual(
     values = c(
-      "Decreased" = "grey40",
+      "Decreased" = "grey",
       "Increased" = "black",
       "No change" = "grey40"
     )
@@ -1163,6 +1180,150 @@ ggsave(
   bg = "white"
 )
 
+## once looking at the table of uncertainty I am going to modify the graph to reflect the evidence of increase or decrease. 
+
+# Add confidence-interval evidence to the prediction data
+pred_trmt <- pred_trmt %>%
+  mutate(sp = as.character(sp)) %>%
+  left_join(
+    species_uncertainty %>%
+      ungroup() %>%
+      transmute(
+        sp = as.character(sp),
+        evidence
+      ),
+    by = "sp"
+  ) %>%
+  mutate(
+    sp = factor(sp, levels = species_order),
+    
+    plot_group = case_when(
+      evidence == "Increase supported" ~ "Supported increase",
+      evidence == "Decrease supported" ~ "Supported decrease",
+      TRUE                             ~ "Uncertain"
+    ),
+    
+    plot_group = factor(
+      plot_group,
+      levels = c(
+        "Supported increase",
+        "Supported decrease",
+        "Uncertain"
+      )
+    )
+  )
+
+pred_trmt %>%
+  distinct(sp, plot_group)
+
+
+p_trmt <- ggplot() +
+  
+  # Raw observations
+  geom_jitter(
+    data = bm_plot,
+    aes(
+      x = trmt_bin,
+      y = n
+    ),
+    width = 0.15,
+    alpha = 0.15,
+    size = 0.6,
+    color = "grey60"
+  ) +
+  
+  # Predicted treatment values
+  geom_point(
+    data = pred_trmt,
+    aes(
+      x = trmt_bin,
+      y = estimate,
+      color = plot_group
+    ),
+    size = 2.2
+  ) +
+  
+  # Lines connecting dark and lit predictions
+  geom_line(
+    data = pred_trmt,
+    aes(
+      x = trmt_bin,
+      y = estimate,
+      group = sp,
+      color = plot_group
+    ),
+    linewidth = 1
+  ) +
+  
+  facet_wrap(
+    ~ sp,
+    scales = "free_y",
+    labeller = labeller(sp = species_labels_effect)
+  ) +
+  
+  scale_color_manual(
+    values = c(
+      "Supported increase" = "black",
+      "Supported decrease" = "grey45",
+      "Uncertain"          = "grey80"
+    ),
+    breaks = c(
+      "Supported increase",
+      "Supported decrease"
+    ),
+    labels = c(
+      "Increase supported",
+      "Decrease supported"
+    ),
+    drop = FALSE
+  ) +
+  
+  scale_y_continuous(
+    trans = "log1p"
+  ) +
+  
+  scale_x_continuous(
+    breaks = c(-1, 1),
+    labels = c("Dark", "Lit")
+  ) +
+  
+  labs(
+    x = "Treatment",
+    y = "Predicted bat calls",
+    color = "Evidence"
+  ) +
+  
+  theme_minimal() +
+  
+  theme(
+    strip.text = element_text(
+      size = 11,
+      face = "italic"
+    ),
+    axis.text = element_text(size = 9),
+    axis.title = element_text(size = 11),
+    legend.text = element_text(size = 9),
+    legend.title = element_text(size = 10),
+    legend.position = "bottom"
+  )
+
+p_trmt
+
+# save new table. 
+ggsave(
+  filename = "figures/glmm_v5/bat_species_treatment_effect.tiff",
+  plot = p_trmt,
+  width = 12,
+  height = 8,
+  units = "in",
+  dpi = 600,
+  compression = "lzw",
+  bg = "white"
+)
+
+
+
+
 
 # table for the results 
 
@@ -1279,7 +1440,7 @@ jday_seq <- seq(
 )
 
 pred_jday <- predictions(
-  m1.8,
+  m1.7,
   newdata = datagrid(
     jday_s = jday_seq,
     trmt_bin = c(-1, 1),
@@ -1346,12 +1507,16 @@ p_jday
 
 
 ggsave(
-  filename = "figures/glmm_v4/jday_v1.png",
+  filename = "figures/glmm_v5/jday_v1.png",
   plot = p_jday,
   width = 10,
   height = 8,
   dpi = 300
 )
+
+
+
+
 
 
 # marginal effects of light and moonlight interactions.

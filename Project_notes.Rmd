@@ -1203,5 +1203,15 @@ sp     total_calls
 > 
 ```
 
-I reran the models and wrote the description of the results in the model. \
-\
+I reran the models and wrote the description of the results in the model.\
+
+------------------------------------------------------------------------
+
+7/28/2026
+
+I need to correct the labels in the sp by jday marginal effect plot for the glmm_v5 script\
+- I need to run the analysis for the sm3 data
+
+- correct the analysis for the robomoth and speakrs so I can show which species show actual evidence like in the models for sm3 calls
+
+- \
