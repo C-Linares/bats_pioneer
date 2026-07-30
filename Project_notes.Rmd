@@ -1212,6 +1212,12 @@ I reran the models and wrote the description of the results in the model.\
 I need to correct the labels in the sp by jday marginal effect plot for the glmm_v5 script\
 - I need to run the analysis for the sm3 data
 
-- correct the analysis for the robomoth and speakrs so I can show which species show actual evidence like in the models for sm3 calls
+- correct the analysis for the robomoth and speakrs so I can show which species show actual evidence like in the models for sm3 calls\
 
-- \
+------------------------------------------------------------------------
+
+7/29/2026
+
+I almost got the data ready to write for the sm3 data and start the analysis. \
+
+I stil need to correct the results in the sonobat data.

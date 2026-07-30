@@ -1521,7 +1521,7 @@ unique(sm3_buzz$site)
 sm3_buzz<-sm3_buzz %>% mutate(
 datetime = ymd_hms(date_time, tz = "America/Denver")
 ) %>% 
-select(-c(date_time, monitoring_night)) # we don't need the date_time column anymore.
+select(-c(date_time)) # we don't need the date_time column anymore.
 
 # now we create using the datetime column 
 # we will use a noon-to noon boundary for the day. 
@@ -1550,7 +1550,7 @@ sm3_buzz <- sm3_buzz %>%
 
 summary(sm3_buzz)
 
-# how many sp were succesfully added
+# how many sp were successfully added
 sm3_buzz %>%
   summarise(
     total_rows = n(),
@@ -1646,7 +1646,7 @@ sm3_buzz %>%
 summary(sm3_buzz)
 glimpse(sm3_buzz)
 
-# now we summarize bat buzzes by species site and monitoring night and year. If we don't do this then we have several buzzes counted for the same species in a site on a given monitoring night. 
+# now we summarize bat buzzes by species site and monitoring night and year. If we don't do this then we have several buzzes counted for the same species in a site on a given monitoring night.here we create the "t_buzzes" column that is the total number of buzzes for a given species in a site on a given monitoring night.
 # 
 sm3_buzz <- sm3_buzz %>%
   group_by(
@@ -1662,31 +1662,220 @@ sm3_buzz <- sm3_buzz %>%
   )
 
 summary(sm3_buzz)
+head(sm3_buzz)
+dim(sm3_buzz)
 
-
+# effort 
 # now we want to add the effort from the table 
+# because the sm3_buzz data shares files from the regular bat data we can use the same effort tables
 
-# # join effort with sm3_buzz. effort is leaving several NAs and I think we have some issues with this. 
-# 
+# sm3_buzz<- left_join(sm3_buzz, effort_hrs, by=c("site", "noche")) # we have 32 NAs but I am going to add the average effort as It is becoming difficutl to assess why these are not present in the effort data set. 
+# sm3_buzz<- left_join(sm3_buzz, effort_days, by=c("site", "year"))
+# summary(sm3_buzz)
 
+# now I will calculate the mean effort by site to then add to the 32 missing rows. 
 
+mean_effort_site_year <- effort_hrs %>%
+  filter(
+    !is.na(eff.hrs),
+    eff.hrs > 0
+  ) %>%
+  group_by(site, year) %>%
+  summarise(
+    mean_eff_hrs = mean(eff.hrs),
+    sd_eff_hrs   = sd(eff.hrs),
+    n_nights     = n(),
+    .groups = "drop"
+  )
 
-sm3_buzz <- sm3_buzz %>% 
+mean_effort_site_year
+
+sm3_buzz <- sm3_buzz %>%
   left_join(
-    effort_lookup,
-    by = c("site", "year", "noche")  )
-summary(sm3_buzz) # as it stands there's 32 sites that do not have effort data. I will need to check this ones for now, I will give them the minimum effort of 1 hour.
+    effort_hrs %>%
+      select(site, noche, eff.hrs),
+    by = c("site", "noche"),
+    relationship = "many-to-one"
+  ) %>%
+  left_join(
+    mean_effort_site_year,
+    by = c("site", "year"),
+    relationship = "many-to-one"
+  ) %>%
+  mutate(
+    effort_imputed = is.na(eff.hrs),
+    eff.hrs = coalesce(eff.hrs, mean_eff_hrs)
+  )
+
+# now we add the zeros as we did for bat_zero_db
+# we keep going from the step 3 on the previous section as we already summarized and loaded the effort_hrs 
+
+# first calculate jday and rename year to yr for the sm3_buzz data frame to match the effort_grid data frame
 
 sm3_buzz <- sm3_buzz %>%
   mutate(
-    eff.hrs = if_else(is.na(eff.hrs), 1, eff.hrs),
-    eff.days = if_else(is.na(eff.days), 1, eff.days)
+    jday = lubridate::yday(noche)
+  ) %>%
+  rename(yr = year)
+
+# 3. Species list
+species_list <- sm3_buzz %>%
+  distinct(sp_clean)
+# edit effort list to remove hif, mysp, lof
+
+species_list <- species_list %>%
+  filter(!sp_clean %in% c("hif", "mysp", "lof", "noise"))
+
+# 4. Create full site-night-species grid
+bat_zero_db <- effort_grid %>%
+  crossing(species_list)
+
+# 5. Join observed counts and replace missing counts with zero
+buzz_observed <- sm3_buzz %>%
+  select(
+    site, yr, jday, noche, sp_clean,
+    t_buzzes, identified_files
   )
 
-summary(sm3_buzz) # now we have no NAs in the effort column.
+bat_zero_db_sm3_buzz <- bat_zero_db %>%
+  left_join(
+    buzz_observed,
+    by = c("site", "yr", "jday", "noche", "sp_clean"),
+    relationship = "one-to-one"
+  ) %>%
+  mutate(
+    t_buzzes = replace_na(t_buzzes, 0),
+    identified_files = replace_na(identified_files, 0)
+  )
 
-# now we add the zeros 
+# now we calculate week for later mergin with insects
 
+bat_zero_db_sm3_buzz <- bat_zero_db_sm3_buzz %>%
+  mutate(
+    wk = lubridate::week(noche)
+  )
+
+# check species present
+
+unique(bat_zero_db_sm3_buzz$sp_clean)
+
+# before merging predictors we will keep only the species that are present in study area. 
+
+sm3_buzz_v2<- bat_zero_db_sm3_buzz %>%
+  filter(!sp_clean %in% c("euma", "myca", "pahe")) # remove species not present in the study area
+
+
+# now merging with predictors. 
+
+
+# merge weather
+# Merge crmo.wet.night into filtered_bm by matching dates
+sm3_buzz_v2 <- sm3_buzz_v2 %>%
+  left_join(crmo.wet.night, by = c("noche" = "date"))
+summary(sm3_buzz_v2)
+
+# merge with moon
+sm3_buzz_v2 <- sm3_buzz_v2 %>%
+
+  left_join(moon, by = c("site", "noche")) 
+
+summary(sm3_buzz_v2) 
+
+# merge with insects
+
+sm3_buzz_v2 <- sm3_buzz_v2 %>%
+  left_join(c_bugs, by = c("site", "wk", "yr")) # merge
+
+# check for NAs
+summary(sm3_buzz_v2)  #lots of NAs in t.insect and t.lepidoptera.
+
+# replace NAs in t.insect and t.lepidoptera with the mean values from c_bugs_mean
+
+
+
+sm3_buzz_v2 <- sm3_buzz_v2 %>%
+  left_join(c_bugs_mean, 
+            by = c("yr", "site"),
+            suffix = c("", "_mean")) %>%  # rename mean columns directly
+  mutate(
+    t_insect = coalesce(t_insect, t_insect_mean),
+    t_lepidoptera = coalesce(t_lepidoptera, t_lepidoptera_mean)
+  ) %>%
+  select(-t_insect_mean, -t_lepidoptera_mean)
+
+summary(sm3_buzz_v2)
+
+
+# we need to add the treatment
+litsites<-c("iron01","iron03","iron05","long01","long03")
+
+sm3_buzz_v2<- sm3_buzz_v2 %>%
+  mutate(
+    treatmt = if_else(site %in% litsites, "lit", "dark"),
+    trmt_bin = if_else(treatmt == "lit", 1, -1)
+  )
+
+summary(sm3_buzz_v2)
+
+
+# now we standardize the predictors as we did for the bm2 data frame.
+
+
+variables_to_scale <- c(
+  "avg_moonlight",
+  "avg_twilight",
+  "avg_illumination",
+  "nit_avg_temp_c",
+  "nit_avg_wspm_s",
+  "t_lepidoptera",
+  "t_insect",
+  "jday"
+)
+
+sm3_buzz_v2 <- sm3_buzz_v2 %>%
+  scale_by_2sd_tidy(variables_to_scale)
+
+summary(sm3_buzz_v2)
+
+# year standardize. 
+
+# make year between -1:1
+sm3_buzz_v2 <- sm3_buzz_v2 %>%
+  mutate(yr_s = case_when(
+    yr == 2021 ~ -1,
+    yr == 2022 ~ 0,
+    TRUE ~ 1
+  ))
+
+#W we can almost write the sm3 data and analyze it. 
+
+
+# species names for graphs # this part dosn't work 
+
+# species <- data.frame(
+#   sp = c("ANTPAL", "CORTOW", "EPTFUS", "EUDMAC", "LASCIN", "LASNOC",
+#          "MYOCAL", "MYOCIL", "MYOEVO", "MYOLUC", "MYOTHY", "MYOVOL",
+#          "MYOYUM", "PARHES"),
+#   species_name = c("Antrozous pallidus", "Corynorhinus townsendii", "Eptesicus fuscus", "Euderma maculatum",
+#                    "Lasiurus cinereus", "Lasiurus noctivagans", "Myotis californicus", "Myotis ciliolabrum",
+#                    "Myotis evotis", "Myotis lucifugus", "Myotis thysanodes", "Myotis volans",
+#                    "Myotis yumanensis", "Parastrellus hesperus")
+# )
+# 
+# species <- species %>%
+#   mutate(
+#     sp = tolower(sp),  # Ensure species codes are lowercase for consistency)
+#     genus = word(species_name, 1),
+#     species = word(species_name, 2),
+#     sp_label = paste0(substr(genus, 1, 1), ".", species)
+#   )
+# 
+# # we make treatment bin -1 for dark and 1 for lit. 
+# sm3_buzz_v2 <- sm3_buzz_v2 %>%
+#   left_join(species %>% select(sp_clean, sp_label), by = "sp") # add species labels for plotting
+# 
+# glimpse(sm3_buzz_v2)
+# summary(sm3_buzz_v2)
 
 
 # outputs -----------------------------------------------------------------

@@ -35,14 +35,15 @@ packages <- c(
   "tidyverse", "magrittr", "lme4", "sjPlot", "ggeffects", "car",
   "glmmTMB", "corrplot", "effects", "reshape2", "DHARMa",
   "marginaleffects", "MuMIn", "performance", "viridis",
-  "data.table", "janitor", "patchwork"
+  "data.table", "janitor", "patchwork", "flextable", 
+  "gtsummary", "lubridate", "beepr", "emmeans", "ggpubr", "ggrepel"
 )
 
 # Load all packages in one go
 invisible(lapply(packages, library, character.only = TRUE))
 
 
-# load(file = "working_env/glmm_v3.RData")
+ load(file = "working_env/glmm_v5.RData") # load the working environment to save time.
 
 # funtions ----------------------------------------------------------------
 
@@ -708,7 +709,7 @@ pred_trmt <- predictions(
     yr_s = typical$yr_s,
     t_lepidoptera_s = typical$t_lepidoptera_s
   ),
-  type = "response"   # VERY IMPORTANT → gives counts, not log scale
+  type = "response"   # VERY IMPORTANT --> gives counts, not log scale
 )
 
 
@@ -802,13 +803,13 @@ p_trmt <- ggplot() +
 
 p_trmt
 
-ggsave(
-  filename = "figures/glmm_v5/trmt_v1.png",
-  plot = p_trmt,
-  width = 10,
-  height = 8,
-  dpi = 300
-)
+# ggsave(
+#   filename = "figures/glmm_v5/trmt_v1.png",
+#   plot = p_trmt,
+#   width = 10,
+#   height = 8,
+#   dpi = 300
+# )
 
 
 # m1.7 treatment marginal -------------------------------------------------
@@ -1420,15 +1421,18 @@ species_results_manuscript <- species_results %>%
 
 species_results_manuscript
 
-flextable(species_results_manuscript) %>%
+ts2<-flextable(species_results_manuscript) %>%
   autofit() %>%
   set_caption(
-    ""
-  )
+     ""
+   )
 
 
-
-
+# save_as_docx(
+#   "table.s2" = ts2,
+#   path = "figures/glmm_v5/tables/ts2.docx")
+# 
+# save_as_image(ts2, path = "figures/glmm_v5/tables/ts2.png")
 
 # jday 
 
@@ -1514,12 +1518,119 @@ ggsave(
   dpi = 300
 )
 
+# here we modify the graph to follow the asthetics from the treatment graph. 
 
+pred_jday <- pred_jday %>%
+  mutate(
+    jday = jday_s * (2 * jday_sd) + jday_mean,
+    
+    trmt = factor(
+      trmt_bin,
+      levels = c(-1, 1),
+      labels = c("Dark", "Lit")
+    ),
+    
+    # Same species order as p_trmt
+    sp = factor(
+      as.character(sp),
+      levels = as.character(species_order)
+    )
+  ) %>%
+  arrange(sp, trmt, jday)
+
+bm_jday_plot <- bm2 %>%
+  mutate(
+    trmt = factor(
+      trmt_bin,
+      levels = c(-1, 1),
+      labels = c("Dark", "Lit")
+    ),
+    
+    # Same species order as p_trmt
+    sp = factor(
+      as.character(sp),
+      levels = as.character(species_order)
+    )
+  )
+
+p_jday <- ggplot() +
+  geom_point(
+    data = bm_jday_plot,
+    aes(
+      x = jday,
+      y = n,
+      color = trmt
+    ),
+    alpha = 0.10,
+    size = 0.7
+  ) +
+  
+  geom_line(
+    data = pred_jday,
+    aes(
+      x = jday,
+      y = estimate,
+      color = trmt,
+      group = interaction(sp, trmt)
+    ),
+    linewidth = 1.2
+  ) +
+  
+  facet_wrap(
+    ~ sp,
+    scales = "free_y",
+    labeller = labeller(sp = species_labels)
+  ) +
+  
+  scale_color_manual(
+    values = c(
+      "Dark" = "grey20",
+      "Lit"  = "grey70"
+    )
+  ) +
+  
+  scale_y_continuous(
+    trans = "log1p"
+  ) +
+  
+  labs(
+    x = "Julian day",
+    y = "Predicted bat calls",
+    color = "Treatment",
+    title = ""
+  ) +
+  
+  theme_minimal() +
+  
+  theme(
+    strip.text = element_text(
+      size = 10,
+      face = "italic"
+    ),
+    axis.text = element_text(size = 9),
+    axis.title = element_text(size = 11),
+    legend.position = "bottom"
+  )
+
+p_jday
+
+
+ggsave(
+  filename = "figures/glmm_v5/jday_v1_fig3.tiff",
+  plot = p_jday,
+  width = 12,
+  height = 8,
+  units = "in",
+  dpi = 600,
+  compression = "lzw",
+  bg = "white"
+)
 
 
 
 
 # marginal effects of light and moonlight interactions.
+# this this was not significant. so moon does decrease activity but we don't see a differenc between lit and dark sites. 
 
 
 moon_seq <- seq(
@@ -1529,7 +1640,7 @@ moon_seq <- seq(
 )
 
 pred_moon <- predictions(
-  m1.8,
+  m1.7,
   newdata = datagrid(
     avg_moonlight_s = moon_seq,
     trmt_bin = c(-1, 1),
@@ -1572,20 +1683,118 @@ p_moon <- ggplot() +
 
 p_moon
 
+# now we format the previous graph in the same way as the p_trmt graph. 
+# Apply the same species order used in p_trmt
+pred_moon <- pred_moon %>%
+  mutate(
+    trmt = factor(
+      trmt_bin,
+      levels = c(-1, 1),
+      labels = c("Dark", "Lit")
+    ),
+    
+    sp = factor(
+      as.character(sp),
+      levels = as.character(species_order)
+    )
+  ) %>%
+  arrange(sp, trmt, avg_moonlight_s)
+
+
+# Prepare observed data using the same order
+bm_moon_plot <- bm2 %>%
+  mutate(
+    trmt = factor(
+      trmt_bin,
+      levels = c(-1, 1),
+      labels = c("Dark", "Lit")
+    ),
+    
+    sp = factor(
+      as.character(sp),
+      levels = as.character(species_order)
+    )
+  )
+
+p_moon <- ggplot() +
+  
+  # Optional raw observations
+  geom_point(
+    data = bm_moon_plot,
+    aes(
+      x = avg_moonlight_s,
+      y = n,
+      color = trmt
+    ),
+    alpha = 0.08,
+    size = 0.6
+  ) +
+  
+  # Model-predicted relationships
+  geom_line(
+    data = pred_moon,
+    aes(
+      x = avg_moonlight_s,
+      y = estimate,
+      color = trmt,
+      group = interaction(sp, trmt)
+    ),
+    linewidth = 1.2
+  ) +
+  
+  facet_wrap(
+    ~ sp,
+    scales = "free_y",
+    labeller = labeller(sp = species_labels)
+  ) +
+  
+  scale_color_manual(
+    values = c(
+      "Dark" = "grey20",
+      "Lit"  = "grey70"
+    )
+  ) +
+  
+  scale_y_continuous(
+    trans = "log1p"
+  ) +
+  
+  labs(
+    x = "Moonlight intensity (scaled)",
+    y = "Predicted bat calls",
+    color = "Treatment",
+    title = "Species-specific responses to moonlight"
+  ) +
+  
+  theme_minimal() +
+  
+  theme(
+    strip.text = element_text(
+      size = 10,
+      face = "italic"
+    ),
+    axis.text = element_text(size = 9),
+    axis.title = element_text(size = 11),
+    legend.position = "bottom"
+  )
+
+p_moon
+
 
 ggsave(
-  filename = "figures/glmm_v4/moon_v1.png",
+  filename = "figures/glmm_v5/moon_v1.png",
   plot = p_moon,
   width = 10,
   height = 8,
-  dpi = 300
+  dpi = 300,
+  bg = "white"
 )
 
 # now the year interaction 
 
 
 pred_year <- predictions(
-  m1.8,
+  m1.7,
   newdata = datagrid(
     yr_s = c(-1, 0, 1),   # ← include ALL years
     trmt_bin = c(-1, 1),
@@ -1629,6 +1838,7 @@ p_year <- ggplot(pred_year,
   )
 
 p_year
+
 # these panels might need to be organized the colors need to change and the olrder of the panesl too. I want to present the panels in three groups first the ones that constantly declined like antpal or edumac then the ones that fip their response like cortow dna eptfus 
 # and then the ones that show increases in lit sites constantly like lasnoc or myluc should I add data points?
 
@@ -1708,17 +1918,130 @@ p_year_alt <- ggplot() +
   )
 
 p_year_alt
+
+
+# now we modify the year marginal effect because we don't want estimates by species. We want the estimates for the community as the fixed effect was significant 
+
+# Match each modeled year value to the original calendar year
+year_key <- bm2 %>%
+  distinct(yr, yr_s) %>%
+  arrange(yr)
+
+# Population-level predictions
+pred_year <- predictions(
+  m1.7,
+  newdata = datagrid(
+    model = m1.7,
+    
+    yr_s = year_key$yr_s,
+    trmt_bin = c(-1, 1),
+    
+    # Hold continuous predictors at their centered values
+    jday_s = 0,
+    avg_moonlight_s = 0,
+    nit_avg_temp_c_s = 0,
+    nit_avg_wspm_s_s = 0,
+    t_lepidoptera_s = 0,
+    
+    # Valid levels are required in newdata, but their random
+    # effects are excluded by re.form = NA
+    sp = first(bm2$sp),
+    site = first(bm2$site)
+  ),
+  type = "response",
+  re.form = NA
+)
+
+pred_year <- pred_year %>%
+  left_join(year_key, by = "yr_s") %>%
+  mutate(
+    trmt = factor(
+      trmt_bin,
+      levels = c(-1, 1),
+      labels = c("Dark", "Lit")
+    )
+  ) %>%
+  arrange(trmt, yr)
+
+pred_year
+
+# plot te two lines, points and confidence ribbons
+p_year <- ggplot(
+  pred_year,
+  aes(
+    x = yr,
+    y = estimate,
+    color = trmt,
+    fill = trmt,
+    group = trmt
+  )
+) +
+  
+  # Model-based 95% confidence intervals
+  geom_ribbon(
+    aes(
+      ymin = conf.low,
+      ymax = conf.high
+    ),
+    alpha = 0.18,
+    color = NA
+  ) +
+  
+  # Estimated annual trajectories
+  geom_line(linewidth = 1.1) +
+  
+  # Annual estimates
+  geom_point(size = 2.7) +
+  
+  scale_color_manual(
+    values = c(
+      "Dark" = "grey15",
+      "Lit"  = "grey60"
+    )
+  ) +
+  
+  scale_fill_manual(
+    values = c(
+      "Dark" = "grey35",
+      "Lit"  = "grey75"
+    )
+  ) +
+  
+  scale_x_continuous(
+    breaks = year_key$yr
+  ) +
+  
+  labs(
+    x = "Year",
+    y = "Predicted bat calls",
+    color = "Treatment",
+    fill = "Treatment"
+  ) +
+  
+  theme_minimal() +
+  
+  theme(
+    axis.text = element_text(size = 10),
+    axis.title = element_text(size = 11),
+    legend.position = "top",
+    panel.grid.minor = element_blank()
+  )
+
+p_year
+
+
+
 ggsave(
-  filename = "figures/glmm_v4/year_v1.png",
-  plot = p_year_alt,
+  filename = "figures/glmm_v5/year_v1.png",
+  plot = p_year,
   width = 10,
   height = 8,
   dpi = 300
 )
 
-summary(m1.8)
+summary(m1.7)
 
-# not graphs for the temperature 
+# now graphs for the temperature 
 
 
 temp_seq <- seq(
@@ -1728,7 +2051,7 @@ temp_seq <- seq(
 )
 
 pred_temp_comm <- predictions(
-  m1.8,
+  m1.7,
   newdata = datagrid(
     nit_avg_temp_c_s = temp_seq,
     trmt_bin = 0,
@@ -1765,19 +2088,19 @@ p_temp_comm <- ggplot(pred_temp_comm, aes(x = temp_c, y = estimate)) +
   labs(
     x = "Nightly average temperature (°C)",
     y = "Predicted bat call counts",
-    title = "Community-level effect of temperature on bat activity"
+    title = ""
   ) +
   theme_minimal()
 
 p_temp_comm
 
-ggsave(
-  filename = "figures/glmm_v4/temp_comm_v1.png",
-  plot = p_temp_comm,
-  width = 6,
-  height = 4,
-  dpi = 300
-)
+# ggsave(
+#   filename = "figures/glmm_v4/temp_comm_v1.png",
+#   plot = p_temp_comm,
+#   width = 6,
+#   height = 4,
+#   dpi = 300
+# )
 
 # not lets do the wind 
 
@@ -1788,7 +2111,7 @@ wind_seq <- seq(
 )
 
 pred_wind_comm <- predictions(
-  m1.8,
+  m1.7,
   newdata = datagrid(
     nit_avg_wspm_s_s = wind_seq,
     trmt_bin = 0,
@@ -1825,22 +2148,29 @@ p_wind_comm <- ggplot(pred_wind_comm, aes(x = windms, y = estimate)) +
   labs(
     x = "Nightly average wind (m/s)",
     y = "Predicted bat call counts",
-    title = "Community-level effect of temperature on bat activity"
+    title = ""
   ) +
   theme_minimal()
 
 p_wind_comm
 
+# ggsave(
+#   filename = "figures/glmm_v4/wind_comm_v1.png",
+#   plot = p_wind_comm,
+#   width = 6,
+#   height = 4,
+#   dpi = 300
+# )
+
+fs3<-p_wind_comm+p_temp_comm
+
 ggsave(
-  filename = "figures/glmm_v4/wind_comm_v1.png",
-  plot = p_wind_comm,
+  filename = "figures/glmm_v5/fs3_v1.png",
+  plot = fs3,
   width = 6,
   height = 4,
   dpi = 300
 )
-
-
-
 
 # marginal effects m1.10 acoustic index -----------------------------------
 
@@ -1961,7 +2291,7 @@ p_trmt_m1.10 <- ggplot() +
 p_trmt_m1.10
 
 ggsave(
-  filename = "figures/glmm_v4/trmt_v1_acoustic_index.png",
+  filename = "figures/glmm_v5/trmt_v1_acoustic_index.png",
   plot = p_trmt_m1.10,
   width = 10,
   height = 8,
@@ -1970,12 +2300,14 @@ ggsave(
 
 
 
+# save working environment ------------------------------------------------
 
+# save.image("working_env/glmm_v5.RData")
 
 
 
 ###
-# -------------------------------------------------------------------------
+# trash-------------------------------------------------------------------------
 
 
 # below are previous models 
@@ -2603,6 +2935,4 @@ summary(m1.12)
 
 # anova( m1.2, m1.3
 
-# save working environment ------------------------------------------------
 
-save.image("working_env/glmm_v4.RData")
