@@ -1218,6 +1218,22 @@ I need to correct the labels in the sp by jday marginal effect plot for the glmm
 
 7/29/2026
 
-I almost got the data ready to write for the sm3 data and start the analysis. \
+I almost got the data ready to write for the sm3 data and start the analysis.\
 
-I stil need to correct the results in the sonobat data.
+I stil need to correct the results in the sonobat data.\
+\
+
+------------------------------------------------------------------------
+
+7/30/2026
+
+Sm3\_ buzz data start analysis.
+
+still need to calculate the uncertainty for the robomoth and speaker data.
+
+I was looking at the data and I see that the there are sites/ night observations with more than 2000 total buzzes for one species. \
+these might need to be double check on the raw data
+
+![](images/clipboard-2567568388.png)
+
+I created the script sm3_glmm_v1 and the model m1.8 will be taken as the final model for now. \

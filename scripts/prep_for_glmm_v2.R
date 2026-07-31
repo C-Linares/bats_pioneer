@@ -999,6 +999,7 @@ bat_clean %>%
 
 table(bat_clean$sp) # it went from 5000 to 638 taht we can easily filter out. 
 
+
 # effort ------------------------------------------------------------------
 # # we have to calculate effort before filtering because we don't have the noise and noID calls. te following section was sent up the script
 # 
@@ -1817,6 +1818,10 @@ sm3_buzz_v2<- sm3_buzz_v2 %>%
 
 summary(sm3_buzz_v2)
 
+# remove unnecessary col
+
+sm3_buzz_v2 <- sm3_buzz_v2 %>%
+  select(-c( treatmt_mean))
 
 # now we standardize the predictors as we did for the bm2 data frame.
 
@@ -1847,35 +1852,46 @@ sm3_buzz_v2 <- sm3_buzz_v2 %>%
     TRUE ~ 1
   ))
 
-#W we can almost write the sm3 data and analyze it. 
+# add species names 
 
+species <- data.frame(
+  sp = c("ANTPAL", "CORTOW", "EPTFUS", "EUDMAC", "LASCIN", "LASNOC",
+         "MYOCAL", "MYOCIL", "MYOEVO", "MYOLUC", "MYOTHY", "MYOVOL",
+         "MYOYUM", "PARHES"),
+  species_name = c("Antrozous pallidus", "Corynorhinus townsendii", "Eptesicus fuscus", "Euderma maculatum",
+                   "Lasiurus cinereus", "Lasiurus noctivagans", "Myotis californicus", "Myotis ciliolabrum",
+                   "Myotis evotis", "Myotis lucifugus", "Myotis thysanodes", "Myotis volans",
+                   "Myotis yumanensis", "Parastrellus hesperus")
+)
 
-# species names for graphs # this part dosn't work 
+species <- species %>%
+  mutate(
+    sp = tolower(sp),  # Ensure species codes are lowercase for consistency)
+    genus = word(species_name, 1),
+    species = word(species_name, 2),
+    sp_label = paste0(substr(genus, 1, 1), ".", species)
+  )
 
-# species <- data.frame(
-#   sp = c("ANTPAL", "CORTOW", "EPTFUS", "EUDMAC", "LASCIN", "LASNOC",
-#          "MYOCAL", "MYOCIL", "MYOEVO", "MYOLUC", "MYOTHY", "MYOVOL",
-#          "MYOYUM", "PARHES"),
-#   species_name = c("Antrozous pallidus", "Corynorhinus townsendii", "Eptesicus fuscus", "Euderma maculatum",
-#                    "Lasiurus cinereus", "Lasiurus noctivagans", "Myotis californicus", "Myotis ciliolabrum",
-#                    "Myotis evotis", "Myotis lucifugus", "Myotis thysanodes", "Myotis volans",
-#                    "Myotis yumanensis", "Parastrellus hesperus")
-# )
-# 
-# species <- species %>%
-#   mutate(
-#     sp = tolower(sp),  # Ensure species codes are lowercase for consistency)
-#     genus = word(species_name, 1),
-#     species = word(species_name, 2),
-#     sp_label = paste0(substr(genus, 1, 1), ".", species)
-#   )
-# 
-# # we make treatment bin -1 for dark and 1 for lit. 
-# sm3_buzz_v2 <- sm3_buzz_v2 %>%
-#   left_join(species %>% select(sp_clean, sp_label), by = "sp") # add species labels for plotting
-# 
-# glimpse(sm3_buzz_v2)
-# summary(sm3_buzz_v2)
+# we need tomake the sp into a 4 letter code to match the sm3_buzz_v2 data frame.
+
+species <- species %>%
+  mutate(
+    sp = tolower(sp),
+    sp = if_else(
+      nchar(sp) == 6,
+      paste0(
+        substr(sp, 1, 2),  # first 2 genus letters
+        substr(sp, 4, 5)   # first 2 species letters
+      ),
+      sp
+    )
+  )
+# now we merge the species names 
+sm3_buzz_v2 <- sm3_buzz_v2 %>%
+  left_join(species %>% select(sp, sp_label), by = c("sp_clean" = "sp")) # add species labels for plotting
+
+glimpse(sm3_buzz_v2)
+summary(sm3_buzz_v2)
 
 
 # outputs -----------------------------------------------------------------
@@ -1886,7 +1902,7 @@ sm3_buzz_v2 <- sm3_buzz_v2 %>%
 write.csv(bat_combined, file = 'data_for_analysis/prep_for_glmm_v2//bat_combined.csv', row.names = F) # raw combine data 
 write.csv(bm2, file = 'data_for_analysis/prep_for_glmm_v2/bm2.csv', row.names = F) #daily counts
 write.csv(bm_miller, file = "data_for_analysis/prep_for_glmm_v2/bm_miller.csv") # miller Ai index data
-# write.csv(sm3_buzz, file = "data_for_analysis/prep_for_glmm/sm3_buzz_sp.csv") # this is not ready to write 
+write.csv(sm3_buzz_v2, file = "data_for_analysis/prep_for_glmm_v2/sm3_buzz_v2.csv") # sm3_buzz counts by species  
 
 
 # Create a README file with information about the script
@@ -1903,10 +1919,11 @@ bat_combined.csv - process data no counts (Update: 7/8/2026 rules for bat specie
 bm2.csv - bats counts ready for analysis with zero added, predictors and standardized 
 bm_miller.csv - number of minutes of activity by day  for 2021-2023 data all sites (last update 7/8/2026)
 
+sm3_buzz_v2.csv - sm3_buzz counts by species summarized by date and species. (7/30/2026)
 
 "
 # Write the README content to a file
-writeLines(readme_content, "data_for_analysis/prep_for_glmm/README.txt")
+writeLines(readme_content, "data_for_analysis/prep_for_glmm_v2/README.txt")
 
 
 
