@@ -1602,6 +1602,81 @@ spkr_species_trt_effects %>%
   )
 
 
+# uncertainty table 
+
+library(tidyverse)
+library(marginaleffects)
+
+# Species in robomoth data
+spkr_species <- spkr_db %>%
+  filter(!is.na(sp)) %>%
+  distinct(sp) %>%
+  arrange(sp) %>%
+  pull(sp)
+
+# Prediction grid at mean covariate values
+spkr_trt_grid <- tidyr::expand_grid(
+  sp = spkr_species,
+  trmt_bin = -1
+) %>%
+  mutate(
+    site = NA,
+    jday_s = mean(rob_db$jday_s, na.rm = TRUE),
+    nit_avg_wspm_s_s = mean(rob_db$nit_avg_wspm_s_s, na.rm = TRUE),
+    avg_moonlight_s = mean(rob_db$avg_moonlight_s, na.rm = TRUE),
+    elev_max_s = mean(rob_db$elev_max_s, na.rm = TRUE),
+    yr_s = mean(rob_db$yr_s, na.rm = TRUE),
+    t_leps_s = mean(rob_db$t_leps_s, na.rm = TRUE)
+  )
+
+
+
+# Species-specific lit/dark ratios
+spkr_species_ratio <- avg_comparisons(
+  m11_s,
+  newdata = spkr_trt_grid,
+  variables = list(trmt_bin = c(-1, 1)),
+  comparison = "ratio",
+  by = "sp",
+  type = "response",
+  re.form = NULL,
+  allow.new.levels = TRUE
+) %>%
+  as_tibble() %>%
+  mutate(
+    percent_change_lit_vs_dark = 100 * (estimate - 1),
+    percent_conf_low = 100 * (conf.low - 1),
+    percent_conf_high = 100 * (conf.high - 1),
+    supported_response = case_when(
+      conf.low > 1 ~ "Higher in lit",
+      conf.high < 1 ~ "Lower in lit",
+      TRUE ~ "Uncertain"
+    )
+  ) %>%
+  arrange(desc(percent_change_lit_vs_dark))
+
+spkr_species_ratio
+
+spkr_species_ratio_clean <- spkr_species_ratio %>%
+  transmute(
+    species = sp,
+    lit_dark_ratio = round(estimate, 2),
+    ratio_CI = paste0(round(conf.low, 2), "–", round(conf.high, 2)),
+    percent_change = round(percent_change_lit_vs_dark, 1),
+    percent_CI = paste0(
+      round(percent_conf_low, 1),
+      " to ",
+      round(percent_conf_high, 1),
+      "%"
+    ),
+    p_value = signif(p.value, 3),
+    supported_response
+  )
+
+spkr_species_ratio_clean
+
+
+
 
 # speaker Jday marginal effects  ------------------------------------------
 

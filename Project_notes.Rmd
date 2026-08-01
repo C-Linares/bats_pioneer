@@ -1231,9 +1231,21 @@ Sm3\_ buzz data start analysis.
 
 still need to calculate the uncertainty for the robomoth and speaker data.
 
-I was looking at the data and I see that the there are sites/ night observations with more than 2000 total buzzes for one species. \
+I was looking at the data and I see that the there are sites/ night observations with more than 2000 total buzzes for one species.\
 these might need to be double check on the raw data
 
 ![](images/clipboard-2567568388.png)
 
-I created the script sm3_glmm_v1 and the model m1.8 will be taken as the final model for now. \
+I created the script sm3_glmm_v1 and the model m1.8 will be taken as the final model for now.\
+
+------------------------------------------------------------------------
+
+7/31/2026
+
+I was able to describe the results for model m1.8 for feeding buzz activity. \
+I still need to fix the speaker and robomoth data. \
+I need to organize the plot for the temp, wind, and moon predictors in the model m1.7 for overal activity so they occupy less space. I will use patchwork to make something similar to the predictors for buzz activity see below.
+
+![](images/clipboard-3293302800.png)
+
+next we need to rewrite the section for robomoth and speakers.
