@@ -1,6 +1,6 @@
 #=============================================================================
 # Script Name:    glmm_v5.R
-# Purpose:        Fit GLMMs for bat paper using weather, and moon data, and light spectra.
+# Purpose:        Fit GLMMs for bat paper calls id at sm3 using weather, and moon data, and light spectra.
 #
 # Version:        v4 - Includes: we are going back and build the model using light as -1/1 
 #                   -
@@ -93,209 +93,6 @@ bm2 <- bm2 %>%
 
 unique(bm2$sp) # check the unique species after filtering)
 
-# predictors --------------------------------------------------------------
-
-# # Craters weather (night)
-# crmo.wet.night <- read_csv("data_for_analysis/weather/craters_weater/craters_night.csv") %>% 
-#   clean_names() # load craters night weather
-# 
-# # Moon
-# moon.int <- read_csv('data_for_analysis/moon_pred/moon.int.csv') %>%
-#   clean_names()
-# summary(moon.int) # check the structure of the moon data
-# 
-# # convert date times from UTC to Denver/America
-# moon.int$denver_time <- with_tz(moon.int$date, tzone = "America/Denver") # Convert to Denver time zone
-# attr(moon.int$denver_time, "tzone") # check the timezone is correct
-# 
-# # summarize moonlight by date but conditional moon_alt_degrees > 0
-# 
-# # Step 1: Filter data where the moon is above the horizon
-# moon_filtered <- moon.int %>%
-#   filter(moon_alt_degrees > 0)
-# 
-# # Step 2: Create a new 'noche' variable (just the date part of the time stamp)
-# # but also makes nights any time stamps that are less than 9 am.
-# moon_filtered <- moon_filtered %>%
-#   mutate(
-#     hour = hour(denver_time),  # Extract hour from datetime
-#     noche = if_else(hour < 9,
-#                     true = as_date(denver_time) - days(1),
-#                     false = as_date(denver_time))
-#   )
-# 
-# # Step 3: Group by 'noche', then summarize the average values
-# moon_daily_avg <- moon_filtered %>%
-#   group_by(noche) %>%
-#   summarise(
-#     avg_moonlight = mean(moonlight_model, na.rm = TRUE),
-#     avg_twilight = mean(twilight_model, na.rm = TRUE),
-#     avg_illumination = mean(illumination, na.rm = TRUE),
-#     n_obs = n()  # optional: number of observations per night
-#   )
-# 
-# # insects 
-# c_bugs <- read_csv("data_for_analysis/insect_wranglin/c_bugs.csv") %>%  # load insect data
-#   clean_names() %>%
-#   rename(yr = yrs) # safe rename
-# # add treatment. 
-# 
-# litsites<-c("iron01","iron03","iron05","long01","long03")
-# 
-# 
-# c_bugs$treatmt<-ifelse(c_bugs$site %in% litsites , "lit", "dark") # this makes a treatment variable.
-# 
-# 
-# # calculate mean by yr, trmt and site. I will use this to substitute the NA valeus from tha appeared when merging the bat data. 
-# 
-# c_bugs_mean <- c_bugs %>%
-#   group_by(yr,treatmt, site) %>%
-#   summarise(
-#     t_insect = mean(t_insect, na.rm = TRUE),
-#     t_lepidoptera = mean(t_lepidoptera, na.rm = TRUE)
-#   ) %>%
-#   ungroup()
-# 
-# 
-# 
-# # light
-# light <- read_csv("data_for_analysis/lights/lightspectra_pioneer.csv") %>%
-#   clean_names() %>%
-#   filter(vert_horiz == "Horizontal") %>%                          # Keep only horizontal measures
-#   mutate(mwatts = rowMeans(across(c(watts_m1, watts_m2, watts_m3)), na.rm = TRUE)) %>%  # Mean of watts
-#   select(site, lux, yr, mwatts)    # Select relevant columns  
-
-# Merge datasets ------------------------------------------------------------
-# 
-# # merge weather
-# # Merge crmo.wet.night into filtered_bm by matching dates
-# bm2 <- filtered_bm %>%
-#   left_join(crmo.wet.night, by = c("noche" = "date"))
-# summary(bm2)
-# 
-# # merge with moon
-# bm2 <- bm2 %>%
-#   left_join(moon_daily_avg, by = "noche") 
-# 
-# summary(bm2) #there is just one NA I can keep it that way. 
-# 
-# # merge with insects
-# 
-# bm2 <- bm2 %>%
-#   left_join(c_bugs, by = c("site", "wk", "yr")) # merge
-# 
-# # check for NAs
-# summary(bm2)  #lots of NAs in t.insect and t.lepidoptera.
-# 
-# # replace NAs in t.insect and t.lepidoptera with the mean values from c_bugs_mean
-# 
-# 
-# bm2 <- bm2 %>%
-#   left_join(c_bugs_mean, 
-#             by = c("yr", "treatmt.x" = "treatmt", "site"),
-#             suffix = c("", "_mean")) %>%  # rename mean columns directly
-#   mutate(
-#     t_insect = coalesce(t_insect, t_insect_mean),
-#     t_lepidoptera = coalesce(t_lepidoptera, t_lepidoptera_mean)
-#   ) %>%
-#   select(-t_insect_mean, -t_lepidoptera_mean)
-# 
-# 
-# # merge light 
-# 
-# bm2<- bm2 %>%
-#   left_join(light, by = c("site", "yr"))
-# 
-# # note:
-# # we are going to write this table to use for the predictors in the dbrda analysis. 
-# # write_csv(bm2, "data_for_analysis/dbrda/bm2.csv")
-
-# correlation -------------------------------------------------------------
-# 
-# 
-# # 1. Select numeric columns, optionally drop unique id/group columns
-# numeric_data <- bm2 %>% 
-#   select(where(is.numeric)) %>% 
-#   select(-any_of(c("yr", "trmt_bin"))) # add/remove columns as needed
-# 
-# # 2. Remove zero-variance columns
-# numeric_data <- numeric_data %>% select(where(~sd(., na.rm = TRUE) > 0))
-# 
-# # 3. Compute correlation matrix
-# cor_mat <- cor(numeric_data, use = "pairwise.complete.obs")
-# 
-# # 4. Visualize correlation matrix
-# corrplot(cor_mat, order = 'AOE')
-
-
-# standardize -------------------------------------------------------------
-# 
-# #calculate Julian day from 'noche' and scale variables
-# bm2<-bm2 %>% 
-#   mutate(
-#     jday = lubridate::yday(noche),  # Calculate Julian day from 'noche'
-#   )
-# 
-# variables_to_scale <- c(
-#   "avg_moonlight",
-#   "avg_twilight",
-#   "avg_illumination",
-#   "nit_avg_temp_c",
-#   "nit_avg_wspm_s",
-#   "t_lepidoptera",
-#   "t_insect",
-#   "lux",
-#   "mwatts",
-#   "jday"
-# )
-# 
-# bm2 <- bm2 %>%
-#   scale_by_2sd_tidy(variables_to_scale)
-# 
-# summary(bm2)
-# 
-# # year standardize. 
-# 
-# # make year between -1:1
-# bm2 <- bm2 %>%
-#   mutate(yr_s = case_when(
-#     yr == 2021 ~ -1,
-#     yr == 2022 ~ 0,
-#     TRUE ~ 1
-#   ))
-# 
-# 
-# # species names for graphs
-# 
-# species <- data.frame(
-#   sp = c("ANTPAL", "CORTOW", "EPTFUS", "EUDMAC", "LASCIN", "LASNOC",
-#          "MYOCAL", "MYOCIL", "MYOEVO", "MYOLUC", "MYOTHY", "MYOVOL",
-#          "MYOYUM", "PARHES"),
-#   species_name = c("Antrozous pallidus", "Corynorhinus townsendii", "Eptesicus fuscus", "Euderma maculatum",
-#                    "Lasiurus cinereus", "Lasiurus noctivagans", "Myotis californicus", "Myotis ciliolabrum",
-#                    "Myotis evotis", "Myotis lucifugus", "Myotis thysanodes", "Myotis volans",
-#                    "Myotis yumanensis", "Parastrellus hesperus")
-# )
-# 
-# species <- species %>%
-#   mutate(
-#     genus = word(species_name, 1),
-#     species = word(species_name, 2),
-#     sp_label = paste0(substr(genus, 1, 1), ".", species)
-#   )
-# 
-# # we make treatment bin -1 for dark and 1 for lit. 
-# bm2 <- bm2 %>%
-#   mutate(trmt_bin = if_else(treatmt.x == "lit", 1, -1)) %>%
-#   left_join(species %>% select(sp, sp_label), by = "sp") # add species labels for plotting
-# 
-# glimpse(bm2)
-# 
-# # now we merge the bm_ai with the bm2 data to have both the Miller activity index and the echolocation count data.
-# 
-# bm2<-bm_ai %>%
-#   select(site,noche, sp, activity_min) %>%
-#   left_join(bm2, by = c("noche", "sp", "site")) # merge by noche and spm
 
 # modeling ----------------------------------------------------------------
 
@@ -662,7 +459,7 @@ m1.10<- glmmTMB(
     #random effects
     (1 | site) + (1 + trmt_bin + jday_s + I(jday_s^2) | sp) +
     #interactions
-    jday_s * trmt_bin + I(jday_s^2) * trmt_bin + trmt_bin*avg_moonlight_s + trmt_bin*yr_s,  
+    jday_s * trmt_bin + I(jday_s^2) * trmt_bin + trmt_bin*avg_moonlight_s,  
   data = bm2,
   family = nbinom2(link = "log")
 )
@@ -683,6 +480,159 @@ anova(m1.7, m1.10)
 summary(m1.10)
 
 
+# table comparing m1.7 and m1.10 
+# Function to extract fixed-effect estimates -------------------------------
+
+extract_fixed <- function(model, response_name) {
+  
+  broom.mixed::tidy(
+    model,
+    effects = "fixed",
+    component = "cond",
+    conf.int = TRUE,
+    conf.level = 0.95
+  ) %>%
+    transmute(
+      term,
+      estimate,
+      SE = std.error,
+      lower_CI = conf.low,
+      upper_CI = conf.high,
+      p_value = p.value
+    ) %>%
+    rename_with(
+      ~ paste0(.x, "_", response_name),
+      -term
+    )
+}
+
+
+count_results <- extract_fixed(
+  m1.7,
+  "counts"
+)
+
+minute_results <- extract_fixed(
+  m1.10,
+  "minutes"
+)
+
+model_comparison <- full_join(
+  count_results,
+  minute_results,
+  by = "term"
+)
+
+
+term_labels <- c(
+  "(Intercept)" = "Intercept",
+  "trmt_bin" = "Artificial light",
+  "jday_s" = "Julian date",
+  'I(jday_s^2)' = "Julian date²",
+  "avg_moonlight_s" = "Moonlight",
+  "nit_avg_temp_c_s" = "Nighttime temperature",
+  "nit_avg_wspm_s_s" = "Wind speed",
+  "yr_s" = "Year",
+  "t_lepidoptera_s" = "Lepidoptera abundance",
+  "trmt_bin:jday_s" = "Light × Julian date",
+  "trmt_bin:I(jday_s^2)" = "Light × Julian date²",
+  "trmt_bin:avg_moonlight_s" = "Light × moonlight"
+)
+
+model_comparison <- model_comparison %>%
+  mutate(
+    predictor = dplyr::recode(
+      term,
+      !!!term_labels,
+      .default = term
+    ),
+    
+    counts_supported = p_value_counts < 0.05,
+    minutes_supported = p_value_minutes < 0.05,
+    
+    pattern = case_when(
+      sign(estimate_counts) != sign(estimate_minutes) ~
+        "Opposite direction",
+      
+      counts_supported & minutes_supported ~
+        "Same direction; supported in both",
+      
+      !counts_supported & !minutes_supported ~
+        "Same direction; unsupported in both",
+      
+      TRUE ~
+        "Same direction; support differs"
+    )
+  )
+
+
+format_p <- function(x) {
+  case_when(
+    is.na(x)  ~ "—",
+    x < 0.001 ~ "<0.001",
+    TRUE      ~ sprintf("%.3f", x)
+  )
+}
+
+table_S1 <- model_comparison %>%
+  # Remove this line if you want to show the intercept
+  filter(term != "(Intercept)") %>%
+  transmute(
+    Predictor = predictor,
+    
+    `Call counts: β (SE)` = sprintf(
+      "%.3f (%.3f)",
+      estimate_counts,
+      SE_counts
+    ),
+    
+    `Call counts: 95% CI` = sprintf(
+      "[%.3f, %.3f]",
+      lower_CI_counts,
+      upper_CI_counts
+    ),
+    
+    `Call counts: p` = format_p(p_value_counts),
+    
+    `Activity minutes: β (SE)` = sprintf(
+      "%.3f (%.3f)",
+      estimate_minutes,
+      SE_minutes
+    ),
+    
+    `Activity minutes: 95% CI` = sprintf(
+      "[%.3f, %.3f]",
+      lower_CI_minutes,
+      upper_CI_minutes
+    ),
+    
+    `Activity minutes: p` = format_p(p_value_minutes),
+    
+    `Comparison` = pattern
+  )
+
+table_S1
+
+ts6<-flextable(table_S1) %>% 
+  set_caption("Table S1. Comparison of fixed-effect estimates from the two models") %>%
+  autofit() %>%
+  theme_vanilla() %>%
+  bold(j = c(1, 2, 4, 6, 8), part = "header") %>%
+  align(j = c(2, 3, 4, 5, 6, 7, 8), align = "center", part = "all") %>%
+  fontsize(size = 10, part = "all") %>%
+  color(j = c(2, 3, 4, 5, 6, 7, 8), color = "black", part = "all") 
+  # # hline(i = seq(1, nrow(table_S1) - 1), border = fp_border(color = "black", width = .5)) %>%
+  # hline_top(border = fp_border(color = "black", width = .5)) %>%
+  # hline_bottom(border = fp_border(color = "black", width = .5))
+
+# save the table (this has been saved.)
+
+# save_as_docx(
+#   "table.s6" = ts6,
+#   path = "figures/glmm_v5/tables/ts6.docx")
+# 
+# save_as_image(ts6, path = "figures/glmm_v5/tables/ts6.png")
+# 
 #============================================================================
 # marginal effects m1.7 ---------------------------------------------------
 
@@ -1790,6 +1740,83 @@ ggsave(
   bg = "white"
 )
 
+
+# becasue moon was not ran inside the random slopes and even if the interaction was not significant we will still plot the interaction between year and treatment but for the whole community instead of the individual species response. 
+
+p_moon_overall <- ggplot(
+  pred_moon_overall,
+  aes(
+    x = avg_moonlight_s,
+    y = estimate,
+    color = trmt,
+    fill = trmt
+  )
+) +
+  
+  # 95% confidence intervals
+  geom_ribbon(
+    aes(
+      ymin = conf.low,
+      ymax = conf.high,
+      group = trmt
+    ),
+    alpha = 0.18,
+    color = NA
+  ) +
+  
+  # Predicted relationships
+  geom_line(linewidth = 1.2) +
+  
+  scale_color_manual(
+    values = c(
+      "Dark" = "grey20",
+      "Illuminated" = "grey65"
+    )
+  ) +
+  
+  scale_fill_manual(
+    values = c(
+      "Dark" = "grey20",
+      "Illuminated" = "grey65"
+    )
+  ) +
+  
+  scale_y_continuous(trans = "log1p") +
+  
+  labs(
+    x = "Moonlight intensity (standardized)",
+    y = "Predicted nightly bat calls",
+    color = "Treatment",
+    fill = "Treatment",
+    title = ""
+  ) +
+  
+  theme_classic(base_size = 11) 
+  
+  # theme(
+  #   legend.position = "bottom",
+  #   legend.title = element_text(size = 10),
+  #   plot.title = element_text(face = "bold")
+  # )
+
+p_moon_overall
+
+
+# now save 
+
+ggsave(
+  filename = "figures/glmm_v5/moon_overall_v1.tiff",
+  plot = p_moon_overall,
+  width = 8,
+  height = 6,
+  units = "in",
+  dpi = 600,
+  compression = "lzw",
+  bg = "white"
+)
+
+
+
 # now the year interaction 
 
 
@@ -2171,6 +2198,26 @@ ggsave(
   height = 4,
   dpi = 300
 )
+
+p_all_covariates <-
+  (p_year | p_moon_overall) /
+  (p_temp_comm | p_wind_comm) +
+  plot_annotation(
+    title = "Environmental predictors Bat call activity",
+    subtitle = paste(
+      "Lines and points show population-level predictions;",
+      "shaded areas show 95% confidence intervals"
+    ),
+    tag_levels = "A"
+  ) &
+  theme(
+    plot.title = element_text(face = "bold"),
+    plot.tag = element_text(face = "bold")
+  )
+
+p_all_covariates
+
+ggsave("figures/glmm_v5/predictors_bat_activity_v1.tiff", plot = p_all_covariates, width = 10, height = 8, dpi = 300)
 
 # marginal effects m1.10 acoustic index -----------------------------------
 
@@ -2935,4 +2982,213 @@ summary(m1.12)
 
 # anova( m1.2, m1.3
 
+
+
+
+
+
+# this is the old predictors section
+# predictors --------------------------------------------------------------
+
+# # Craters weather (night)
+# crmo.wet.night <- read_csv("data_for_analysis/weather/craters_weater/craters_night.csv") %>% 
+#   clean_names() # load craters night weather
+# 
+# # Moon
+# moon.int <- read_csv('data_for_analysis/moon_pred/moon.int.csv') %>%
+#   clean_names()
+# summary(moon.int) # check the structure of the moon data
+# 
+# # convert date times from UTC to Denver/America
+# moon.int$denver_time <- with_tz(moon.int$date, tzone = "America/Denver") # Convert to Denver time zone
+# attr(moon.int$denver_time, "tzone") # check the timezone is correct
+# 
+# # summarize moonlight by date but conditional moon_alt_degrees > 0
+# 
+# # Step 1: Filter data where the moon is above the horizon
+# moon_filtered <- moon.int %>%
+#   filter(moon_alt_degrees > 0)
+# 
+# # Step 2: Create a new 'noche' variable (just the date part of the time stamp)
+# # but also makes nights any time stamps that are less than 9 am.
+# moon_filtered <- moon_filtered %>%
+#   mutate(
+#     hour = hour(denver_time),  # Extract hour from datetime
+#     noche = if_else(hour < 9,
+#                     true = as_date(denver_time) - days(1),
+#                     false = as_date(denver_time))
+#   )
+# 
+# # Step 3: Group by 'noche', then summarize the average values
+# moon_daily_avg <- moon_filtered %>%
+#   group_by(noche) %>%
+#   summarise(
+#     avg_moonlight = mean(moonlight_model, na.rm = TRUE),
+#     avg_twilight = mean(twilight_model, na.rm = TRUE),
+#     avg_illumination = mean(illumination, na.rm = TRUE),
+#     n_obs = n()  # optional: number of observations per night
+#   )
+# 
+# # insects 
+# c_bugs <- read_csv("data_for_analysis/insect_wranglin/c_bugs.csv") %>%  # load insect data
+#   clean_names() %>%
+#   rename(yr = yrs) # safe rename
+# # add treatment. 
+# 
+# litsites<-c("iron01","iron03","iron05","long01","long03")
+# 
+# 
+# c_bugs$treatmt<-ifelse(c_bugs$site %in% litsites , "lit", "dark") # this makes a treatment variable.
+# 
+# 
+# # calculate mean by yr, trmt and site. I will use this to substitute the NA valeus from tha appeared when merging the bat data. 
+# 
+# c_bugs_mean <- c_bugs %>%
+#   group_by(yr,treatmt, site) %>%
+#   summarise(
+#     t_insect = mean(t_insect, na.rm = TRUE),
+#     t_lepidoptera = mean(t_lepidoptera, na.rm = TRUE)
+#   ) %>%
+#   ungroup()
+# 
+# 
+# 
+# # light
+# light <- read_csv("data_for_analysis/lights/lightspectra_pioneer.csv") %>%
+#   clean_names() %>%
+#   filter(vert_horiz == "Horizontal") %>%                          # Keep only horizontal measures
+#   mutate(mwatts = rowMeans(across(c(watts_m1, watts_m2, watts_m3)), na.rm = TRUE)) %>%  # Mean of watts
+#   select(site, lux, yr, mwatts)    # Select relevant columns  
+
+# Merge datasets ------------------------------------------------------------
+# 
+# # merge weather
+# # Merge crmo.wet.night into filtered_bm by matching dates
+# bm2 <- filtered_bm %>%
+#   left_join(crmo.wet.night, by = c("noche" = "date"))
+# summary(bm2)
+# 
+# # merge with moon
+# bm2 <- bm2 %>%
+#   left_join(moon_daily_avg, by = "noche") 
+# 
+# summary(bm2) #there is just one NA I can keep it that way. 
+# 
+# # merge with insects
+# 
+# bm2 <- bm2 %>%
+#   left_join(c_bugs, by = c("site", "wk", "yr")) # merge
+# 
+# # check for NAs
+# summary(bm2)  #lots of NAs in t.insect and t.lepidoptera.
+# 
+# # replace NAs in t.insect and t.lepidoptera with the mean values from c_bugs_mean
+# 
+# 
+# bm2 <- bm2 %>%
+#   left_join(c_bugs_mean, 
+#             by = c("yr", "treatmt.x" = "treatmt", "site"),
+#             suffix = c("", "_mean")) %>%  # rename mean columns directly
+#   mutate(
+#     t_insect = coalesce(t_insect, t_insect_mean),
+#     t_lepidoptera = coalesce(t_lepidoptera, t_lepidoptera_mean)
+#   ) %>%
+#   select(-t_insect_mean, -t_lepidoptera_mean)
+# 
+# 
+# # merge light 
+# 
+# bm2<- bm2 %>%
+#   left_join(light, by = c("site", "yr"))
+# 
+# # note:
+# # we are going to write this table to use for the predictors in the dbrda analysis. 
+# # write_csv(bm2, "data_for_analysis/dbrda/bm2.csv")
+
+# correlation -------------------------------------------------------------
+# 
+# 
+# # 1. Select numeric columns, optionally drop unique id/group columns
+# numeric_data <- bm2 %>% 
+#   select(where(is.numeric)) %>% 
+#   select(-any_of(c("yr", "trmt_bin"))) # add/remove columns as needed
+# 
+# # 2. Remove zero-variance columns
+# numeric_data <- numeric_data %>% select(where(~sd(., na.rm = TRUE) > 0))
+# 
+# # 3. Compute correlation matrix
+# cor_mat <- cor(numeric_data, use = "pairwise.complete.obs")
+# 
+# # 4. Visualize correlation matrix
+# corrplot(cor_mat, order = 'AOE')
+
+
+# standardize -------------------------------------------------------------
+# 
+# #calculate Julian day from 'noche' and scale variables
+# bm2<-bm2 %>% 
+#   mutate(
+#     jday = lubridate::yday(noche),  # Calculate Julian day from 'noche'
+#   )
+# 
+# variables_to_scale <- c(
+#   "avg_moonlight",
+#   "avg_twilight",
+#   "avg_illumination",
+#   "nit_avg_temp_c",
+#   "nit_avg_wspm_s",
+#   "t_lepidoptera",
+#   "t_insect",
+#   "lux",
+#   "mwatts",
+#   "jday"
+# )
+# 
+# bm2 <- bm2 %>%
+#   scale_by_2sd_tidy(variables_to_scale)
+# 
+# summary(bm2)
+# 
+# # year standardize. 
+# 
+# # make year between -1:1
+# bm2 <- bm2 %>%
+#   mutate(yr_s = case_when(
+#     yr == 2021 ~ -1,
+#     yr == 2022 ~ 0,
+#     TRUE ~ 1
+#   ))
+# 
+# 
+# # species names for graphs
+# 
+# species <- data.frame(
+#   sp = c("ANTPAL", "CORTOW", "EPTFUS", "EUDMAC", "LASCIN", "LASNOC",
+#          "MYOCAL", "MYOCIL", "MYOEVO", "MYOLUC", "MYOTHY", "MYOVOL",
+#          "MYOYUM", "PARHES"),
+#   species_name = c("Antrozous pallidus", "Corynorhinus townsendii", "Eptesicus fuscus", "Euderma maculatum",
+#                    "Lasiurus cinereus", "Lasiurus noctivagans", "Myotis californicus", "Myotis ciliolabrum",
+#                    "Myotis evotis", "Myotis lucifugus", "Myotis thysanodes", "Myotis volans",
+#                    "Myotis yumanensis", "Parastrellus hesperus")
+# )
+# 
+# species <- species %>%
+#   mutate(
+#     genus = word(species_name, 1),
+#     species = word(species_name, 2),
+#     sp_label = paste0(substr(genus, 1, 1), ".", species)
+#   )
+# 
+# # we make treatment bin -1 for dark and 1 for lit. 
+# bm2 <- bm2 %>%
+#   mutate(trmt_bin = if_else(treatmt.x == "lit", 1, -1)) %>%
+#   left_join(species %>% select(sp, sp_label), by = "sp") # add species labels for plotting
+# 
+# glimpse(bm2)
+# 
+# # now we merge the bm_ai with the bm2 data to have both the Miller activity index and the echolocation count data.
+# 
+# bm2<-bm_ai %>%
+#   select(site,noche, sp, activity_min) %>%
+#   left_join(bm2, by = c("noche", "sp", "site")) # merge by noche and spm
 

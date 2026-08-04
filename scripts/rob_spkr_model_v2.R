@@ -378,6 +378,45 @@ performance::check_collinearity(m11)
 summary(m11)
 anova( m1, m2, m3, m4, m5, m6, m7, m9, m10, m11) # after testing AIC shos m10 is could be better candidate but If I want to keep it simple and focus only in the answer. then the model m11 works as well
 
+
+m11_table <- tbl_regression(
+  m11,
+  exponentiate = FALSE
+)
+
+m11_table <- gtsummary::tbl_regression(
+  m11,
+  exponentiate = TRUE,
+  label = list(
+    trmt_bin ~ "Treatment (Lit vs Dark)",
+    jday_s ~ "Julian Day (scaled)",
+    `I(jday_s^2)` ~ "Julian Day Squared",
+    avg_moonlight_s ~ "Average Moonlight (scaled)",
+    nit_avg_wspm_s_s ~ "Average Wind Speed (scaled)",
+    yr_s ~ "Year (scaled)",
+    `trmt_bin:jday_s` ~ "Treatment × Julian Day",
+    `trmt_bin:I(jday_s^2)` ~ "Treatment × Julian Day Squared",
+    `trmt_bin:avg_moonlight_s` ~ "Treatment × Moonlight"
+  )
+)
+
+m11_table
+
+m11_flex <- gtsummary::as_flex_table(m11_table) %>%
+  flextable::theme_booktabs() %>%
+  flextable::font(fontname = "Times New Roman", part = "all") %>%
+  flextable::fontsize(size = 10, part = "all") %>%
+  flextable::bold(part = "header") %>%
+  flextable::autofit()
+
+save_as_docx(
+  "m11_table" = m11_flex,
+  path = "figures/rob_spkr_model/v2/tables/m11_table.docx")
+
+
+save_as_image(m11_flex, path = "figures/rob_spkr_model/v2/tables/m11_table.png")
+
+
 # we have been suggested to test a model with an offset lets see how it changes. 
 
 m12 <- glmmTMB(
@@ -1401,6 +1440,102 @@ performance::check_collinearity(m11_s)
 summary(m11_s)
 anova( m7_s, m10_s, m11_s) 
 
+m11_s_table <- gtsummary::tbl_regression(
+  m11_s,
+  
+  # FALSE reports coefficients on the model's log scale
+  exponentiate = FALSE,
+  
+  conf.level = 0.95,
+  
+  label = list(
+    trmt_bin ~ "Treatment (Lit vs. Dark)",
+    jday_s ~ "Julian date",
+    `I(jday_s^2)` ~ "Julian date²",
+    nit_avg_wspm_s_s ~ "Average wind speed",
+    avg_moonlight_s ~ "Average moonlight",
+    elev_max_s ~ "Maximum elevation",
+    yr_s ~ "Year",
+    t_leps_s ~ "Lepidoptera abundance",
+    `trmt_bin:jday_s` ~ "Treatment × Julian date",
+    `trmt_bin:I(jday_s^2)` ~ "Treatment × Julian date²",
+    `trmt_bin:avg_moonlight_s` ~ "Treatment × moonlight"
+  )
+) %>%
+  
+  modify_header(
+    label ~ "**Predictor**",
+    estimate ~ "**β**",
+    ci ~ "**95% CI**",
+    p.value ~ "**p-value**"
+  ) %>%
+  
+  modify_caption(
+    "**Table S__. Negative binomial mixed-effects model of bat call activity during speaker experiments.**"
+  ) %>%
+  
+  bold_p(t = 0.05) %>%
+  
+  modify_footnote(
+    estimate ~
+      "Coefficients are presented on the log scale."
+  )
+
+m11_s_table
+
+
+# convert into a flex table 
+
+m11_s_flex <- m11_s_table %>%
+  gtsummary::as_flex_table() %>%
+  flextable::theme_booktabs() %>%
+  flextable::font(
+    fontname = "Times New Roman",
+    part = "all"
+  ) %>%
+  flextable::fontsize(
+    size = 10,
+    part = "all"
+  ) %>%
+  flextable::bold(
+    part = "header"
+  ) %>%
+  flextable::align(
+    j = 1,
+    align = "left",
+    part = "all"
+  ) %>%
+  flextable::align(
+    j = 2:ncol(m11_s_flex$body$dataset),
+    align = "center",
+    part = "all"
+  ) %>%
+  flextable::padding(
+    padding = 4,
+    part = "all"
+  ) %>%
+  flextable::autofit()
+
+m11_s_flex
+
+m11_s_flex <- m11_s_table %>%
+  gtsummary::as_flex_table() %>%
+  flextable::theme_booktabs() %>%
+  flextable::font(fontname = "Times New Roman", part = "all") %>%
+  flextable::fontsize(size = 10, part = "all") %>%
+  flextable::bold(part = "header") %>%
+  flextable::autofit()
+
+flextable::save_as_image(
+  x = m11_s_flex,
+  path = "figures/rob_spkr_model/v2/tables/m11_s_table.png",
+  zoom = 3,
+  expand = 15
+)
+
+
+
+
 # we have been suggested to test a model with an offset lets see how it changes. 
 
 m12_s <- glmmTMB(
@@ -2222,6 +2357,192 @@ ggsave(
 )
 
 
+
+
+
+# moon marginal effects for both robomoth and speakr moon
+
+moon_predictions <- function(model, data, experiment_label) {
+  
+  moon_seq <- seq(
+    min(data$avg_moonlight_s, na.rm = TRUE),
+    max(data$avg_moonlight_s, na.rm = TRUE),
+    length.out = 100
+  )
+  
+  new_data <- tidyr::crossing(
+    avg_moonlight_s = moon_seq,
+    trmt_bin = c(-1, 1)
+  ) %>%
+    mutate(
+      jday_s = 0,
+      nit_avg_wspm_s_s = 0,
+      elev_max_s = 0,
+      yr_s = 0,
+      t_leps_s = 0,
+      site = data$site[which(!is.na(data$site))[1]],
+      sp   = data$sp[which(!is.na(data$sp))[1]]
+    )
+  
+  marginaleffects::predictions(
+    model,
+    newdata = new_data,
+    
+    # Obtain predictions and CIs on the linear-predictor scale
+    type = "link",
+    re.form = NA
+  ) %>%
+    
+    # Back-transform through the inverse log link
+    mutate(
+      estimate = exp(estimate),
+      conf.low = exp(conf.low),
+      conf.high = exp(conf.high),
+      
+      Treatment = factor(
+        trmt_bin,
+        levels = c(-1, 1),
+        labels = c("Dark", "Lit")
+      ),
+      
+      Experiment = experiment_label
+    ) %>%
+    
+    arrange(Treatment, avg_moonlight_s)
+}
+
+# pred for modesl
+
+pred_m11 <- moon_predictions(
+  model = m11,
+  data = rob_db,
+  experiment_label = "Moth decoys"
+)
+
+pred_m11_s <- moon_predictions(
+  model = m11_s,
+  data = spkr_db,
+  experiment_label = "Speaker lures"
+)
+
+
+pred_m11 <- moon_predictions(
+  model = m11,
+  data = rob_db,
+  experiment_label = "Moth decoys"
+)
+
+pred_m11_s <- moon_predictions(
+  model = m11_s,
+  data = spkr_db,
+  experiment_label = "Speaker lures"
+)
+
+
+
+bind_rows(pred_m11, pred_m11_s) %>%
+  summarise(
+    minimum_estimate = min(estimate),
+    minimum_lower_CI = min(conf.low),
+    maximum_upper_CI = max(conf.high)
+  )
+
+plot_moon_effect <- function(pred_data, panel_title, y_title = NULL) {
+  
+  ggplot(
+    pred_data,
+    aes(
+      x = avg_moonlight_s,
+      y = estimate,
+      color = Treatment,
+      fill = Treatment,
+      group = Treatment
+    )
+  ) +
+    geom_ribbon(
+      aes(
+        ymin = conf.low,
+        ymax = conf.high
+      ),
+      alpha = 0.20,
+      color = NA
+    ) +
+    geom_line(linewidth = 1.15) +
+    scale_color_manual(
+      values = c(
+        "Dark" = "grey20",
+        "Lit"  = "grey70"
+      )
+    ) +
+    scale_fill_manual(
+      values = c(
+        "Dark" = "grey20",
+        "Lit"  = "grey70"
+      )
+    ) +
+    scale_y_continuous(
+      trans = "log1p"
+    ) +
+    labs(
+      x = "Moonlight intensity (standardized)",
+      y = y_title,
+      title = panel_title,
+      color = "Treatment",
+      fill = "Treatment"
+    ) +
+    theme_minimal(base_size = 11) +
+    theme(
+      plot.title = element_text(face = "bold", size = 14),
+      legend.position = "bottom",
+      panel.grid.minor = element_blank()
+    )
+}
+
+
+p_moon_rob <- plot_moon_effect(
+  pred_m11,
+  panel_title = "A",
+  y_title = "Predicted number of faint bat passes"
+)
+
+p_moon_spkr <- plot_moon_effect(
+  pred_m11_s,
+  panel_title = "B",
+  y_title = NULL
+)
+
+p_moon_combined <-
+  p_moon_rob + p_moon_spkr +
+  plot_layout(guides = "collect") +
+  plot_annotation(
+    title = paste(
+      "Faint bat passes at moth decoys (A) and speaker lures (B)",
+      "by treatment and moonlight"
+    ),
+    subtitle = paste(
+      "Lines show population-level model predictions;",
+      "shaded areas show 95% confidence intervals"
+    )
+  ) &
+  theme(
+    legend.position = "bottom",
+    plot.title = element_text(face = "bold", size = 12),
+    plot.subtitle = element_text(size = 10)
+  )
+
+p_moon_combined
+
+
+ggsave(
+  plot = p_moon_combined,
+  filename = "figures/rob_spkr_model/v2/moon_effects_combined.tiff",
+  width = 8,
+  height = 4,
+  units = "in",
+  dpi = 600,
+  compression = "lzw", # this compression just works with tiff files. 
+  bg = "white"
+)
 
 
 # Old script  -------------------------------------------------------------

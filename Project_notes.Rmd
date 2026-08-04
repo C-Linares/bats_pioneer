@@ -1255,5 +1255,5 @@ next we need to rewrite the section for robomoth and speakers.\
 
 8/1/2026
 
-I am still fixing the robomoth and speaker section but we already started it. \
+I am still fixing the robomoth and speaker section but we already started it.\
 I migg need to plot the spkr and robomoth additional marginal effects plots. I will fix these sections and then that should be it for the results. I think I can send it for feedback about the results.
