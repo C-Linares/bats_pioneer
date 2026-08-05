@@ -336,17 +336,25 @@ anova( m1.2, m1.3,m1.4,m1.5,m1.6,m1.7)
 summary(m1.7)
 beep(sound = 4)
 
-gtsummary::tbl_regression(c(m1.7), exponentiate = TRUE, 
-                          label = list(
-                            trmt_bin = "Treatment (Lit vs Dark)",
-                            jday_s = "Julian Day (scaled)",
-                            # I(jday_s^2)= "Julian Day Squared (scaled)",
-                            avg_moonlight_s = "Average Moonlight (scaled)",
-                            nit_avg_temp_c_s = "Average Temperature (scaled)",
-                            nit_avg_wspm_s_s = "Average Wind Speed (scaled)",
-                            yr_s = "Year (scaled)",
-                            t_lepidoptera_s = "Lepidoptera Abundance (scaled)"
-                          )) 
+m1.7_table <- gtsummary::tbl_regression(
+  m1.7,
+  exponentiate = TRUE,
+  label = list(
+    trmt_bin ~ "Treatment (Lit vs Dark)",
+    jday_s ~ "Julian Day (scaled)",
+    `I(jday_s^2)` ~ "Julian Day Squared",
+    avg_moonlight_s ~ "Average Moonlight (scaled)",
+    nit_avg_temp_c_s ~ "Average Temperature (scaled)",
+    nit_avg_wspm_s_s ~ "Average Wind Speed (scaled)",
+    yr_s ~ "Year (scaled)",
+    t_lepidoptera_s ~ "Lepidoptera Abundance (scaled)",
+    `trmt_bin:jday_s` ~ "Treatment × Julian Day",
+    `trmt_bin:I(jday_s^2)` ~ "Treatment × Julian Day Squared",
+    `trmt_bin:avg_moonlight_s` ~ "Treatment × Moonlight"
+  )
+)
+
+m1.7_table
 
 #now we try the interaction with year
 

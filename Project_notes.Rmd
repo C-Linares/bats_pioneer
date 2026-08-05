@@ -1256,4 +1256,19 @@ next we need to rewrite the section for robomoth and speakers.\
 8/1/2026
 
 I am still fixing the robomoth and speaker section but we already started it.\
-I migg need to plot the spkr and robomoth additional marginal effects plots. I will fix these sections and then that should be it for the results. I think I can send it for feedback about the results.
+I migg need to plot the spkr and robomoth additional marginal effects plots. I will fix these sections and then that should be it for the results. I think I can send it for feedback about the results.\
+\
+
+------------------------------------------------------------------------
+
+8/3/2026\
+\
+I created several tables and graphs for the analysis across speakers sm3 buzz and sm3 activity. all this have complemented the manuscript result section and I feel it is ready for some discussion. However, it might need to be open for feed back before I discuss the results.\
+\
+
+------------------------------------------------------------------------
+
+8/4/2026\
+\
+Before sending it for feedback, I need to get work on the dbrda analysis and update it with the latest data sets. I am working on the dbrda \
+I updated the dbrda analysis and the graph for the manuscript. It is almost ready for feedback.

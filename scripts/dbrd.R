@@ -45,10 +45,10 @@ pacman::p_load(
 # data --------------------------------------------------------------------
 
 # bat data 
-bm<- read_csv("data_for_analysis/prep_for_glmm/bm.csv") %>% 
+bm<- read_csv("data_for_analysis/prep_for_glmm_v2/bm2.csv") %>% # we need to update this to the new data set. 
   clean_names()
 
-bat_combined<-read_csv("data_for_analysis/prep_for_glmm/bat_combined.csv")
+bat_combined<-read_csv("data_for_analysis/prep_for_glmm_v2/bat_combined.csv")
 
 #effort
 
@@ -60,9 +60,15 @@ effort_days <- bat_combined %>%
     eff.days = as.numeric(difftime(max(noche), min(noche), units = "days"))
   )
 
+# we update the effort to the one calculated with the actual files stored in harddrive. 
+
+effort_days<- read_csv("data_for_analysis/effort/effort_days.csv") %>% 
+  clean_names()
+
+
 total_effort <- effort_days %>%
   group_by(site) %>%
-  summarise(total_effort = sum(eff.days, na.rm = TRUE))
+  summarise(total_effort = sum(eff_days, na.rm = TRUE))
 
 
 # predictors --------------------------------------------------------------
@@ -89,6 +95,7 @@ litsites<-c("iron01","iron03","iron05","long01","long03")
 mlight$treatmt<-ifelse(mlight$site %in% litsites , "lit", "dark")
 
 head(mlight)
+
 # elevation
 
 elev<-read_csv('data_for_analysis/elev/elevation.csv', name_repair = "universal")
@@ -102,7 +109,7 @@ insect<-read_csv('data_for_analysis/insect_wranglin/ins_bm.csv', name_repair = "
 
 insect<-insect %>% 
   group_by(site) %>% 
-  summarise(t.leps= sum(t.lepidoptera))
+  summarise(t.leps= sum(t.leps))
 
 
 
@@ -115,8 +122,7 @@ insect<-insect %>%
 bat_comm <- bm %>%
   group_by(site, sp) %>%     # site = sampling unit, auto_id = species
   summarise(abundance = sum(n), .groups = "drop") %>%
-  pivot_wider(names_from = sp, values_from = abundance, values_fill = 0) %>% 
-  select(-c(NoID, Noise)) # remove Noise and NoID
+  pivot_wider(names_from = sp, values_from = abundance, values_fill = 0) 
 
 # Check matrix
 head(bat_comm)
@@ -277,6 +283,22 @@ effrot_tbl<- bm %>%
 
 effort_keep<-effrot_tbl %>%  filter (n_nights > 5) # we keep those nights site years with more than 5 nights sampled.
 
+effrot_tbl<- effort_days %>%
+  distinct(across(c(all_of(row_unit), noche))) %>% #unique night sampled
+  count(across(all_of(row_unit)), name = "n_nights") # count nights per row unitross)
+
+# prepare the effort table calculated with the files 
+effort_tbl <- effort_days %>%
+  transmute(
+    site,
+    yr = year, # change the year to yr
+    n_nights = eff_days # change the name of effort days to n_nights 
+  )
+
+# keep only more than five nights in this case is all because we they all have more than 5 days.  
+effort_keep <- effort_tbl %>%
+  filter(n_nights > 5)
+
 # species abundance per row unit
 
 comm_long<- bm %>% 
@@ -284,8 +306,8 @@ comm_long<- bm %>%
   group_by(across(c(all_of(row_unit), sp))) %>%
   summarise(n_tot= sum(n, na.rm= TRUE), .groups = "drop")
 
-#remove noise and noid
-comm_long<- comm_long %>% filter(!sp %in% c("Noise", "NoID")) # remove noise and noid
+#remove noise and noid, parhes, and mycal
+comm_long<- comm_long %>% filter(!sp %in% c("Noise", "NoID", "myocal", "parhes")) # remove noise and noid
 
 # standardize by effort
 
@@ -410,7 +432,7 @@ dbrda_light<- dbrda(comm_matrix_std ~ treatmt, pred_matrix_std, dist= "bray")
 # dbRDA has no information on species you we have to include it manually.
 sppscores(dbrda_full)<-wisconsin(bray_dist)
 
-anova.cca(dbrda_full,dbrda_light)
+anova.cca(dbrda_light, dbrda_full)
 
 # Test marginal (type III) effects of each predictor
 anova_marginal <- anova.cca(dbrda_full, by = "margin", permutations = 999)
@@ -424,6 +446,16 @@ anova.cca(dbrda_light, by = "margin") # marginal (type III) effects
 RsquareAdj(dbrda_full) # total variation explaned is r.quared 
 RsquareAdj(dbrda_light)
 
+# dbrda axis variance percentage explained 
+
+eig_constrained <- eigenvals(dbrda_full, model = "constrained")
+
+eig_constrained
+
+axis_percent_constrained <-
+  100 * eig_constrained / sum(eig_constrained)
+
+axis_percent_constrained
 
 # Variation partitioning
 # 1. Apply Hellinger transformation to community data
@@ -435,6 +467,15 @@ varpart_result <- varpart(comm_hell,
                           ~ t_leps,
                           ~ elev_mean,
                           data = pred_matrix)
+
+# then for plotting 
+
+axis1_pct <- round(axis_percent_constrained[1], 1)
+axis2_pct <- round(axis_percent_constrained[2], 1)
+
+axis1_pct
+axis2_pct
+
 
 # 3. Check the adjusted R² fractions
 varpart_result
@@ -482,10 +523,18 @@ site_scores_df<- site_scores_df %>% rownames_to_column(var = "ID")
 # join them 
 site_scores_df<- left_join(pred_matrix_std2, site_scores_df, by= "ID")
 
-# # change names of the variables to be able to plot the actual names. 
-# 
-# site_scores_df<- site_scores_df %>% 
-#   rename(light = mean_mwatts, elevation = elev_mean, leps = t_leps)
+# add species labels
+# load species names
+
+species_names<- read_csv(file = "data_for_analysis/Species_bats.csv") %>% 
+  clean_names()
+
+# make the codes small caps 
+species_names$four_letter_species_code <- tolower(species_names$four_letter_species_code )
+
+# take the first letter for the scientific name and the genus for make A.pallidus like labels
+
+
 
 # Plot
 p1<-ggplot() +
@@ -514,19 +563,22 @@ p1<-ggplot() +
                   max.overlaps = 30) +
   
   labs(title = "dbRDA of bat community",
-       x = "dbRDA1", y = "dbRDA2") +
+       x = paste0("dbRDA1 (", axis1_pct, "% of constrained variation)"),
+       y = paste0("dbRDA2 (", axis2_pct, "% of constrained variation)")) +
   scale_color_manual(values = c("dark" = "black", "lit" = "grey50"))+
   # scale_color_viridis_c(option = "inferno", end = 0.9) +  # nice continuous color scale
   theme_minimal(base_size = 14, base_family = "serif") +
   theme(legend.position = "right",
+        panel.grid = element_blank()
   )
+
 p1
 
 
 # this graph looks good but I want to understand why do I have a point all the way up. It seems like we have some outliers just from the visual inspection of the graph. 
 
 
-ggsave("figures/dbrd/dbRDA_v2.tiff",
+ggsave("figures/dbrd/dbRDA_v3.tiff",
        p1,
        dev = "tiff",
        dpi = 600,
@@ -537,6 +589,8 @@ ggsave("figures/dbrd/dbRDA_v2.tiff",
 species_scores_df %>%
   arrange(desc(abs(dbRDA1))) %>%
   head(10)
+
+
 
 # mvGLM -----------------------------------------------------------------
 
@@ -647,11 +701,27 @@ anova_species <- anova.manyglm(
 mv_tab_manual <- tibble::tibble(
   term = c("Treatment", "Lepidoptera", "Elevation"),
   Df = c(1, 1, 1),
-  Dev = c(85.38, 18.82, 41.66),
-  p_value = c(0.001, 0.251, 0.020)
+  Dev = c(70.54, 19.52, 35.44),
+  p_value = c(0.001, 0.128, 0.018)
 )
 
-flextable::flextable(mv_tab_manual)
+tab3<-flextable::flextable(mv_tab_manual) %>%
+  flextable::set_header_labels(
+    term = "Predictor",
+    Df = "Degrees of Freedom",
+    Dev = "Deviance",
+    p_value = "P-value"
+  ) %>%
+  flextable::theme_vanilla() %>%
+  flextable::bold(i = ~ p_value < 0.05, j = "p_value") %>%
+  flextable::autofit()
+
+library(flextable)
+save_as_image(
+  tab3,
+  path = "figures/dbrd/mvglm_multivariate_results.png"
+)
+
 # Extract univariate test table
 uni_table <- as.data.frame(anova_species$uni.test)
 
@@ -716,11 +786,49 @@ fitted_df <- as.data.frame(fitted_vals)
 fitted_df$site <- rownames(comm_matrix_counts)
 fitted_long <- pivot_longer(fitted_df, -site, names_to = "species", values_to = "fit")
 
-ggplot(fitted_long, aes(x = species, y = fit)) +
+ggplot(fitted_long, aes(x = species, y = fit)) + # this shows how predicted abundance vries across species. 
   geom_boxplot() +
   theme_minimal() +
-  labs(title = "Fitted bird abundances across species",
+  labs(title = "Fitted bat abundances across species",
        y = "Fitted abundance (calls)", x = "Species")
+
+
+# coefficients
+
+coef_fit <- coef(fit)
+
+str(coef_fit)
+coef_fit
+
+coef_df <- as.data.frame(t(coef(fit))) |>
+  tibble::rownames_to_column("species")
+
+coef_df
+
+
+p1.2<-ggplot(
+  coef_df,
+  aes(
+    x = treatmtlit,
+    y = reorder(species, treatmtlit)
+  )
+) +
+  geom_vline(xintercept = 0, linetype = 2) +
+  geom_point(size = 3) +
+  labs(
+    x = "Treatment coefficient (lit vs dark)",
+    y = "Species"
+  ) +
+  theme_classic()
+
+ggsave("figures/dbrd/mvGLM_species_coefficients.tiff", # this graph could complement the manuscript if requested im the future. 
+       p1.2,
+       dev = "tiff",
+       dpi = 600,
+       width = 10,
+       height = 8,
+       bg = "white",)
+
 
 # rank abundance curves ---------------------------------------------------
 
@@ -822,14 +930,15 @@ library(codyn)
 row_unit<-c("site", "yr")
 
 # 1) Effort (nights) per row unit --------------------------------------
-effort_tbl <- bm %>%
-  distinct(across(c(all_of(row_unit), noche))) %>%   # unique nights sampled
-  count(across(all_of(row_unit)), name = "n_nights")
-
-effort_keep <- effort_tbl %>% filter(n_nights >= 10) # we filter nights site,years that have more than 10 nights 
-range(effort_keep$n_nights) # check range of nights sampled per site-year)
-# most sites have plenty of data the range of number of night sampled is 28-78
-
+# we don't need this as we already have a effort keep and tbl from the previous analysis.
+# effort_tbl <- bm %>%
+#   distinct(across(c(all_of(row_unit), noche))) %>%   # unique nights sampled
+#   count(across(all_of(row_unit)), name = "n_nights")
+# 
+# effort_keep <- effort_tbl %>% filter(n_nights >= 10) # we filter nights site,years that have more than 10 nights 
+# range(effort_keep$n_nights) # check range of nights sampled per site-year)
+# # most sites have plenty of data the range of number of night sampled is 28-78
+# 
 
 # we use community long table 
 
@@ -907,13 +1016,20 @@ library(lmerTest)
 m_rich <- lmer(richness_change  ~ tmt * as.factor(yr2) + (1|site), data = rac_cambio)
 m_even <- lmer(evenness_change ~ tmt * as.factor(yr2) + (1|site), data = rac_cambio)
 m_rank <- lmer(rank_change ~ tmt * as.factor(yr2) + (1|site), data = rac_cambio)
-m_gain <- lmer(gains ~ tmt * as.factor(yr2) + (1|site), data = rac_cambio)
+m_gain <- lmer(gains ~ tmt * as.factor(yr2) + (1|site), data = rac_cambio) # this model is not working 
 m_loss <- lmer(losses ~ tmt * as.factor(yr2) + (1|site), data = rac_cambio)
 
 confidenceIntervals <- function(model) {
   confint(model, level = 0.95, method = "Wald")
 }
 
+
+# check gains to see why it didn't converge
+summary(rac_cambio$gains)
+
+table(rac_cambio$gains)
+
+xtabs(~ gains + yr2 + tmt, rac_cambio)
 
 confidenceIntervals(m_rich)
 
@@ -1114,7 +1230,7 @@ losses<-ggplot() +
 
 losses
 
-RAC<-rich + gains + losses 
+RAC<-rich + rank + losses 
 
 # Now I want to make the graph into a three panels with richness, gains, and losses. 
 # below there is the code to polish the graph above according to chatgpt
@@ -1126,7 +1242,8 @@ rac_cambio <- rac_cambio %>%
 pred_rich <- pred_rich %>% mutate(yr_f = factor(yr))
 pred_gain <- pred_gain %>% mutate(yr_f = factor(yr))
 pred_loss <- pred_loss %>% mutate(yr_f = factor(yr))
-
+pred_rank <- pred_rank %>%
+  mutate(yr_f = factor(yr))
 # --- 2) Shared palette + shared theme --------------------------------------
 year_cols <- c("2022" = "gray50", "2023" = "#1b9e77")
 
@@ -1169,27 +1286,27 @@ rich <- ggplot() +
   labs(x = NULL, y = "Change in Richness", title = "RAC: Richness") +
   theme_serif
 
-gains <- ggplot() +
+rank <- ggplot() +
   geom_point(
     data = rac_cambio,
-    aes(x = tmt, y = gains, color = yr2_f),
+    aes(x = tmt, y = rank_change, color = yr2_f),
     position = position_jitter(width = 0.1, height = 0, seed = 1),
     alpha = 0.35, size = 2
   ) +
   geom_errorbar(
-    data = pred_gain,
+    data = pred_rank,
     aes(x = tmt, ymin = conf.low, ymax = conf.high, color = yr_f),
     width = 0.08, linewidth = 1,
     position = position_dodge(width = 0.4)
   ) +
   geom_point(
-    data = pred_gain,
+    data = pred_rank,
     aes(x = tmt, y = predicted, color = yr_f),
     size = 3,
     position = position_dodge(width = 0.4)
   ) +
   scale_year +
-  labs(x = NULL, y = "Gains", title = "RAC: Gains") +
+  labs(x = NULL, y = "Rack", title = "RAC: Rank") +
   theme_serif
 
 losses <- ggplot() +
@@ -1216,13 +1333,42 @@ losses <- ggplot() +
   theme_serif
 
 # --- 4) Combine with ONE legend --------------------------------------------
-RAC <- (rich + gains + losses) +
+RAC <- (rich + rank + losses) +
   plot_layout(ncol = 3, guides = "collect") &
   theme(legend.position = "bottom",
         panel.grid = element_blank()   # removes all grid lines
   )  # applies after collecting
 
 RAC
+
+
+ggsave("figures/dbrd/RAC_change_2021_2023.tiff",
+       RAC,
+       dev = "tiff",
+       dpi = 600,
+       width = 12,
+       height = 9,
+       bg = "white",)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 # trash -------------------------------------------------------------------
 
