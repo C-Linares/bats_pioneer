@@ -1113,6 +1113,9 @@ nrow(bat_clean_v2) - nrow(bat_clean_v3)
 
 bat_clean_v3 # this files has acoustic, duplicates, and species vetted as much as possible. 
 
+# we might have to write bat_clean_v3 to analyze using the bat_delta_sunset.R script
+
+
 
 # count matrix ------------------------------------------------------------
 # # this is a matrix where we create a n column that tells us how many calls for each bat are there.
@@ -1903,7 +1906,7 @@ write.csv(bat_combined, file = 'data_for_analysis/prep_for_glmm_v2//bat_combined
 write.csv(bm2, file = 'data_for_analysis/prep_for_glmm_v2/bm2.csv', row.names = F) #daily counts
 write.csv(bm_miller, file = "data_for_analysis/prep_for_glmm_v2/bm_miller.csv") # miller Ai index data
 write.csv(sm3_buzz_v2, file = "data_for_analysis/prep_for_glmm_v2/sm3_buzz_v2.csv") # sm3_buzz counts by species  
-
+write.csv(bat_clean_v3, file = "data_for_analysis/prep_for_glmm_v2/bat_clean_v3.csv") # has bat data that has been cleaned needed for the bat_delta_sunset analysis 
 
 # Create a README file with information about the script
 readme_content <- "
@@ -1921,6 +1924,7 @@ bm_miller.csv - number of minutes of activity by day  for 2021-2023 data all sit
 
 sm3_buzz_v2.csv - sm3_buzz counts by species summarized by date and species. (7/30/2026)
 
+bat_clean_v3.csv - bat data that has been cleaned and flagged for species not likely to be found in the study area. This is needed for the bat_delta_sunset analysis. (8/05/2026)
 "
 # Write the README content to a file
 writeLines(readme_content, "data_for_analysis/prep_for_glmm_v2/README.txt")

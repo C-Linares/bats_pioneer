@@ -1270,5 +1270,15 @@ I created several tables and graphs for the analysis across speakers sm3 buzz an
 
 8/4/2026\
 \
-Before sending it for feedback, I need to get work on the dbrda analysis and update it with the latest data sets. I am working on the dbrda \
-I updated the dbrda analysis and the graph for the manuscript. It is almost ready for feedback.
+Before sending it for feedback, I need to get work on the dbrda analysis and update it with the latest data sets. I am working on the dbrda\
+I updated the dbrda analysis and the graph for the manuscript. It is almost ready for feedback.\
+\
+
+------------------------------------------------------------------------
+
+8/05/2026
+
+I am updating the bat_delta_sunset.R script and I had to write the bat_clean_v3 from the prep for glmm_v2 script to use as the data analysis table as it is a cleaner and updated version of the bat_combined previously used in the delta script. \
+the script works but I feel I need to polish the graph. I might include the overlap result next to each name.
+
+![](images/clipboard-2628932383.png)
