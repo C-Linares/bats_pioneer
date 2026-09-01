@@ -1278,7 +1278,28 @@ I updated the dbrda analysis and the graph for the manuscript. It is almost read
 
 8/05/2026
 
-I am updating the bat_delta_sunset.R script and I had to write the bat_clean_v3 from the prep for glmm_v2 script to use as the data analysis table as it is a cleaner and updated version of the bat_combined previously used in the delta script. \
+I am updating the bat_delta_sunset.R script and I had to write the bat_clean_v3 from the prep for glmm_v2 script to use as the data analysis table as it is a cleaner and updated version of the bat_combined previously used in the delta script.\
 the script works but I feel I need to polish the graph. I might include the overlap result next to each name.
 
 ![](images/clipboard-2628932383.png)
+
+------------------------------------------------------------------------
+
+8/27/2026
+
+I am trying to update the analysis for the speaker and robomoth data. Now we need to filter calls according to their amplitude.\
+![](images/clipboard-2653759936.png)
+
+In the past I was reading everything to the left of -20 db. I was calling them faint calls. Supervisor suggest to analyze everything to the right of -40 dBfs. In other words we want the calls that are the loudest. Another thing that needs to be modified is some kind of division. We need to get the total calls of bats in a site from the sm3 and then divide the number of bat calls at speakers and robomoths by that day's total. He calls this controlling for abundance.
+
+------------------------------------------------------------------------
+
+8/28/2026
+
+I am controlling for abundance for the robomoth and spkr data. I loaded the sm3 data and I will figure out how to divide them.\
+
+------------------------------------------------------------------------
+
+8/31/2026
+
+I decided to do the offset using the sm3 data as background and offset. I have updated the rob_db and the spkr_db dataset. \
