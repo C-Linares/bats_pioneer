@@ -1302,4 +1302,11 @@ I am controlling for abundance for the robomoth and spkr data. I loaded the sm3 
 
 8/31/2026
 
-I decided to do the offset using the sm3 data as background and offset. I have updated the rob_db and the spkr_db dataset. \
+I decided to do the offset using the sm3 data as background and offset. I have updated the rob_db and the spkr_db dataset.
+
+------------------------------------------------------------------------
+
+9/01/2026
+
+I modified the models for spekr and robomoth. these are almost ready to build a table of uncertainty and marginal effects plots. \
+\

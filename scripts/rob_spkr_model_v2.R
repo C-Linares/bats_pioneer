@@ -5,17 +5,18 @@
 # =======================================================================
 
 # Description:
-# this script helps analyze the data I created with the robomoth_build_v2.R and the rob_spkr_prepr_v2.R scripts
-# now we filter calls using an amplitude threshold and analyze passes and not feeding buzzes. 
+# this script helps analyze the data I created with the robomoth_build_v2.R and the updated version of  rob_spkr_prepr_v.R scripts
+# now we filter calls using an amplitude threshold and analyze passes and not feeding buzzes. And we have filtered calls >= -20 dBfs
 
 # Author: Carlos Linares
 # Date:   2026-03-3
 # Contact: carlosgarcialina@u.boisestate.edu
+# version : v3 updated for the models using the v3 version of databases. 
 
 # =======================================================================
 # Inputs:
-# - robomoth data 'data_for_analysis/rob_spkr_prep/rob_db_v2.csv' 
-# - speakr data 'data_for_analysis/rob_spkr_prep/spkr_db_v2.csv'
+# - robomoth data 'data_for_analysis/rob_spkr_prep/rob_db_v3.csv' 
+# - speakr data 'data_for_analysis/rob_spkr_prep/spkr_db_v3.csv'
 
 #  Outputs:
 # - Marginal effects plots for the robomoth and speaker data showing the effect of light on bat calls/passes under an amplitude threshold. 
@@ -63,11 +64,12 @@ calculate_c_hat <- function(model) {
 
 # load data 
 
-rob_db <- fread('data_for_analysis/rob_spkr_prep/rob_db_v2.csv') %>% 
+rob_db <- fread('data_for_analysis/rob_spkr_prep_v3/rob_db_v3.csv') %>% 
   clean_names()
 
 
-spkr_db <- fread('data_for_analysis/rob_spkr_prep/spkr_db_v2.csv') %>% # spkr needs to be resaved because is missing the .csv and might not be read correctly. 
+
+spkr_db <- fread('data_for_analysis/rob_spkr_prep_v3/spkr_db_v3.csv') %>% 
   clean_names()
 
 glimpse(rob_db)
@@ -108,7 +110,7 @@ DHARMa::simulateResiduals(m0, n = 1000, plot = TRUE)
 
 
 
-# given the c_hat is big 80.025 it indicates overdisperssion. let's try negative binomial. 
+# given the c_hat is big 40.025 it indicates overdissperssion. let's try negative binomial. 
 
 m1 <- glmmTMB(
   n_calls ~ trmt_bin + (1 | site),
@@ -167,7 +169,7 @@ check_singularity(m3)
 m3$sdr$pdHess
 m3$fit$message
 check_zeroinflation(m3)
-calculate_c_hat(m3)  # indicates the is overdispersion we need to try negative binomial.  
+calculate_c_hat(m3)    
 performance_mae(m3)
 performance::r2(m3)
 DHARMa::simulateResiduals(m3, n = 1000, plot = TRUE)
@@ -187,13 +189,15 @@ check_singularity(m4)
 m4$sdr$pdHess
 m4$fit$message
 check_zeroinflation(m4)
-calculate_c_hat(m4)  # indicates the is overdispersion we need to try negative binomial.  
+calculate_c_hat(m4)    
 performance_mae(m4)
 performance::r2(m4)
 DHARMa::simulateResiduals(m4, n = 1000, plot = TRUE)
 summary(m4)
 
 anova(m0, m1, m2, m3, m4)
+
+# m4 does not seem to improve significantly when adding insects. compared to m3 
 
 
 # Phase 5 interactions aleps and treatment 
@@ -220,6 +224,7 @@ summary(m5)
 
 anova(m0, m1, m2, m3, m4, m5)
 
+# m5 does improve significantly compared to m3,4
 
 # Phase 6 lets add random slopes by species
 
@@ -244,37 +249,41 @@ summary(m6)
 
 anova(m0, m1, m2, m3, m4, m5, m6)
 
+#m6 does improve the model fit. 
 
-# phase 7 lets add random slopes by species and site
-m7 <- glmmTMB(
-  n_calls ~ trmt_bin + jday_s + I(jday_s^2) + nit_avg_wspm_s_s  + avg_moonlight_s + elev_max_s + yr_s
-    + t_leps_s +
-    (1 | site)+ (1 + trmt_bin | sp) +
-    #interactions
-    trmt_bin*t_leps_s,
+# phase 7 lets add random slopes by species and treatment. but this time we add the offset for background calls. 
+
+m7_bg <- glmmTMB(
+  n_calls ~ trmt_bin + jday_s + I(jday_s^2) +
+    nit_avg_wspm_s_s + avg_moonlight_s + elev_max_s +
+    yr_s + t_leps_s +
+    offset(log_background_offset) +
+    (1 | site) +
+    (1 + trmt_bin | sp) +
+    trmt_bin * t_leps_s,
   family = nbinom2,
   data = rob_db
 )
 
 
-check_singularity(m7)
-m7$sdr$pdHess
-m7$fit$message
-check_zeroinflation(m7)
-calculate_c_hat(m7)   
-performance_mae(m7)
-performance::r2(m7)
-DHARMa::simulateResiduals(m7, n = 1000, plot = TRUE)
-performance::check_collinearity(m7)
-summary(m7)
+check_singularity(m7_bg)
+m7_bg$sdr$pdHess
+m7_bg$fit$message
+check_zeroinflation(m7_bg)
+calculate_c_hat(m7_bg)   
+performance_mae(m7_bg)
+performance::r2(m7_bg)
+DHARMa::simulateResiduals(m7_bg, n = 1000, plot = TRUE)
+performance::check_collinearity(m7_bg)
+summary(m7_bg)
 
 
-anova(m0, m1, m2, m3, m4, m5, m6, m7)
+anova(m0, m1, m2, m3, m4, m5, m6, m7_bg)
 
 
-# seasonality inside the random slope 
+# seasonality inside the random slope
 # the model breaks if we add seasonality inside the random slopes this.
-# 
+
 # m8<- glmmTMB(
 #   n_calls ~ trmt_bin + jday_s + I(jday_s^2) + nit_avg_wspm_s_s + nit_avg_temp_c_s + avg_moonlight_s + elev_max_s + yr_s +
 #     + t_leps_s +
@@ -284,6 +293,7 @@ anova(m0, m1, m2, m3, m4, m5, m6, m7)
 #   family = nbinom2,
 #   data = rob_db
 # )
+# 
 # # #
 # check_singularity(m8)
 # m8$sdr$pdHess
@@ -299,14 +309,18 @@ anova(m0, m1, m2, m3, m4, m5, m6, m7)
 # 
 # anova(m0, m1, m2, m3, m4, m5, m6, m7, m8)
 
-# let's check what happens if we check for interaction between treatment and seasonality. It seems model 9 is not better than m8 and m7
+# let's check what happens if we check for interaction between treatment and seasonality. It seems model 9 is not better than m7
 
-m9 <- glmmTMB(
-  n_calls ~ trmt_bin + jday_s + I(jday_s^2) + nit_avg_wspm_s_s  + avg_moonlight_s + elev_max_s + yr_s +
-    + t_leps_s +
-    (1 | site)+ (1 + trmt_bin | sp) +
-    #interactions
-    trmt_bin*t_leps_s + trmt_bin*jday_s + trmt_bin*I(jday_s^2),
+m9_bg <- glmmTMB(
+  n_calls ~ trmt_bin + jday_s + I(jday_s^2) +
+    nit_avg_wspm_s_s + avg_moonlight_s + elev_max_s +
+    yr_s + t_leps_s +
+    offset(log_background_offset) +
+    (1 | site) +
+    (1 + trmt_bin | sp) +
+    trmt_bin * t_leps_s +
+    trmt_bin * jday_s +
+    trmt_bin * I(jday_s^2),
   family = nbinom2,
   data = rob_db
 )
@@ -324,127 +338,190 @@ performance::check_collinearity(m9)
 summary(m9)
 
 
-anova( m1, m2, m3, m4, m5, m6, m7, m9)
 
-#now we add the moon interaction with treatment 
+anova( m7_bg, m9_bg)
 
-m10<- glmmTMB(
-  n_calls ~ trmt_bin + jday_s + I(jday_s^2) + nit_avg_wspm_s_s  + avg_moonlight_s + elev_max_s + yr_s +
-    + t_leps_s +
-    (1 | site)+ (1 + trmt_bin | sp) +
-    #interactions
-    trmt_bin*t_leps_s + trmt_bin*jday_s + trmt_bin*I(jday_s^2) + trmt_bin*avg_moonlight_s,
-  family = nbinom2,
-  data = rob_db
-) 
-
-check_singularity(m10)
-m10$sdr$pdHess
-m10$fit$message
-check_zeroinflation(m10)
-calculate_c_hat(m10)   
-performance_mae(m10)
-performance::r2(m10)
-DHARMa::simulateResiduals(m10, n = 1000, plot = TRUE)
-performance::check_collinearity(m10)
-summary(m10)
+# m9 is not better and than m7 
 
 
-anova( m1, m2, m3, m4, m5, m6, m7, m9, m10)
+#now we add the moon interaction with treatment. but we remove the seasonality interaction as it does not improve the model. 
 
-# now we remove lepidopter and treatment interaction becasuse it is not significant, it increases collinearity and is not really central to the question. 
-# 
-
-m11 <- glmmTMB(
-  n_calls ~ trmt_bin + jday_s + I(jday_s^2) + nit_avg_wspm_s_s   + avg_moonlight_s + elev_max_s + yr_s   + t_leps_s +
-    (1 | site) + (1 + trmt_bin | sp) +
-    #interactions
-    trmt_bin * jday_s + trmt_bin * I(jday_s^2) + trmt_bin * avg_moonlight_s,
-  family = nbinom2,
-  data = rob_db
-)
-
-
-check_singularity(m11)
-m11$sdr$pdHess
-m11$fit$message
-check_zeroinflation(m11)
-calculate_c_hat(m11)   
-performance_mae(m11)
-range(rob_db$c_buzz)
-performance::r2(m11)
-DHARMa::simulateResiduals(m11, n = 1000, plot = TRUE)
-performance::check_collinearity(m11)
-summary(m11)
-anova( m1, m2, m3, m4, m5, m6, m7, m9, m10, m11) # after testing AIC shos m10 is could be better candidate but If I want to keep it simple and focus only in the answer. then the model m11 works as well
-
-
-m11_table <- tbl_regression(
-  m11,
-  exponentiate = FALSE
-)
-
-m11_table <- gtsummary::tbl_regression(
-  m11,
-  exponentiate = TRUE,
-  label = list(
-    trmt_bin ~ "Treatment (Lit vs Dark)",
-    jday_s ~ "Julian Day (scaled)",
-    `I(jday_s^2)` ~ "Julian Day Squared",
-    avg_moonlight_s ~ "Average Moonlight (scaled)",
-    nit_avg_wspm_s_s ~ "Average Wind Speed (scaled)",
-    yr_s ~ "Year (scaled)",
-    `trmt_bin:jday_s` ~ "Treatment × Julian Day",
-    `trmt_bin:I(jday_s^2)` ~ "Treatment × Julian Day Squared",
-    `trmt_bin:avg_moonlight_s` ~ "Treatment × Moonlight"
-  )
-)
-
-m11_table
-
-m11_flex <- gtsummary::as_flex_table(m11_table) %>%
-  flextable::theme_booktabs() %>%
-  flextable::font(fontname = "Times New Roman", part = "all") %>%
-  flextable::fontsize(size = 10, part = "all") %>%
-  flextable::bold(part = "header") %>%
-  flextable::autofit()
-
-save_as_docx(
-  "m11_table" = m11_flex,
-  path = "figures/rob_spkr_model/v2/tables/m11_table.docx")
-
-
-save_as_image(m11_flex, path = "figures/rob_spkr_model/v2/tables/m11_table.png")
-
-
-# we have been suggested to test a model with an offset lets see how it changes. 
-
-m12 <- glmmTMB(
+m10_bg <- glmmTMB(
   n_calls ~ trmt_bin + jday_s + I(jday_s^2) +
     nit_avg_wspm_s_s + avg_moonlight_s + elev_max_s +
     yr_s + t_leps_s +
     offset(log(effort_hours)) +
+    offset(log_background_offset) +
     (1 | site) +
     (1 + trmt_bin | sp) +
-    trmt_bin * jday_s +
-    trmt_bin * I(jday_s^2) +
+    trmt_bin * t_leps_s +
     trmt_bin * avg_moonlight_s,
   family = nbinom2,
   data = rob_db
 )
 
-check_singularity(m12)
-m12$sdr$pdHess
-m12$fit$message
-check_zeroinflation(m12)
-calculate_c_hat(m12)   
-performance_mae(m12)
-performance::r2(m12)
-DHARMa::simulateResiduals(m12, n = 1000, plot = TRUE)
-performance::check_collinearity(m12)
-summary(m12)
-anova( m10, m11, m12)
+check_singularity(m10_bg)
+m10_bg$sdr$pdHess
+m10_bg$fit$message
+check_zeroinflation(m10_bg)
+calculate_c_hat(m10_bg)
+performance_mae(m10_bg)
+performance::r2(m10_bg)
+DHARMa::simulateResiduals(m10_bg, n = 1000, plot = TRUE)
+performance::check_collinearity(m10_bg)
+summary(m10_bg)
 
+
+
+anova( m7_bg, m9_bg, m10_bg)
+
+
+# now we check the model with the conservative data where we just keep data that has n_background > 0 indicating those where we have some background calls from sm3 and for those effort hours > 0 as well. 
+
+rob_db_offset_conservative <- rob_db %>%
+  filter(
+    effort_hours > 0,
+    n_background > 0,
+    !is.na(n_calls),
+    !is.na(trmt_bin),
+    !is.na(jday_s),
+    !is.na(nit_avg_wspm_s_s),
+    !is.na(avg_moonlight_s),
+    !is.na(elev_max_s),
+    !is.na(yr_s),
+    !is.na(t_leps_s),
+    !is.na(site),
+    !is.na(sp)
+  )
+
+
+# we run the same model as m10_bg but with the conservative data 
+
+m10_bg_conservative <- update(
+  m10_bg,
+  data = rob_db_offset_conservative
+)
+
+check_singularity(m10_bg_conservative)
+m10_bg_conservative$sdr$pdHess
+m10_bg_conservative$fit$message
+check_zeroinflation(m10_bg_conservative)
+calculate_c_hat(m10_bg_conservative)
+performance_mae(m10_bg_conservative)
+performance::r2(m10_bg_conservative)
+DHARMa::simulateResiduals(m10_bg_conservative, n = 1000, plot = TRUE)
+performance::check_collinearity(m10_bg_conservative)
+
+
+summary(m10_bg_conservative)
+
+
+
+
+# it seems like the best model is m10_bg even when compared with the conservative model m10_bg_conservative. i might need to do a table for this one instead. 
+
+# in the past models leps interaction with treatment was not significant but now it is. I won't use m11 because it removes the interaction. 
+
+
+# m11 <- glmmTMB(
+#   n_calls ~ trmt_bin + jday_s + I(jday_s^2) + nit_avg_wspm_s_s   + avg_moonlight_s + elev_max_s + yr_s   + t_leps_s +
+#     (1 | site) + (1 + trmt_bin | sp) +
+#     #interactions
+#     trmt_bin * jday_s + trmt_bin * I(jday_s^2) + trmt_bin * avg_moonlight_s,
+#   family = nbinom2,
+#   data = rob_db
+# )
+
+# 
+# check_singularity(m11)
+# m11$sdr$pdHess
+# m11$fit$message
+# check_zeroinflation(m11)
+# calculate_c_hat(m11)   
+# performance_mae(m11)
+# range(rob_db$c_buzz)
+# performance::r2(m11)
+# DHARMa::simulateResiduals(m11, n = 1000, plot = TRUE)
+# performance::check_collinearity(m11)
+# summary(m11)
+# anova( m1, m2, m3, m4, m5, m6, m7, m9, m10, m11) # after testing AIC shos m10 is could be better candidate but If I want to keep it simple and focus only in the answer. then the model m11 works as well
+
+
+m10_table <- tbl_regression(
+  m10_bg,
+  exponentiate = FALSE
+)
+
+m10_table <- gtsummary::tbl_regression(
+  m10_bg,
+  exponentiate = TRUE,
+  label = list(
+    trmt_bin ~ "Treatment (Lit vs Dark)",
+    jday_s ~ "Julian Day ",
+    `I(jday_s^2)` ~ "Julian Day Squared",
+    avg_moonlight_s ~ "Average Moonlight ",
+    elev_max_s  ~ "Maximum Elevation",
+    nit_avg_wspm_s_s ~ "Nigt Average Wind Speed",
+    t_leps_s ~ "Total Lepidoptera",
+    yr_s ~ "Year",
+    `trmt_bin:avg_moonlight_s` ~ "Treatment × Moonlight"
+  )
+)
+
+m10_table
+
+m10_flex <- gtsummary::as_flex_table(m10_table) %>%
+  flextable::theme_booktabs() %>%
+  flextable::font(fontname = "Times New Roman", part = "all") %>%
+  flextable::fontsize(size = 14, part = "all") %>%
+  flextable::bold(part = "header") %>%
+  flextable::autofit() %>% 
+  # bold sig values
+  flextable::bold(
+    i = ~ p.value < 0.05,
+    j = "p.value",
+    bold = TRUE,
+    part = "body"
+  )
+
+m10_flex
+
+save_as_docx(
+  "m10_bg_table" = m10_flex,
+  path = "figures/rob_spkr_model/v3/tables/m10_bg_table.docx")
+
+
+save_as_image(m10_flex, path = "figures/rob_spkr_model/v3/tables/m10_bg_table.png")
+
+
+# # currently the best model seems to be m10. but we still have to add the offset. 
+# 
+# m12 <- glmmTMB(
+#   n_calls ~ trmt_bin + jday_s + I(jday_s^2) +
+#     nit_avg_wspm_s_s + avg_moonlight_s + elev_max_s +
+#     yr_s + t_leps_s +
+#     offset(log(effort_hours)) +
+#     (1 | site) +
+#     (1 + trmt_bin | sp) +
+#     trmt_bin * jday_s +
+#     trmt_bin * I(jday_s^2) +
+#     trmt_bin * avg_moonlight_s,
+#   family = nbinom2,
+#   data = rob_db
+# )
+# 
+# check_singularity(m12)
+# m12$sdr$pdHess
+# m12$fit$message
+# check_zeroinflation(m12)
+# calculate_c_hat(m12)   
+# performance_mae(m12)
+# performance::r2(m12)
+# DHARMa::simulateResiduals(m12, n = 1000, plot = TRUE)
+# performance::check_collinearity(m12)
+# summary(m12)
+# anova( m10, m11, m12)
+# 
 
 ####################################
 ####################################
@@ -466,6 +543,26 @@ rob_species <- rob_db %>%
   arrange(sp) %>%
   pull(sp)
 
+# typical offsevalue
+
+typical_log_background<- median(
+  rob_db$log_background_offset,
+  na.rm = TRUE
+)
+
+typical_background<- exp(typical_log_background)
+
+typical_background
+
+
+# typical effort hours 
+typical_effort_hours <- median(
+  rob_db$effort_hours,
+  na.rm = TRUE
+)
+
+typical_effort_hours
+
 # -------------------------------------------------------------------------
 # Species-specific prediction grid
 # -------------------------------------------------------------------------
@@ -481,7 +578,13 @@ pred_grid_species <- tidyr::expand_grid(
     avg_moonlight_s = 0,
     elev_max_s = 0,
     yr_s = 0,
-    t_leps_s = 0
+    t_leps_s = 0,
+    
+    # required ofsset 
+    
+    log_background_offset = typical_log_background, # is around 6
+    # Required because the new model includes offset(log(effort_hours))
+    effort_hours = typical_effort_hours
   )
 
 is.factor(rob_db$site)
@@ -492,7 +595,7 @@ is.factor(rob_db$sp)
 # -------------------------------------------------------------------------
 
 pred_species <- predictions(
-  m11,
+  m10_bg,
   newdata = pred_grid_species,
   type = "response",
   re.form = NULL,
@@ -512,7 +615,7 @@ pred_species <- predictions(
 # -------------------------------------------------------------------------
 
 pred_community <- avg_predictions(
-  m11,
+  m10_bg,
   newdata = pred_grid_species,
   by = "trmt_bin",
   type = "response",
@@ -602,19 +705,25 @@ rob_trt_grid <- tidyr::expand_grid(
 ) %>%
   mutate(
     site = NA,
-    jday_s = mean(rob_db$jday_s, na.rm = TRUE),
-    nit_avg_wspm_s_s = mean(rob_db$nit_avg_wspm_s_s, na.rm = TRUE),
-    avg_moonlight_s = mean(rob_db$avg_moonlight_s, na.rm = TRUE),
-    elev_max_s = mean(rob_db$elev_max_s, na.rm = TRUE),
-    yr_s = mean(rob_db$yr_s, na.rm = TRUE),
-    t_leps_s = mean(rob_db$t_leps_s, na.rm = TRUE)
+    # Mean scaled covariate values
+    jday_s = 0,
+    nit_avg_wspm_s_s = 0,
+    avg_moonlight_s = 0,
+    elev_max_s = 0,
+    yr_s = 0,
+    t_leps_s = 0,
+    
+    # Required offset value
+    log_background_offset = typical_log_background,
+    # Required because the new model includes offset(log(effort_hours))
+    effort_hours = typical_effort_hours
   )
 
 
 
 # Species-specific lit/dark ratios
 rob_species_ratio <- avg_comparisons(
-  m11,
+  m10_bg,
   newdata = rob_trt_grid,
   variables = list(trmt_bin = c(-1, 1)),
   comparison = "ratio",
@@ -656,18 +765,28 @@ rob_species_ratio_clean <- rob_species_ratio %>%
 
 rob_species_ratio_clean
 
-ts4<-flextable(rob_species_ratio_clean) %>%
+ts4 <- flextable(rob_species_ratio_clean) %>%
+  theme_booktabs() %>%
+  font(fontname = "Times New Roman", part = "all") %>%
+  fontsize(size = 10, part = "all") %>%
+  bold(part = "header") %>%
+  bold(
+    i = ~ supported_response != "Uncertain",
+    bold = TRUE,
+    part = "body"
+  ) %>%
   autofit() %>%
   set_caption(
-    ""
+    "Table S4. Species-specific lit/dark ratios for faint robomoth passes from the abundance-offset robomoth model."
   )
 
+ts4
 
 save_as_docx(
   "table.s4" = ts4,
-  path = "figures/rob_spkr_model/v2/tables/ts4_robomoth.docx")
+  path = "figures/rob_spkr_model/v3/tables/ts4_robomoth.docx")
 
-save_as_image(ts4, path = "figures/rob_spkr_model/v2/tables/ts4robomoth.png")
+save_as_image(ts4, path = "figures/rob_spkr_model/v3/tables/ts4_robomoth.png")
 
 
 
@@ -712,12 +831,16 @@ pred_grid_jday <- tidyr::expand_grid(
     avg_moonlight_s = 0,
     elev_max_s = 0,
     yr_s = 0,
-    t_leps_s = 0
+    t_leps_s = 0,
+    # Required offset value
+    log_background_offset = typical_log_background,
+    # Required because the new model includes offset(log(effort_hours))
+    effort_hours = typical_effort_hours
   )
 
 
 pred_jday_comm <- avg_predictions(
-  m11,
+  m10_bg,
   newdata = pred_grid_jday,
   by = c("jday", "jday_s", "trmt_bin"),
   type = "response",
@@ -746,10 +869,10 @@ p_jday_comm <- ggplot(
   scale_color_manual(values = trt_cols) +
   scale_fill_manual(values = trt_cols) +
   labs(
-    title = "Seasonal pattern of faint robomoth bat passes by treatment",
-    subtitle = "Predictions from m11; non-focal covariates held at mean scaled values",
+    title = "Seasonal pattern of robomoth bat passes (>= -40 dBfs) by treatment",
+    subtitle = "Predictions from m10_bg; non-focal covariates held at mean scaled values",
     x = "Julian day",
-    y = "Predicted number of faint bat passes",
+    y = "Predicted number of bat passes",
     color = "Treatment",
     fill = "Treatment"
   ) +
@@ -857,7 +980,11 @@ pred_grid_year <- tidyr::expand_grid(
     nit_avg_wspm_s_s = 0,
     avg_moonlight_s = 0,
     elev_max_s = 0,
-    t_leps_s = 0
+    t_leps_s = 0,
+    # Required offset value
+    log_background_offset = typical_log_background,
+    # Required because the new model includes offset(log(effort_hours))
+    effort_hours = typical_effort_hours
   )
 
 
@@ -866,7 +993,7 @@ pred_grid_year <- tidyr::expand_grid(
 # -------------------------------------------------------------------------
 
 pred_year_trt <- avg_predictions(
-  m11,
+  m10_bg,
   newdata = pred_grid_year,
   by = c("year", "trmt_bin"),
   type = "response",
@@ -924,7 +1051,7 @@ p_year_trt
 # -------------------------------------------------------------------------
 
 pred_year_comm <- avg_predictions(
-  m11,
+  m10_bg,
   newdata = pred_grid_year,
   by = "year",
   type = "response",
@@ -964,6 +1091,7 @@ p_year_comm
 
 
 
+
 # moon robmoth marginal  --------------------------------------------------
 
 
@@ -999,13 +1127,15 @@ pred_grid_moon <- tidyr::expand_grid(
     nit_avg_wspm_s_s = 0,
     elev_max_s = 0,
     yr_s = 0,
-    t_leps_s = 0
+    t_leps_s = 0,
+    effort_hours = typical_effort_hours,
+    log_background_offset = typical_log_background
   )
 
 
 
 pred_moon_comm <- avg_predictions(
-  m11,
+  m10_bg,
   newdata = pred_grid_moon,
   by = c("avg_moonlight_s", "trmt_bin"),
   type = "response",
@@ -1035,7 +1165,7 @@ p_moon_comm <- ggplot(
   scale_fill_manual(values = trt_cols) +
   labs(
     title = "Moonlight modifies the effect of artificial light on faint robomoth passes",
-    subtitle = "Predictions from m11; non-focal covariates held at mean scaled values",
+    subtitle = "Predictions from m10_bg; non-focal covariates held at mean scaled values",
     x = "Moonlight intensity (scaled)",
     y = "Predicted number of faint bat passes",
     color = "Treatment",
@@ -1086,11 +1216,14 @@ pred_grid_moon_levels <- tidyr::expand_grid(
     nit_avg_wspm_s_s = 0,
     elev_max_s = 0,
     yr_s = 0,
-    t_leps_s = 0
+    t_leps_s = 0,
+    effort_hours = typical_effort_hours,
+    log_background_offset = typical_log_background
+    
   )
 
 pred_moon_levels <- avg_predictions(
-  m11,
+  m10_bg,
   newdata = pred_grid_moon_levels,
   by = c("moon_level", "avg_moonlight_s", "trmt_bin"),
   type = "response",
@@ -1139,8 +1272,86 @@ p_moon_levels <- ggplot(
 
 p_moon_levels
 
+# lepidoptera marginal effect. 
 
 
+# Sequence of observed Lepidoptera values on the scaled scale
+leps_seq <- seq(
+  min(rob_db$t_leps_s, na.rm = TRUE),
+  max(rob_db$t_leps_s, na.rm = TRUE),
+  length.out = 100
+)
+
+# Prediction grid
+pred_grid_leps <- tidyr::expand_grid(
+  t_leps_s = leps_seq,
+  trmt_bin = c(-1, 1),
+  sp = rob_species
+) %>%
+  mutate(
+    site = NA,
+    jday_s = 0,
+    nit_avg_wspm_s_s = 0,
+    avg_moonlight_s = 0,
+    elev_max_s = 0,
+    yr_s = 0,
+    
+    # Required offsets
+    effort_hours = typical_effort_hours,
+    log_background_offset = typical_log_background
+  )
+
+# Community-average predictions across species
+pred_leps_comm <- avg_predictions(
+  m10_bg,
+  newdata = pred_grid_leps,
+  by = c("t_leps_s", "trmt_bin"),
+  type = "response",
+  re.form = NULL,
+  allow.new.levels = TRUE
+) %>%
+  as_tibble() %>%
+  mutate(
+    treatment = factor(
+      if_else(trmt_bin == -1, "Dark", "Lit"),
+      levels = c("Dark", "Lit")
+    )
+  )
+
+# Plot
+p_leps_comm <- ggplot(
+  pred_leps_comm,
+  aes(x = t_leps_s, y = estimate, color = treatment, fill = treatment)
+) +
+  geom_ribbon(
+    aes(ymin = conf.low, ymax = conf.high),
+    alpha = 0.20,
+    color = NA
+  ) +
+  geom_line(linewidth = 1.2) +
+  scale_color_manual(values = trt_cols) +
+  scale_fill_manual(values = trt_cols) +
+  labs(
+    title = "Lepidoptera abundance modifies the effect of artificial light on faint robomoth passes",
+    subtitle = paste0(
+      "Predictions from m10_bg; non-focal covariates held at mean scaled values; ",
+      "effort held at ", round(typical_effort_hours, 2), " h; ",
+      "background activity held at ", round(typical_background, 1), " calls"
+    ),
+    x = "Total Lepidoptera abundance (scaled)",
+    y = "Predicted number of faint robomoth passes",
+    color = "Treatment",
+    fill = "Treatment"
+  ) +
+  theme_minimal(base_size = 15) +
+  theme(
+    legend.position = "bottom",
+    panel.grid.minor = element_blank(),
+    plot.title = element_text(face = "bold"),
+    plot.subtitle = element_text(size = 12)
+  )
+
+p_leps_comm
 
 
 
@@ -1168,171 +1379,216 @@ DHARMa::simulateResiduals(m0, n = 1000, plot = TRUE)
 
 
 
-# with a negative binomial the c_hat goes down to 1.0. the light seems to have no effect. 
+# we will go straignt tot he negative binomial model. 
+# phase 1: treatment-only model with offsets ------------------------------
 
-m1m1_s <- glmmTMB( n_calls ~ trmt_bin + (1 | site),
+m1_s_bg <- glmmTMB(
+  n_calls ~ trmt_bin +
+    offset(log(effort_hours)) +
+    offset(log_background_offset) +
+    (1 | site),
   family = nbinom2,
   data = spkr_db
 )
 
-# check model
-
-check_singularity(m1)
-m1$sdr$pdHess
-m1$fit$message
-check_zeroinflation(m1) # not zero inflated.
-calculate_c_hat(m1)    # no overdispersion, c_hat is 1.08 which is good.
-performance_mae(m1)
-performance::r2(m1)
-DHARMa::simulateResiduals(m1, n = 1000, plot = TRUE)
-summary(m1)
+check_singularity(m1_s_bg)
+m1_s_bg$sdr$pdHess
+m1_s_bg$fit$message
+check_zeroinflation(m1_s_bg)
+calculate_c_hat(m1_s_bg)
+performance_mae(m1_s_bg)
+performance::r2(m1_s_bg)
+DHARMa::simulateResiduals(m1_s_bg, n = 1000, plot = TRUE)
+summary(m1_s_bg)
 
 # phase 2
 # now we add seasonality. It seems seasonality does not improve the model. 
 
-m2_s <- glmmTMB(
-  n_calls ~ trmt_bin + jday_s + I(jday_s^2) + (1 | site),
+m2_s_bg <- glmmTMB(
+  n_calls ~ trmt_bin +
+    jday_s + I(jday_s^2) +
+    offset(log(effort_hours)) +
+    offset(log_background_offset) +
+    (1 | site),
   family = nbinom2,
   data = spkr_db
 )
 
-# check model
+check_singularity(m2_s_bg)
+m2_s_bg$sdr$pdHess
+m2_s_bg$fit$message
+check_zeroinflation(m2_s_bg)
+calculate_c_hat(m2_s_bg)
+performance_mae(m2_s_bg)
+performance::r2(m2_s_bg)
+DHARMa::simulateResiduals(m2_s_bg, n = 1000, plot = TRUE)
+summary(m2_s_bg)
 
-check_singularity(m2)
-m2$sdr$pdHess
-m2$fit$message
-check_zeroinflation(m2)
-calculate_c_hat(m2)    
-performance_mae(m2)
-performance::r2(m2)
-DHARMa::simulateResiduals(m2, n = 1000, plot = TRUE)
-summary(m2)
+anova(m1_s_bg, m2_s_bg) # when we add seasonality the model improves 
 
-anova(m0, m1, m2) # model with seasonality is not significantly better. 
 
 #phase 3
 # now we add environmental variables. treatment is not significant even with environmental variables. 
 
-m3_s <- glmmTMB(
-  n_calls ~ trmt_bin + jday_s + I(jday_s^2) + nit_avg_wspm_s_s + avg_moonlight_s + elev_max_s + yr_s +
+# phase 3: add environmental predictors ----------------------------------
+
+m3_s_bg <- glmmTMB(
+  n_calls ~ trmt_bin +
+    jday_s + I(jday_s^2) +
+    nit_avg_wspm_s_s +
+    avg_moonlight_s +
+    elev_max_s +
+    yr_s +
+    offset(log(effort_hours)) +
+    offset(log_background_offset) +
     (1 | site),
   family = nbinom2,
   data = spkr_db
 )
 
-# check model
+check_singularity(m3_s_bg)
+m3_s_bg$sdr$pdHess
+m3_s_bg$fit$message
+check_zeroinflation(m3_s_bg)
+calculate_c_hat(m3_s_bg)
+performance_mae(m3_s_bg)
+performance::r2(m3_s_bg)
+DHARMa::simulateResiduals(m3_s_bg, n = 1000, plot = TRUE)
+performance::check_collinearity(m3_s_bg)
+summary(m3_s_bg)
 
-check_singularity(m3_s)
-m3_s$sdr$pdHess
-m3_s$fit$message
-check_zeroinflation(m3_s)
-calculate_c_hat(m3_s)  
-performance_mae(m3_s)
-performance::r2(m3_s)
-DHARMa::simulateResiduals(m3_s, n = 1000, plot = TRUE)
-summary(m3_s)
-
-anova(m0_s, m2_s, m3_s) # it seems m3_s is better. 
+anova(m1_s_bg, m2_s_bg, m3_s_bg)
 
 # phase 4 we add the insect data. with the insect data added we see an effect of moon and year but no treatment. 
 
-m4_s <- glmmTMB(
-  n_calls ~ trmt_bin + jday_s + I(jday_s^2) + nit_avg_wspm_s_s  + avg_moonlight_s + elev_max_s + yr_s +
-    + t_leps_s +
-    (1 | site),
-  family = nbinom2,
-  data = spkr_db
-)
+# phase 4: add Lepidoptera abundance -------------------------------------
+  
+  m4_s_bg <- glmmTMB(
+    n_calls ~ trmt_bin +
+      jday_s + I(jday_s^2) +
+      nit_avg_wspm_s_s +
+      avg_moonlight_s +
+      elev_max_s +
+      yr_s +
+      t_leps_s +
+      offset(log(effort_hours)) +
+      offset(log_background_offset) +
+      (1 | site),
+    family = nbinom2,
+    data = spkr_db
+  )
 
-check_singularity(m4_s)
-m4_s$sdr$pdHess
-m4_s$fit$message
-check_zeroinflation(m4_s)
-calculate_c_hat(m4_s)  # indicates the is overdispersion we need to try negative binomial.  
-performance_mae(m4_s)
-performance::r2(m4_s)
-DHARMa::simulateResiduals(m4_s, n = 1000, plot = TRUE)
-summary(m4_s)
+check_singularity(m4_s_bg)
+m4_s_bg$sdr$pdHess
+m4_s_bg$fit$message
+check_zeroinflation(m4_s_bg)
+calculate_c_hat(m4_s_bg)
+performance_mae(m4_s_bg)
+performance::r2(m4_s_bg)
+DHARMa::simulateResiduals(m4_s_bg, n = 1000, plot = TRUE)
+performance::check_collinearity(m4_s_bg)
+summary(m4_s_bg)
 
-anova(m0_s, m2_s, m3_s, m4_s) # it seems m4_s is not better. 
-
+anova(m1_s_bg, m2_s_bg, m3_s_bg, m4_s_bg) # adding insect data does not seem to improve model fit. 
 
 # Phase 5 interactions leps and treatment. the interaction is sinificant and the model does slightly improve. 
 # 
+# phase 5: treatment x Lepidoptera ---------------------------------------
 
-m5_s <- glmmTMB(
-  n_calls ~ trmt_bin + jday_s + I(jday_s^2) + nit_avg_wspm_s_s  + avg_moonlight_s + elev_max_s + yr_s 
-  + t_leps_s +
-    (1 | site)+
-    #interactions
-    trmt_bin*t_leps_s,
-  family = nbinom2,
-  data = spkr_db
-)
-check_singularity(m5_s)
-m5_s$sdr$pdHess
-m5_s$fit$message
-check_zeroinflation(m5_s)
-calculate_c_hat(m5_s)  #  
-performance_mae(m5_s)
-performance::r2(m5_s)
-DHARMa::simulateResiduals(m5_s, n = 1000, plot = TRUE)
-summary(m5_s)
-
-anova(m0_s, m2_s, m3_s, m4_s, m5_s)
-
-
-# Phase 6 lets add random slopes by species. the model does significantly improve and the interaction is still significant while jday is a new parameter showing significance. 
-
-m6_s <- glmmTMB(
-  n_calls ~ trmt_bin + jday_s + I(jday_s^2) + nit_avg_wspm_s_s  + avg_moonlight_s + elev_max_s + yr_s + t_leps_s 
-  +(1 | site)+ (1 | sp) +
-    #interactions
-    trmt_bin*t_leps_s,
+m5_s_bg <- glmmTMB(
+  n_calls ~ trmt_bin +
+    jday_s + I(jday_s^2) +
+    nit_avg_wspm_s_s +
+    avg_moonlight_s +
+    elev_max_s +
+    yr_s +
+    t_leps_s +
+    offset(log(effort_hours)) +
+    offset(log_background_offset) +
+    (1 | site) +
+    trmt_bin * t_leps_s,
   family = nbinom2,
   data = spkr_db
 )
 
-check_singularity(m6_s)
-m6_s$sdr$pdHess
-m6_s$fit$message
-check_zeroinflation(m6_s)
-calculate_c_hat(m6_s)  #  
-performance_mae(m6_s)
-performance::r2(m6_s)
-DHARMa::simulateResiduals(m6_s, n = 1000, plot = TRUE)
-summary(m6_s)
+check_singularity(m5_s_bg)
+m5_s_bg$sdr$pdHess
+m5_s_bg$fit$message
+check_zeroinflation(m5_s_bg)
+calculate_c_hat(m5_s_bg)
+performance_mae(m5_s_bg)
+performance::r2(m5_s_bg)
+DHARMa::simulateResiduals(m5_s_bg, n = 1000, plot = TRUE)
+performance::check_collinearity(m5_s_bg)
+summary(m5_s_bg)
 
-anova(m0_s, m2_s, m3_s, m4_s, m5_s, m6_s)
+anova(m4_s_bg, m5_s_bg) # the interaction is not significant neither so we might need to remove it. 
 
+# Phase 6 lets add random slopes by species. 
 
-# phase 7 lets add random slopes by species and site. Nuanced improvement in the model. jday, moon, year, and the treatment and leps interaction are still significant. 
+# phase 6: add species random intercept ----------------------------------
 
-m7_s <- glmmTMB(
-  n_calls ~ trmt_bin + jday_s + I(jday_s^2) + nit_avg_wspm_s_s  + avg_moonlight_s + elev_max_s + yr_s
-  + t_leps_s +
-    (1 | site)+ (1 + trmt_bin | sp) +
-    #interactions
-    trmt_bin*t_leps_s,
+m6_s_bg <- glmmTMB(
+  n_calls ~ trmt_bin +
+    jday_s + I(jday_s^2) +
+    nit_avg_wspm_s_s +
+    avg_moonlight_s +
+    elev_max_s +
+    yr_s +
+    t_leps_s +
+    offset(log(effort_hours)) +
+    offset(log_background_offset) +
+    (1 | site) +
+    (1 | sp) +
+    trmt_bin * t_leps_s,
   family = nbinom2,
   data = spkr_db
 )
 
+check_singularity(m6_s_bg)
+m6_s_bg$sdr$pdHess
+m6_s_bg$fit$message
+check_zeroinflation(m6_s_bg)
+calculate_c_hat(m6_s_bg)
+performance_mae(m6_s_bg)
+performance::r2(m6_s_bg)
+DHARMa::simulateResiduals(m6_s_bg, n = 1000, plot = TRUE)
+performance::check_collinearity(m6_s_bg)
+summary(m6_s_bg)
 
-check_singularity(m7_s)
-m7_s$sdr$pdHess
-m7_s$fit$message
-check_zeroinflation(m7_s)
-calculate_c_hat(m7_s)   
-performance_mae(m7_s)
-performance::r2(m7_s)
-DHARMa::simulateResiduals(m7_s, n = 1000, plot = TRUE)
-performance::check_collinearity(m7_s)
-summary(m7_s)
+anova(m5_s_bg, m6_s_bg) # the model improves with the addition of the random intercept for species.
 
+# phase 7 lets add random treatment inside the random slopes by specie. 
 
-anova(m0_s, m2_s, m3_s, m4_s, m5_s, m6_s, m7_s)
+m7_s_bg <- glmmTMB(
+  n_calls ~ trmt_bin +
+    jday_s + I(jday_s^2) +
+    nit_avg_wspm_s_s +
+    avg_moonlight_s +
+    elev_max_s +
+    yr_s +
+    t_leps_s +
+    offset(log(effort_hours)) +
+    offset(log_background_offset) +
+    (1 | site) +
+    (1 + trmt_bin | sp) +
+    trmt_bin * t_leps_s,
+  family = nbinom2,
+  data = spkr_db
+)
 
+check_singularity(m7_s_bg)
+m7_s_bg$sdr$pdHess
+m7_s_bg$fit$message
+check_zeroinflation(m7_s_bg)
+calculate_c_hat(m7_s_bg)
+performance_mae(m7_s_bg)
+performance::r2(m7_s_bg)
+DHARMa::simulateResiduals(m7_s_bg, n = 1000, plot = TRUE)
+performance::check_collinearity(m7_s_bg)
+summary(m7_s_bg)
+
+anova(m6_s_bg, m7_s_bg) # the model improves with the addition of the treatment inside the random slopes for species.
 
 # seasonality inside the random slope 
 # the model breaks if we add seasonality inside the random slopes
@@ -1363,82 +1619,114 @@ anova(m0_s, m2_s, m3_s, m4_s, m5_s, m6_s, m7_s)
 
 # let's check what happens if we check for interaction between treatment and seasonality. It seems model 9 is not better than m7_s
 
-m9_s <- glmmTMB(
-  n_calls ~ trmt_bin + jday_s + I(jday_s^2) + nit_avg_wspm_s_s  + avg_moonlight_s + elev_max_s + yr_s +
-    + t_leps_s +
-    (1 | site)+ (1 + trmt_bin | sp) +
-    #interactions
-    trmt_bin*t_leps_s + trmt_bin*jday_s + trmt_bin*I(jday_s^2),
+# phase 9: treatment x seasonality ---------------------------------------
+
+m9_s_bg <- glmmTMB(
+  n_calls ~ trmt_bin +
+    jday_s + I(jday_s^2) +
+    nit_avg_wspm_s_s +
+    avg_moonlight_s +
+    elev_max_s +
+    yr_s +
+    t_leps_s +
+    offset(log(effort_hours)) +
+    offset(log_background_offset) +
+    (1 | site) +
+    (1 + trmt_bin | sp) +
+    trmt_bin * t_leps_s +
+    trmt_bin * jday_s +
+    trmt_bin * I(jday_s^2),
   family = nbinom2,
   data = spkr_db
 )
 
+check_singularity(m9_s_bg)
+m9_s_bg$sdr$pdHess
+m9_s_bg$fit$message
+check_zeroinflation(m9_s_bg)
+calculate_c_hat(m9_s_bg)
+performance_mae(m9_s_bg)
+performance::r2(m9_s_bg)
+DHARMa::simulateResiduals(m9_s_bg, n = 1000, plot = TRUE)
+performance::check_collinearity(m9_s_bg)
+summary(m9_s_bg)
 
-check_singularity(m9_s)
-m9_s$sdr$pdHess
-m9_s$fit$message
-check_zeroinflation(m9_s)
-calculate_c_hat(m9_s)   
-performance_mae(m9_s)
-performance::r2(m9_s)
-DHARMa::simulateResiduals(m9_s, n = 1000, plot = TRUE)
-performance::check_collinearity(m9_s)
-summary(m9_s)
-
-
-anova( m2_s, m3_s, m4_s, m5_s, m6_s, m7_s, m9_s)
+anova(m7_s_bg, m9_s_bg) # model does improve with the addition of seasonality interaction with treatment. 
 
 #now we add the moon interaction with treatment. Again it seems we observed the model improve in m10_s. The interaction is significant and the model improves.a
 
-m10_s<- glmmTMB(
-  n_calls ~ trmt_bin + jday_s + I(jday_s^2) + nit_avg_wspm_s_s  + avg_moonlight_s + elev_max_s + yr_s +
-    + t_leps_s +
-    (1 | site)+ (1 + trmt_bin | sp) +
-    #interactions
-    trmt_bin*t_leps_s + trmt_bin*jday_s + trmt_bin*I(jday_s^2) + trmt_bin*avg_moonlight_s,
+# phase 10: treatment x Lepidoptera + seasonality + moonlight ------------- this seems to be the best model. 
+
+m10_s_bg <- glmmTMB(
+  n_calls ~ trmt_bin +
+    jday_s + I(jday_s^2) +
+    nit_avg_wspm_s_s +
+    avg_moonlight_s +
+    elev_max_s +
+    yr_s +
+    t_leps_s +
+    offset(log(effort_hours)) +
+    offset(log_background_offset) +
+    (1 | site) +
+    (1 + trmt_bin | sp) +
+    trmt_bin * t_leps_s +
+    trmt_bin * jday_s +
+    trmt_bin * I(jday_s^2) +
+    trmt_bin * avg_moonlight_s,
   family = nbinom2,
   data = spkr_db
-) 
+)
 
-check_singularity(m10_s)
-m10_s$sdr$pdHess
-m10_s$fit$message
-check_zeroinflation(m10_s)
-calculate_c_hat(m10_s)   
-performance_mae(m10_s)
-performance::r2(m10_s)
-DHARMa::simulateResiduals(m10_s, n = 1000, plot = TRUE)
-performance::check_collinearity(m10_s)
-summary(m10_s)
+check_singularity(m10_s_bg)
+m10_s_bg$sdr$pdHess
+m10_s_bg$fit$message
+check_zeroinflation(m10_s_bg)
+calculate_c_hat(m10_s_bg)
+performance_mae(m10_s_bg)
+performance::r2(m10_s_bg)
+DHARMa::simulateResiduals(m10_s_bg, n = 1000, plot = TRUE)
+performance::check_collinearity(m10_s_bg)
+summary(m10_s_bg)
 
+anova(m7_s_bg, m9_s_bg, m10_s_bg) # model does improve with the addition of moonlight interaction with treatment.
 
-anova( m2_s, m3_s, m4_s, m5_s, m6_s, m7_s, m9_s, m10_s)
-anova( m7_s, m10_s) # it seems m10_s is better candidate. 
 
 # now we remove lepidopter and treatment interaction to see if it improves model fit. Is seems it improves compared to m10_s and m7_s so this might be the model we describe in our manuscript. 
 # 
 
-m11_s <- glmmTMB(
-  n_calls ~ trmt_bin + jday_s + I(jday_s^2) + nit_avg_wspm_s_s   + avg_moonlight_s + elev_max_s + yr_s   + t_leps_s +
-    (1 | site) + (1 + trmt_bin | sp) +
-    #interactions
-    trmt_bin * jday_s + trmt_bin * I(jday_s^2) + trmt_bin * avg_moonlight_s,
+# phase 11: remove treatment x Lepidoptera -------------------------------
+
+m11_s_bg <- glmmTMB(
+  n_calls ~ trmt_bin +
+    jday_s + I(jday_s^2) +
+    nit_avg_wspm_s_s +
+    avg_moonlight_s +
+    elev_max_s +
+    yr_s +
+    t_leps_s +
+    offset(log(effort_hours)) +
+    offset(log_background_offset) +
+    (1 | site) +
+    (1 + trmt_bin | sp) +
+    trmt_bin * jday_s +
+    trmt_bin * I(jday_s^2) +
+    trmt_bin * avg_moonlight_s,
   family = nbinom2,
   data = spkr_db
 )
 
+check_singularity(m11_s_bg)
+m11_s_bg$sdr$pdHess
+m11_s_bg$fit$message
+check_zeroinflation(m11_s_bg)
+calculate_c_hat(m11_s_bg)
+performance_mae(m11_s_bg)
+performance::r2(m11_s_bg)
+DHARMa::simulateResiduals(m11_s_bg, n = 1000, plot = TRUE)
+performance::check_collinearity(m11_s_bg)
+summary(m11_s_bg)
 
-check_singularity(m11_s)
-m11_s$sdr$pdHess
-m11_s$fit$message
-check_zeroinflation(m11_s)
-calculate_c_hat(m11_s)   
-performance_mae(m11_s)
-performance::r2(m11_s)
-DHARMa::simulateResiduals(m11_s, n = 1000, plot = TRUE)
-performance::check_collinearity(m11_s)
-summary(m11_s)
-anova( m7_s, m10_s, m11_s) 
+anova(m7_s_bg, m9_s_bg, m10_s_bg, m11_s_bg) # it seems he best model might be m10_s_bg 
 
 m11_s_table <- gtsummary::tbl_regression(
   m11_s,
