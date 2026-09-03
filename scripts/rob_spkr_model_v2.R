@@ -278,7 +278,6 @@ performance::check_collinearity(m7_bg)
 summary(m7_bg)
 
 
-anova(m0, m1, m2, m3, m4, m5, m6, m7_bg)
 
 
 # seasonality inside the random slope
@@ -326,16 +325,16 @@ m9_bg <- glmmTMB(
 )
 
 
-check_singularity(m9)
-m9$sdr$pdHess
-m9$fit$message
-check_zeroinflation(m9)
-calculate_c_hat(m9)   
-performance_mae(m9)
-performance::r2(m9)
-DHARMa::simulateResiduals(m9, n = 1000, plot = TRUE)
-performance::check_collinearity(m9)
-summary(m9)
+check_singularity(m9_bg)
+m9_bg$sdr$pdHess
+m9_bg$fit$message
+check_zeroinflation(m9_bg)
+calculate_c_hat(m9_bg)   
+performance_mae(m9_bg)
+performance::r2(m9_bg)
+DHARMa::simulateResiduals(m9_bg, n = 1000, plot = TRUE)
+performance::check_collinearity(m9_bg)
+summary(m9_bg)
 
 
 
@@ -373,7 +372,7 @@ summary(m10_bg)
 
 
 
-anova( m7_bg, m9_bg, m10_bg)
+anova( m7_bg, m9_bg, m10_bg) #the model doe improve when we add the treatment and moonlight interaction 
 
 
 # now we check the model with the conservative data where we just keep data that has n_background > 0 indicating those where we have some background calls from sm3 and for those effort hours > 0 as well. 
@@ -494,34 +493,6 @@ save_as_docx(
 save_as_image(m10_flex, path = "figures/rob_spkr_model/v3/tables/m10_bg_table.png")
 
 
-# # currently the best model seems to be m10. but we still have to add the offset. 
-# 
-# m12 <- glmmTMB(
-#   n_calls ~ trmt_bin + jday_s + I(jday_s^2) +
-#     nit_avg_wspm_s_s + avg_moonlight_s + elev_max_s +
-#     yr_s + t_leps_s +
-#     offset(log(effort_hours)) +
-#     (1 | site) +
-#     (1 + trmt_bin | sp) +
-#     trmt_bin * jday_s +
-#     trmt_bin * I(jday_s^2) +
-#     trmt_bin * avg_moonlight_s,
-#   family = nbinom2,
-#   data = rob_db
-# )
-# 
-# check_singularity(m12)
-# m12$sdr$pdHess
-# m12$fit$message
-# check_zeroinflation(m12)
-# calculate_c_hat(m12)   
-# performance_mae(m12)
-# performance::r2(m12)
-# DHARMa::simulateResiduals(m12, n = 1000, plot = TRUE)
-# performance::check_collinearity(m12)
-# summary(m12)
-# anova( m10, m11, m12)
-# 
 
 ####################################
 ####################################
@@ -663,7 +634,7 @@ p_1 <- ggplot(
       color = treatment
     ),
     linewidth = 0.7,
-    fatten = 2.3
+    size = 1.5
   ) +
   facet_wrap(
     ~ panel,
@@ -726,7 +697,7 @@ rob_species_ratio <- avg_comparisons(
   m10_bg,
   newdata = rob_trt_grid,
   variables = list(trmt_bin = c(-1, 1)),
-  comparison = "ratio",
+  comparison = "lnratio",
   by = "sp",
   type = "response",
   re.form = NULL,
@@ -788,7 +759,88 @@ save_as_docx(
 
 save_as_image(ts4, path = "figures/rob_spkr_model/v3/tables/ts4_robomoth.png")
 
+# change to log ratio for the comparaison 
 
+rob_species_logratio <- avg_comparisons(
+  m10_bg,
+  newdata = rob_trt_grid,
+  variables = list(trmt_bin = c(-1, 1)),
+  comparison = "lnratio",
+  by = "sp",
+  type = "response",
+  re.form = NULL,
+  allow.new.levels = TRUE
+) %>%
+  as_tibble() %>%
+  mutate(
+    # Back-transform from log ratio to lit/dark ratio
+    lit_dark_ratio = exp(estimate),
+    ratio_conf_low = exp(conf.low),
+    ratio_conf_high = exp(conf.high),
+    
+    # Convert ratio to percent change
+    percent_change_lit_vs_dark = 100 * (lit_dark_ratio - 1),
+    percent_conf_low = 100 * (ratio_conf_low - 1),
+    percent_conf_high = 100 * (ratio_conf_high - 1),
+    
+    # On the log-ratio scale, 0 means no difference.
+    supported_response = case_when(
+      conf.low > 0 ~ "Higher in lit",
+      conf.high < 0 ~ "Lower in lit",
+      TRUE ~ "Uncertain"
+    )
+  ) %>%
+  arrange(desc(percent_change_lit_vs_dark))
+
+rob_species_logratio
+
+
+# then we have a clean table 
+
+rob_species_ratio_clean <- rob_species_logratio %>%
+  transmute(
+    species = sp,
+    lit_dark_ratio = round(lit_dark_ratio, 2),
+    ratio_CI = paste0(
+      round(ratio_conf_low, 2),
+      "–",
+      round(ratio_conf_high, 2)
+    ),
+    percent_change = round(percent_change_lit_vs_dark, 1),
+    percent_CI = paste0(
+      round(percent_conf_low, 1),
+      " to ",
+      round(percent_conf_high, 1),
+      "%"
+    ),
+    p_value = signif(p.value, 3),
+    supported_response
+  )
+
+rob_species_ratio_clean
+
+ts4 <- flextable(rob_species_ratio_clean) %>%
+  theme_booktabs() %>%
+  font(fontname = "Times New Roman", part = "all") %>%
+  fontsize(size = 10, part = "all") %>%
+  bold(part = "header") %>%
+  bold(
+    i = ~ supported_response != "Uncertain",
+    bold = TRUE,
+    part = "body"
+  ) %>%
+  autofit() %>%
+  set_caption(
+    "Table S4. Species-specific lit/dark ratios for faint robomoth passes from the abundance-offset robomoth model."
+  )
+
+ts4
+
+save_as_docx(
+  "table.s4" = ts4,
+  path = "figures/rob_spkr_model/v3/tables/ts4_robomoth.docx")
+
+save_as_image(ts4, path = "figures/rob_spkr_model/v3/tables/ts4_robomoth.png")
 
 
 # jday robomot marginal  --------------------------------------------------
@@ -1164,7 +1216,7 @@ p_moon_comm <- ggplot(
   scale_color_manual(values = trt_cols) +
   scale_fill_manual(values = trt_cols) +
   labs(
-    title = "Moonlight modifies the effect of artificial light on faint robomoth passes",
+    title = "Moonlight modifies the effect of artificial light on moth decoy passes",
     subtitle = "Predictions from m10_bg; non-focal covariates held at mean scaled values",
     x = "Moonlight intensity (scaled)",
     y = "Predicted number of faint bat passes",
@@ -1402,7 +1454,7 @@ DHARMa::simulateResiduals(m1_s_bg, n = 1000, plot = TRUE)
 summary(m1_s_bg)
 
 # phase 2
-# now we add seasonality. It seems seasonality does not improve the model. 
+# now we add seasonality.
 
 m2_s_bg <- glmmTMB(
   n_calls ~ trmt_bin +
@@ -1428,7 +1480,7 @@ anova(m1_s_bg, m2_s_bg) # when we add seasonality the model improves
 
 
 #phase 3
-# now we add environmental variables. treatment is not significant even with environmental variables. 
+# now we add environmental variables. treatment is not significant even with environmental variables.but adding environmental predictors does improve the model fit. 
 
 # phase 3: add environmental predictors ----------------------------------
 
@@ -1491,7 +1543,7 @@ summary(m4_s_bg)
 
 anova(m1_s_bg, m2_s_bg, m3_s_bg, m4_s_bg) # adding insect data does not seem to improve model fit. 
 
-# Phase 5 interactions leps and treatment. the interaction is sinificant and the model does slightly improve. 
+# Phase 5 interactions leps and treatment. the interaction is not significant and the model does not improve. 
 # 
 # phase 5: treatment x Lepidoptera ---------------------------------------
 
@@ -1691,8 +1743,77 @@ summary(m10_s_bg)
 anova(m7_s_bg, m9_s_bg, m10_s_bg) # model does improve with the addition of moonlight interaction with treatment.
 
 
-# now we remove lepidopter and treatment interaction to see if it improves model fit. Is seems it improves compared to m10_s and m7_s so this might be the model we describe in our manuscript. 
-# 
+# now we create the table for the model. 
+
+m10_s_bg_table <- gtsummary::tbl_regression(
+  m10_s_bg,
+  
+  # FALSE reports coefficients on the model's log scale
+  exponentiate = FALSE,
+  conf.level = 0.95,
+  
+  label = list(
+    trmt_bin ~ "Treatment (Lit vs. Dark)",
+    jday_s ~ "Julian date",
+    `I(jday_s^2)` ~ "Julian date²",
+    nit_avg_wspm_s_s ~ "Average wind speed",
+    avg_moonlight_s ~ "Average moonlight",
+    elev_max_s ~ "Maximum elevation",
+    yr_s ~ "Year",
+    t_leps_s ~ "Lepidoptera abundance",
+    `trmt_bin:t_leps_s` ~ "Treatment × Lepidoptera abundance",
+    `trmt_bin:jday_s` ~ "Treatment × Julian date",
+    `trmt_bin:I(jday_s^2)` ~ "Treatment × Julian date²",
+    `trmt_bin:avg_moonlight_s` ~ "Treatment × moonlight"
+  )
+) %>%
+  modify_header(
+    label ~ "**Predictor**",
+    estimate ~ "**β**",
+    conf.low ~ "**95% CI**",
+    p.value ~ "**p-value**"
+  ) %>%
+  modify_caption(
+    "**Table S__. Negative binomial mixed-effects model of bat call activity during speaker-lure experiments.**"
+  ) %>%
+  bold_p(t = 0.05) %>%
+  modify_footnote(
+    estimate ~ "Coefficients are presented on the log scale. The model includes offsets for speaker sampling effort and species-specific background acoustic activity."
+  )
+
+m10_s_bg_table
+
+
+# make ir a flex table 
+
+m10_s_bg_flex <- m10_s_bg_table %>%
+  gtsummary::as_flex_table() %>%
+  flextable::theme_booktabs() %>%
+  flextable::font(fontname = "Times New Roman", part = "all") %>%
+  flextable::fontsize(size = 10, part = "all") %>%
+  flextable::bold(part = "header") %>%
+  flextable::align(j = 1, align = "left", part = "all") %>%
+  flextable::align(j = 2:4, align = "left", part = "all") %>%
+  flextable::padding(padding = 4, part = "all") %>%
+  flextable::autofit()
+
+m10_s_bg_flex
+
+
+flextable::save_as_image(
+  x = m10_s_bg_flex,
+  path = "figures/rob_spkr_model/v3/tables/m10_s_bg_table.png",
+  zoom = 3,
+  expand = 15
+)
+
+flextable::save_as_docx(
+  "Table m10_s_bg" = m10_s_bg_flex,
+  path = "figures/rob_spkr_model/v3/tables/m10_s_bg_table.docx"
+)
+
+# now we remove lepidopter and treatment interaction to see if it improves model fit. 
+# I didn't show improvements so we keep m10_s_bg as the best model.
 
 # phase 11: remove treatment x Lepidoptera -------------------------------
 
@@ -1726,133 +1847,133 @@ DHARMa::simulateResiduals(m11_s_bg, n = 1000, plot = TRUE)
 performance::check_collinearity(m11_s_bg)
 summary(m11_s_bg)
 
-anova(m7_s_bg, m9_s_bg, m10_s_bg, m11_s_bg) # it seems he best model might be m10_s_bg 
+anova( m10_s_bg, m11_s_bg) # it seems he best model might be m10_s_bg 
 
-m11_s_table <- gtsummary::tbl_regression(
-  m11_s,
-  
-  # FALSE reports coefficients on the model's log scale
-  exponentiate = FALSE,
-  
-  conf.level = 0.95,
-  
-  label = list(
-    trmt_bin ~ "Treatment (Lit vs. Dark)",
-    jday_s ~ "Julian date",
-    `I(jday_s^2)` ~ "Julian date²",
-    nit_avg_wspm_s_s ~ "Average wind speed",
-    avg_moonlight_s ~ "Average moonlight",
-    elev_max_s ~ "Maximum elevation",
-    yr_s ~ "Year",
-    t_leps_s ~ "Lepidoptera abundance",
-    `trmt_bin:jday_s` ~ "Treatment × Julian date",
-    `trmt_bin:I(jday_s^2)` ~ "Treatment × Julian date²",
-    `trmt_bin:avg_moonlight_s` ~ "Treatment × moonlight"
-  )
-) %>%
-  
-  modify_header(
-    label ~ "**Predictor**",
-    estimate ~ "**β**",
-    ci ~ "**95% CI**",
-    p.value ~ "**p-value**"
-  ) %>%
-  
-  modify_caption(
-    "**Table S__. Negative binomial mixed-effects model of bat call activity during speaker experiments.**"
-  ) %>%
-  
-  bold_p(t = 0.05) %>%
-  
-  modify_footnote(
-    estimate ~
-      "Coefficients are presented on the log scale."
-  )
+# m11_s_table <- gtsummary::tbl_regression(
+#   m11_s,
+#   
+#   # FALSE reports coefficients on the model's log scale
+#   exponentiate = FALSE,
+#   
+#   conf.level = 0.95,
+#   
+#   label = list(
+#     trmt_bin ~ "Treatment (Lit vs. Dark)",
+#     jday_s ~ "Julian date",
+#     `I(jday_s^2)` ~ "Julian date²",
+#     nit_avg_wspm_s_s ~ "Average wind speed",
+#     avg_moonlight_s ~ "Average moonlight",
+#     elev_max_s ~ "Maximum elevation",
+#     yr_s ~ "Year",
+#     t_leps_s ~ "Lepidoptera abundance",
+#     `trmt_bin:jday_s` ~ "Treatment × Julian date",
+#     `trmt_bin:I(jday_s^2)` ~ "Treatment × Julian date²",
+#     `trmt_bin:avg_moonlight_s` ~ "Treatment × moonlight"
+#   )
+# ) %>%
+#   
+#   modify_header(
+#     label ~ "**Predictor**",
+#     estimate ~ "**β**",
+#     ci ~ "**95% CI**",
+#     p.value ~ "**p-value**"
+#   ) %>%
+#   
+#   modify_caption(
+#     "**Table S__. Negative binomial mixed-effects model of bat call activity during speaker experiments.**"
+#   ) %>%
+#   
+#   bold_p(t = 0.05) %>%
+#   
+#   modify_footnote(
+#     estimate ~
+#       "Coefficients are presented on the log scale."
+#   )
+# 
+# m11_s_table
+# 
+# 
+# # convert into a flex table 
+# 
+# m11_s_flex <- m11_s_table %>%
+#   gtsummary::as_flex_table() %>%
+#   flextable::theme_booktabs() %>%
+#   flextable::font(
+#     fontname = "Times New Roman",
+#     part = "all"
+#   ) %>%
+#   flextable::fontsize(
+#     size = 10,
+#     part = "all"
+#   ) %>%
+#   flextable::bold(
+#     part = "header"
+#   ) %>%
+#   flextable::align(
+#     j = 1,
+#     align = "left",
+#     part = "all"
+#   ) %>%
+#   flextable::align(
+#     j = 2:ncol(m11_s_flex$body$dataset),
+#     align = "center",
+#     part = "all"
+#   ) %>%
+#   flextable::padding(
+#     padding = 4,
+#     part = "all"
+#   ) %>%
+#   flextable::autofit()
+# 
+# m11_s_flex
+# 
+# m11_s_flex <- m11_s_table %>%
+#   gtsummary::as_flex_table() %>%
+#   flextable::theme_booktabs() %>%
+#   flextable::font(fontname = "Times New Roman", part = "all") %>%
+#   flextable::fontsize(size = 10, part = "all") %>%
+#   flextable::bold(part = "header") %>%
+#   flextable::autofit()
+# 
+# flextable::save_as_image(
+#   x = m11_s_flex,
+#   path = "figures/rob_spkr_model/v2/tables/m11_s_table.png",
+#   zoom = 3,
+#   expand = 15
+# )
+# 
+# 
 
-m11_s_table
 
-
-# convert into a flex table 
-
-m11_s_flex <- m11_s_table %>%
-  gtsummary::as_flex_table() %>%
-  flextable::theme_booktabs() %>%
-  flextable::font(
-    fontname = "Times New Roman",
-    part = "all"
-  ) %>%
-  flextable::fontsize(
-    size = 10,
-    part = "all"
-  ) %>%
-  flextable::bold(
-    part = "header"
-  ) %>%
-  flextable::align(
-    j = 1,
-    align = "left",
-    part = "all"
-  ) %>%
-  flextable::align(
-    j = 2:ncol(m11_s_flex$body$dataset),
-    align = "center",
-    part = "all"
-  ) %>%
-  flextable::padding(
-    padding = 4,
-    part = "all"
-  ) %>%
-  flextable::autofit()
-
-m11_s_flex
-
-m11_s_flex <- m11_s_table %>%
-  gtsummary::as_flex_table() %>%
-  flextable::theme_booktabs() %>%
-  flextable::font(fontname = "Times New Roman", part = "all") %>%
-  flextable::fontsize(size = 10, part = "all") %>%
-  flextable::bold(part = "header") %>%
-  flextable::autofit()
-
-flextable::save_as_image(
-  x = m11_s_flex,
-  path = "figures/rob_spkr_model/v2/tables/m11_s_table.png",
-  zoom = 3,
-  expand = 15
-)
-
-
-
-
-# we have been suggested to test a model with an offset lets see how it changes. 
-
-m12_s <- glmmTMB(
-  n_calls ~ trmt_bin + jday_s + I(jday_s^2) +
-    nit_avg_wspm_s_s + avg_moonlight_s + elev_max_s +
-    yr_s + t_leps_s +
-    offset(log(effort_hours)) +
-    (1 | site) +
-    (1 + trmt_bin | sp) +
-    trmt_bin * jday_s +
-    trmt_bin * I(jday_s^2) +
-    trmt_bin * avg_moonlight_s,
-  family = nbinom2,
-  data = spkr_db
-)
-
-check_singularity(m12_s)
-m12_s$sdr$pdHess
-m12_s$fit$message
-check_zeroinflation(m12_s)
-calculate_c_hat(m12_s)   
-performance_mae(m12_s)
-performance::r2(m12_s)
-DHARMa::simulateResiduals(m12_s, n = 1000, plot = TRUE)
-performance::check_collinearity(m12_s)
-summary(m12_s)
-anova( m10_s, m11_s, m12_s)
-
-# now we generate marginal effects plot for the model m11_s for the sepeaker data. It seems we have a final model. 
+# # we have been suggested to test a model with an offset lets see how it changes. 
+# 
+# m12_s <- glmmTMB(
+#   n_calls ~ trmt_bin + jday_s + I(jday_s^2) +
+#     nit_avg_wspm_s_s + avg_moonlight_s + elev_max_s +
+#     yr_s + t_leps_s +
+#     offset(log(effort_hours)) +
+#     (1 | site) +
+#     (1 + trmt_bin | sp) +
+#     trmt_bin * jday_s +
+#     trmt_bin * I(jday_s^2) +
+#     trmt_bin * avg_moonlight_s,
+#   family = nbinom2,
+#   data = spkr_db
+# )
+# 
+# check_singularity(m12_s)
+# m12_s$sdr$pdHess
+# m12_s$fit$message
+# check_zeroinflation(m12_s)
+# calculate_c_hat(m12_s)   
+# performance_mae(m12_s)
+# performance::r2(m12_s)
+# DHARMa::simulateResiduals(m12_s, n = 1000, plot = TRUE)
+# performance::check_collinearity(m12_s)
+# summary(m12_s)
+# anova( m10_s, m11_s, m12_s)
+# 
+# # now we generate marginal effects plot for the model m11_s for the sepeaker data. It seems we have a final model. 
 
 
 # spkr marginal effect plots.  --------------------------------------------
@@ -1871,6 +1992,21 @@ spkr_species <- spkr_db %>%
   arrange(sp) %>%
   pull(sp)
 
+# typical values for offsets. 
+typical_effort_hours <- median(
+  spkr_db$effort_hours,
+  na.rm = TRUE
+)
+
+typical_log_background <- median(
+  spkr_db$log_background_offset,
+  na.rm = TRUE
+)
+
+typical_background <- exp(typical_log_background)
+
+typical_effort_hours
+typical_background
 
 # -------------------------------------------------------------------------
 # Speaker treatment prediction grid
@@ -1882,12 +2018,17 @@ pred_grid_spkr_trt <- tidyr::expand_grid(
 ) %>%
   mutate(
     site = NA,
-    jday_s = mean(spkr_db$jday_s, na.rm = TRUE),
-    nit_avg_wspm_s_s = mean(spkr_db$nit_avg_wspm_s_s, na.rm = TRUE),
-    avg_moonlight_s = mean(spkr_db$avg_moonlight_s, na.rm = TRUE),
-    elev_max_s = mean(spkr_db$elev_max_s, na.rm = TRUE),
-    yr_s = mean(spkr_db$yr_s, na.rm = TRUE),
-    t_leps_s = mean(spkr_db$t_leps_s, na.rm = TRUE)
+    # Non-focal covariates held at mean scaled values
+    jday_s = 0,
+    nit_avg_wspm_s_s = 0,
+    avg_moonlight_s = 0,
+    elev_max_s = 0,
+    yr_s = 0,
+    t_leps_s = 0,
+    
+    # Required offsets for m10_s_bg
+    effort_hours = typical_effort_hours,
+    log_background_offset = typical_log_background
   )
 
 # -------------------------------------------------------------------------
@@ -1895,7 +2036,7 @@ pred_grid_spkr_trt <- tidyr::expand_grid(
 # -------------------------------------------------------------------------
 
 pred_spkr_species <- predictions(
-  m11_s,
+  m10_s_bg,
   newdata = pred_grid_spkr_trt,
   type = "response",
   re.form = NULL,
@@ -1915,7 +2056,7 @@ pred_spkr_species <- predictions(
 # -------------------------------------------------------------------------
 
 pred_spkr_comm <- avg_predictions(
-  m11_s,
+  m10_s_bg,
   newdata = pred_grid_spkr_trt,
   by = "trmt_bin",
   type = "response",
@@ -1975,7 +2116,7 @@ p_spkr_treatment <- ggplot(
   scale_color_manual(values = trt_cols) +
   labs(
     title = "Predicted faint bat passes at speaker lures by treatment",
-    subtitle = "Predictions from m11_s; non-focal covariates held at mean values",
+    subtitle = "Predictions from m10_s_bg; non-focal covariates held at mean values",
     x = "Treatment",
     y = "Predicted number of faint bat passes",
     color = "Treatment"
@@ -1991,9 +2132,9 @@ p_spkr_treatment <- ggplot(
 
 p_spkr_treatment
 
-library(tidyverse)
 
-spkr_ranef_trt <- ranef(m11_s)$cond$sp %>%
+
+spkr_ranef_trt <- ranef(m10_s_bg)$cond$sp %>%
   as.data.frame() %>%
   rownames_to_column("sp") %>%
   rename(
@@ -2001,7 +2142,7 @@ spkr_ranef_trt <- ranef(m11_s)$cond$sp %>%
     species_trmt_deviation = trmt_bin
   )
 
-fixed_trmt <- fixef(m11_s)$cond["trmt_bin"]
+fixed_trmt <- fixef(m10_s_bg)$cond["trmt_bin"]
 
 spkr_species_trt_effects <- spkr_ranef_trt %>%
   mutate(
@@ -2059,19 +2200,23 @@ spkr_trt_grid <- tidyr::expand_grid(
 ) %>%
   mutate(
     site = NA,
-    jday_s = mean(rob_db$jday_s, na.rm = TRUE),
-    nit_avg_wspm_s_s = mean(rob_db$nit_avg_wspm_s_s, na.rm = TRUE),
-    avg_moonlight_s = mean(rob_db$avg_moonlight_s, na.rm = TRUE),
-    elev_max_s = mean(rob_db$elev_max_s, na.rm = TRUE),
-    yr_s = mean(rob_db$yr_s, na.rm = TRUE),
-    t_leps_s = mean(rob_db$t_leps_s, na.rm = TRUE)
+    jday_s = 0,
+    nit_avg_wspm_s_s = 0,
+    avg_moonlight_s = 0,
+    elev_max_s = 0,
+    yr_s = 0,
+    t_leps_s = 0,
+    
+    # Required offsets
+    effort_hours = typical_effort_hours,
+    log_background_offset = typical_log_background
   )
 
 
 
 # Species-specific lit/dark ratios
 spkr_species_ratio <- avg_comparisons(
-  m11_s,
+  m10_s_bg,
   newdata = spkr_trt_grid,
   variables = list(trmt_bin = c(-1, 1)),
   comparison = "ratio",
@@ -2094,6 +2239,8 @@ spkr_species_ratio <- avg_comparisons(
   arrange(desc(percent_change_lit_vs_dark))
 
 spkr_species_ratio
+
+# clean uncertainty table. 
 
 spkr_species_ratio_clean <- spkr_species_ratio %>%
   transmute(
@@ -2120,12 +2267,131 @@ ts5<-flextable(spkr_species_ratio_clean) %>%
     ""
   )
 
+ts5
+
+ts5 <- flextable(spkr_species_ratio_clean) %>%
+  theme_booktabs() %>%
+  font(fontname = "Times New Roman", part = "all") %>%
+  fontsize(size = 10, part = "all") %>%
+  bold(part = "header") %>%
+  bold(
+    i = ~ supported_response != "Uncertain",
+    bold = FALSE,
+    part = "body"
+  ) %>%
+  autofit() %>%
+  set_caption(
+    "Table S__. Species-specific lit/dark ratios for faint bat passes at speaker lures from the effort- and background-offset speaker model."
+  )
+
+ts5
 
 save_as_docx(
   "table.s2" = ts5,
-  path = "figures/rob_spkr_model/v2/tables/ts2.docx")
+  path = "figures/rob_spkr_model/v3/tables/speaker_uncertainty.docx")
 
-save_as_image(ts5, path = "figures/rob_spkr_model/v2/tables/ts2.png")
+save_as_image(ts5, path = "figures/rob_spkr_model/v3/tables/spkr_uncertainty.png")
+
+
+
+# improved table 
+
+# -------------------------------------------------------------------------
+# Species-specific lit/dark log ratios with uncertainty
+# -------------------------------------------------------------------------
+
+spkr_species_logratio <- avg_comparisons(
+  m10_s_bg,
+  newdata = spkr_trt_grid,
+  variables = list(trmt_bin = c(-1, 1)),
+  comparison = "lnratio",
+  by = "sp",
+  type = "response",
+  re.form = NULL,
+  allow.new.levels = TRUE
+) %>%
+  as_tibble() %>%
+  mutate(
+    # Convert log ratio back to lit/dark ratio
+    lit_dark_ratio = exp(estimate),
+    ratio_conf_low = exp(conf.low),
+    ratio_conf_high = exp(conf.high),
+    
+    # Convert ratio to percent change
+    percent_change_lit_vs_dark = 100 * (lit_dark_ratio - 1),
+    percent_conf_low = 100 * (ratio_conf_low - 1),
+    percent_conf_high = 100 * (ratio_conf_high - 1),
+    
+    # On the log-ratio scale, 0 means no difference.
+    # If the CI is entirely below 0, lit is lower than dark.
+    # If the CI is entirely above 0, lit is higher than dark.
+    supported_response = case_when(
+      conf.low > 0 ~ "Higher in lit",
+      conf.high < 0 ~ "Lower in lit",
+      TRUE ~ "Uncertain"
+    )
+  ) %>%
+  arrange(desc(percent_change_lit_vs_dark))
+
+spkr_species_logratio
+
+
+# clean table 
+
+spkr_species_ratio_clean <- spkr_species_logratio %>%
+  transmute(
+    species = sp,
+    lit_dark_ratio = round(lit_dark_ratio, 2),
+    ratio_CI = paste0(
+      round(ratio_conf_low, 2),
+      "–",
+      round(ratio_conf_high, 2)
+    ),
+    percent_change = round(percent_change_lit_vs_dark, 1),
+    percent_CI = paste0(
+      round(percent_conf_low, 1),
+      " to ",
+      round(percent_conf_high, 1),
+      "%"
+    ),
+    p_value = signif(p.value, 3),
+    supported_response
+  )
+
+spkr_species_ratio_clean
+
+ts5<-flextable(spkr_species_ratio_clean) %>%
+  autofit() %>%
+  set_caption(
+    ""
+  )
+
+ts5
+
+ts5 <- flextable(spkr_species_ratio_clean) %>%
+  theme_booktabs() %>%
+  font(fontname = "Times New Roman", part = "all") %>%
+  fontsize(size = 10, part = "all") %>%
+  bold(part = "header") %>%
+  bold(
+    i = ~ supported_response != "Uncertain",
+    bold = TRUE,
+    part = "body"
+  ) %>%
+  autofit() %>%
+  set_caption(
+    "Table S__. Species-specific lit/dark ratios for faint bat passes at speaker lures from the effort- and background-offset speaker model."
+  )
+
+ts5
+
+save_as_docx(
+  "table.s2" = ts5,
+  path = "figures/rob_spkr_model/v3/tables/speaker_uncertainty.docx")
+
+save_as_image(ts5, path = "figures/rob_spkr_model/v3/tables/spkr_uncertainty.png")
+
+
 
 
 # speaker Jday marginal effects  ------------------------------------------
@@ -2168,12 +2434,16 @@ pred_grid_jday <- tidyr::expand_grid(
     avg_moonlight_s = 0,
     elev_max_s = 0,
     yr_s = 0,
-    t_leps_s = 0
+    t_leps_s = 0,
+    # Required offsets for m10_s_bg
+    effort_hours = typical_effort_hours,
+    log_background_offset = typical_log_background
+    
   )
 
 
 pred_jday_comm <- avg_predictions(
-  m11_s,
+  m10_s_bg,
   newdata = pred_grid_jday,
   by = c("jday", "jday_s", "trmt_bin"),
   type = "response",
@@ -2274,7 +2544,7 @@ p_jday_comm_raw_spkr
 
 ggsave(
   p_jday_comm_raw_spkr,
-  filename = "figures/rob_spkr_model/v2/spkr_jday_marginal_effects.png",
+  filename = "figures/rob_spkr_model/v3/spkr_jday_marginal_effects.png",
   width = 8,
   height = 6,
   dpi = 300)
@@ -2283,9 +2553,9 @@ ggsave(
 
 # both robomoth and speaker data ------------------------------------------
 
-# Colors similar to Gomes-style contrast
+# color for the two decoys and lures 
 assay_cols <- c(
-  "Speaker"  = "grey",  # teal
+  "Speaker"  = "grey45",  # teal
   "Robomoth" = "black"   # red/salmon
 )
 
@@ -2301,23 +2571,35 @@ make_trt_grid <- function(dat) {
     arrange(sp) %>%
     pull(sp)
   
+  typical_effort_hours <- median(
+    dat$effort_hours,
+    na.rm = TRUE
+  )
+  
+  typical_log_background <- median(
+    dat$log_background_offset,
+    na.rm = TRUE
+  )
+  
   grid <- tidyr::expand_grid(
     sp = species,
     trmt_bin = c(-1, 1)
   ) %>%
     mutate(
       site = NA,
-      jday_s = mean(dat$jday_s, na.rm = TRUE),
-      nit_avg_wspm_s_s = mean(dat$nit_avg_wspm_s_s, na.rm = TRUE),
-      avg_moonlight_s = mean(dat$avg_moonlight_s, na.rm = TRUE),
-      elev_max_s = mean(dat$elev_max_s, na.rm = TRUE),
-      yr_s = mean(dat$yr_s, na.rm = TRUE),
-      t_leps_s = mean(dat$t_leps_s, na.rm = TRUE)
+      
+      # Non-focal scaled covariates held at mean/reference value
+      jday_s = 0,
+      nit_avg_wspm_s_s = 0,
+      avg_moonlight_s = 0,
+      elev_max_s = 0,
+      yr_s = 0,
+      t_leps_s = 0,
+      
+      # Required offsets for current models
+      effort_hours = typical_effort_hours,
+      log_background_offset = typical_log_background
     )
-  
-  if ("effort_hours" %in% names(dat)) {
-    grid$effort_hours <- 1
-  }
   
   if (is.factor(dat$sp)) {
     grid$sp <- factor(grid$sp, levels = levels(dat$sp))
@@ -2332,10 +2614,12 @@ make_trt_grid <- function(dat) {
 
 
 # robomoth predictions 
+# 
+# 
 rob_grid <- make_trt_grid(rob_db)
 
 pred_rob_sp <- predictions(
-  m11,
+  m10_bg,
   newdata = rob_grid,
   type = "response",
   re.form = NULL,
@@ -2352,7 +2636,7 @@ pred_rob_sp <- predictions(
   )
 
 pred_rob_comm <- avg_predictions(
-  m11,
+  m10_bg,
   newdata = rob_grid,
   by = "trmt_bin",
   type = "response",
@@ -2376,7 +2660,7 @@ pred_rob_comm <- avg_predictions(
 spkr_grid <- make_trt_grid(spkr_db)
 
 pred_spkr_sp <- predictions(
-  m11_s,
+  m10_s_bg,
   newdata = spkr_grid,
   type = "response",
   re.form = NULL,
@@ -2393,7 +2677,7 @@ pred_spkr_sp <- predictions(
   )
 
 pred_spkr_comm <- avg_predictions(
-  m11_s,
+  m10_s_bg,
   newdata = spkr_grid,
   by = "trmt_bin",
   type = "response",
@@ -2410,6 +2694,7 @@ pred_spkr_comm <- avg_predictions(
     panel = "Community"
   )
 
+#combine predictions 
 pred_compare <- bind_rows(
   pred_rob_comm,
   pred_rob_sp,
@@ -2417,14 +2702,17 @@ pred_compare <- bind_rows(
   pred_spkr_sp
 ) %>%
   mutate(
-    assay = factor(assay, levels = c("Speaker", "Robomoth"))
+    assay = factor(assay, levels = c("Speaker", "Robomoth")),
+    treatment = factor(treatment, levels = c("Dark", "Lit")),
+    panel = as.character(panel)
   )
 
 # Keep only species present in both assays, plus Community
 shared_panels <- intersect(
   unique(as.character(pred_rob_sp$panel)),
   unique(as.character(pred_spkr_sp$panel))
-)
+) %>% 
+  sort()
 
 panel_levels <- c("Community", shared_panels)
 
@@ -2436,6 +2724,14 @@ pred_compare <- pred_compare %>%
 
 
 raw_rob <- rob_db %>%
+  filter(
+    !is.na(n_calls),
+    !is.na(sp),
+    !is.na(trmt_bin),
+    !is.na(effort_hours),
+    effort_hours > 0,
+    !is.na(log_background_offset)
+  ) %>%
   mutate(
     assay = "Robomoth",
     treatment = factor(
@@ -2446,6 +2742,14 @@ raw_rob <- rob_db %>%
   )
 
 raw_spkr <- spkr_db %>%
+  filter(
+    !is.na(n_calls),
+    !is.na(sp),
+    !is.na(trmt_bin),
+    !is.na(effort_hours),
+    effort_hours > 0,
+    !is.na(log_background_offset)
+  ) %>%
   mutate(
     assay = "Speaker",
     treatment = factor(
@@ -2458,6 +2762,7 @@ raw_spkr <- spkr_db %>%
 raw_species <- bind_rows(raw_rob, raw_spkr) %>%
   filter(panel %in% shared_panels)
 
+# community level raw observations
 raw_comm <- bind_rows(raw_rob, raw_spkr) %>%
   group_by(assay, treatment, trmt_bin, site, noche) %>%
   summarise(
@@ -2469,12 +2774,22 @@ raw_comm <- bind_rows(raw_rob, raw_spkr) %>%
 raw_compare <- bind_rows(raw_comm, raw_species) %>%
   mutate(
     assay = factor(assay, levels = c("Speaker", "Robomoth")),
+    treatment = factor(treatment, levels = c("Dark", "Lit")),
     panel = factor(panel, levels = panel_levels)
   )
 
+# color for the two decoys and lures 
+assay_cols <- c(
+  "Speaker"  = "green2",  # teal
+  "Robomoth" = "black"   # red/salmon
+)
+
+# now we plot both analysis. 
 
 pd <- position_dodge(width = 0.18)
 
+ 
+# raw observations
 p_gomes_style_treatment <- ggplot() +
   geom_jitter(
     data = raw_compare,
@@ -2484,6 +2799,7 @@ p_gomes_style_treatment <- ggplot() +
     alpha = 0.10,
     size = 0.7
   ) +
+  # model estimates
   geom_errorbar(
     data = pred_compare,
     aes(
@@ -2495,7 +2811,7 @@ p_gomes_style_treatment <- ggplot() +
     width = 0.08,
     linewidth = 0.5,
     position = pd) +
-  # ) +
+  
   # geom_line(
   #   data = pred_compare,
   #   aes(
@@ -2507,6 +2823,7 @@ p_gomes_style_treatment <- ggplot() +
   #   linewidth = 0.9,
   #   position = pd
   # ) +
+  # model -estimated predicted mean
   geom_point(
     data = pred_compare,
     aes(
@@ -2517,17 +2834,17 @@ p_gomes_style_treatment <- ggplot() +
     size = 2.2,
     position = pd
   ) +
-  geom_ribbon(
-    data = pred_compare,
-    aes(
-      x = treatment,
-      ymin = conf.low,
-      ymax = conf.high,
-      fill = assay
-    ),
-    alpha = 0.2,
-    position = pd
-  ) +
+  # geom_ribbon(
+  #   data = pred_compare,
+  #   aes(
+  #     x = treatment,
+  #     ymin = conf.low,
+  #     ymax = conf.high,
+  #     fill = assay
+  #   ),
+  #   alpha = 0.2,
+  #   position = pd
+  # ) +
   facet_wrap(~ panel, scales = "free_y", ncol = 4) +
   scale_color_manual(values = assay_cols) +
   scale_y_continuous(
@@ -2535,10 +2852,14 @@ p_gomes_style_treatment <- ggplot() +
   ) +
   labs(
     title = "Contrasting speaker and robomoth responses to artificial light",
-    subtitle = "Predictions from selected negative-binomial mixed models; points show observed faint passes",
+    subtitle = paste(
+      "Predictions from selected negative-binomial mixed models;",
+      "models include offsets for sampling effort and species-specific background activity;",
+      "points show observed faint passes"
+    ),
     x = "Treatment",
-    y = "Faint bat passes",
-    color = "Assay"
+    y = "Bat passes",
+    color = "experiment"
   ) +
   theme_minimal(base_size = 15) +
   theme(
@@ -2609,9 +2930,118 @@ p_gomes_style_treatment <- ggplot() +
 p_gomes_style_treatment
 
 ggsave(
-  filename = "figures/rob_spkr_model/v2/gomes_style_treatment.tiff",)
+  filename = "figures/rob_spkr_model/v3/rob_spkr_treatment.tiff",)
 
 
+
+# trial for improved graph 
+
+plot_ratio_df <- bind_rows(
+  rob_species_ratio_clean %>%
+    mutate(assay = "Robomoth"),
+  
+  spkr_species_ratio_clean %>%
+    mutate(assay = "Speaker")
+) %>%
+  mutate(
+    assay = factor(assay, levels = c("Speaker", "Robomoth")),
+    
+    # Extract lower and upper percent confidence limits from text.
+    # Example: "-96.1 to 110.7%" becomes -96.1 and 110.7
+    percent_conf_low = map_dbl(
+      str_extract_all(percent_CI, "-?\\d+\\.?\\d*"),
+      ~ as.numeric(.x[1])
+    ),
+    percent_conf_high = map_dbl(
+      str_extract_all(percent_CI, "-?\\d+\\.?\\d*"),
+      ~ as.numeric(.x[2])
+    ),
+    
+    support_status = if_else(
+      supported_response == "Uncertain",
+      "Uncertain",
+      "Supported evidence"
+    )
+  )
+
+plot_ratio_df <- plot_ratio_df %>%
+  group_by(assay) %>%
+  arrange(percent_change, .by_group = TRUE) %>%
+  mutate(
+    species_facet = paste0(assay, "__", species)
+  ) %>%
+  ungroup()
+
+plot_ratio_df$species_facet <- factor(
+  plot_ratio_df$species_facet,
+  levels = unique(plot_ratio_df$species_facet)
+)
+
+
+# -------------------------------------------------------------------------
+
+support_cols <- c(
+  "Supported evidence" = "black",
+  "Uncertain" = "grey70"
+)
+
+p_species_support <- ggplot(
+  plot_ratio_df,
+  aes(
+    x = percent_change,
+    y = species_facet,
+    color = support_status
+  )
+) +
+  geom_vline(
+    xintercept = 0,
+    linetype = "dashed",
+    linewidth = 0.6,
+    color = "grey40"
+  ) +
+  geom_segment(
+    aes(
+      x = percent_conf_low,
+      xend = percent_conf_high,
+      y = species_facet,
+      yend = species_facet
+    ),
+    linewidth = 0.8
+  ) +
+  geom_point(size = 3) +
+  facet_wrap(
+    ~ assay,
+    scales = "free_y",
+    ncol = 2
+  ) +
+  scale_y_discrete(
+    labels = function(x) sub(".*__", "", x)
+  ) +
+  scale_color_manual(values = support_cols) +
+  labs(
+    title = "Species-specific responses to artificial light",
+    subtitle = "Black points indicate species with confidence intervals excluding no change",
+    x = "Percent change in lit relative to dark sites",
+    y = "Species",
+    color = ""
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(
+    legend.position = "bottom",
+    strip.text = element_text(face = "bold"),
+    panel.grid.minor = element_blank(),
+    plot.title = element_text(face = "bold")
+  )
+
+p_species_support
+
+ggsave(
+  filename = "figures/rob_spkr_model/v3/support_spkr_rob.png",
+  plot = p_species_support,
+  width = 9,
+  height = 6,
+  dpi = 300
+)
 
 #Jday with patchwork for jday for both speaker and robomoth data. 
 
@@ -2635,7 +3065,7 @@ p_jday_robomoth_spkr
 
 ggsave(
   plot = p_jday_robomoth_spkr,
-  filename = "figures/rob_spkr_model/v2/jday_spkr_robomoth.tiff",
+  filename = "figures/rob_spkr_model/v3/jday_spkr_robomoth.tiff",
   width = 12,
   height = 6,
   units = "in",
@@ -2649,7 +3079,6 @@ ggsave(
 
 
 # moon marginal effects for both robomoth and speakr moon
-
 moon_predictions <- function(model, data, experiment_label) {
   
   moon_seq <- seq(
@@ -2658,82 +3087,102 @@ moon_predictions <- function(model, data, experiment_label) {
     length.out = 100
   )
   
+  species <- data %>%
+    filter(!is.na(sp)) %>%
+    distinct(sp) %>%
+    arrange(sp) %>%
+    pull(sp)
+  
+  typical_effort_hours <- median(
+    data$effort_hours,
+    na.rm = TRUE
+  )
+  
+  typical_log_background <- median(
+    data$log_background_offset,
+    na.rm = TRUE
+  )
+  
+  typical_background <- exp(typical_log_background)
+  
   new_data <- tidyr::crossing(
     avg_moonlight_s = moon_seq,
-    trmt_bin = c(-1, 1)
+    trmt_bin = c(-1, 1),
+    sp = species
   ) %>%
     mutate(
+      site = NA,
       jday_s = 0,
       nit_avg_wspm_s_s = 0,
       elev_max_s = 0,
       yr_s = 0,
       t_leps_s = 0,
-      site = data$site[which(!is.na(data$site))[1]],
-      sp   = data$sp[which(!is.na(data$sp))[1]]
+      effort_hours = typical_effort_hours,
+      log_background_offset = typical_log_background
     )
   
-  marginaleffects::predictions(
+  if (is.factor(data$sp)) {
+    new_data$sp <- factor(new_data$sp, levels = levels(data$sp))
+  }
+  
+  if (is.factor(data$site)) {
+    new_data$site <- factor(NA, levels = levels(data$site))
+  }
+  
+  marginaleffects::avg_predictions(
     model,
     newdata = new_data,
-    
-    # Obtain predictions and CIs on the linear-predictor scale
-    type = "link",
-    re.form = NA
+    by = c("avg_moonlight_s", "trmt_bin"),
+    type = "response",
+    re.form = NULL,
+    allow.new.levels = TRUE
   ) %>%
-    
-    # Back-transform through the inverse log link
+    as_tibble() %>%
     mutate(
-      estimate = exp(estimate),
-      conf.low = exp(conf.low),
-      conf.high = exp(conf.high),
-      
       Treatment = factor(
         trmt_bin,
         levels = c(-1, 1),
         labels = c("Dark", "Lit")
       ),
-      
-      Experiment = experiment_label
+      Experiment = experiment_label,
+      typical_effort_hours = typical_effort_hours,
+      typical_background = typical_background
     ) %>%
-    
     arrange(Treatment, avg_moonlight_s)
 }
 
-# pred for modesl
+# -------------------------------------------------------------------------
+# Generate predictions from current selected models
+# -------------------------------------------------------------------------
 
-pred_m11 <- moon_predictions(
-  model = m11,
+pred_moon_rob <- moon_predictions(
+  model = m10_bg,
   data = rob_db,
   experiment_label = "Moth decoys"
 )
 
-pred_m11_s <- moon_predictions(
-  model = m11_s,
+pred_moon_spkr <- moon_predictions(
+  model = m10_s_bg,
   data = spkr_db,
   experiment_label = "Speaker lures"
 )
 
+# -------------------------------------------------------------------------
+# Check prediction ranges
+# -------------------------------------------------------------------------
 
-pred_m11 <- moon_predictions(
-  model = m11,
-  data = rob_db,
-  experiment_label = "Moth decoys"
-)
-
-pred_m11_s <- moon_predictions(
-  model = m11_s,
-  data = spkr_db,
-  experiment_label = "Speaker lures"
-)
-
-
-
-bind_rows(pred_m11, pred_m11_s) %>%
+bind_rows(pred_moon_rob, pred_moon_spkr) %>%
+  group_by(Experiment) %>%
   summarise(
-    minimum_estimate = min(estimate),
-    minimum_lower_CI = min(conf.low),
-    maximum_upper_CI = max(conf.high)
+    minimum_estimate = min(estimate, na.rm = TRUE),
+    minimum_lower_CI = min(conf.low, na.rm = TRUE),
+    maximum_upper_CI = max(conf.high, na.rm = TRUE),
+    .groups = "drop"
   )
+
+# -------------------------------------------------------------------------
+# Plotting function
+# -------------------------------------------------------------------------
 
 plot_moon_effect <- function(pred_data, panel_title, y_title = NULL) {
   
@@ -2759,13 +3208,13 @@ plot_moon_effect <- function(pred_data, panel_title, y_title = NULL) {
     scale_color_manual(
       values = c(
         "Dark" = "grey20",
-        "Lit"  = "grey70"
+        "Lit"  = "grey60"
       )
     ) +
     scale_fill_manual(
       values = c(
         "Dark" = "grey20",
-        "Lit"  = "grey70"
+        "Lit"  = "grey60"
       )
     ) +
     scale_y_continuous(
@@ -2786,30 +3235,38 @@ plot_moon_effect <- function(pred_data, panel_title, y_title = NULL) {
     )
 }
 
+# -------------------------------------------------------------------------
+# Build individual panels
+# -------------------------------------------------------------------------
 
 p_moon_rob <- plot_moon_effect(
-  pred_m11,
+  pred_moon_rob,
   panel_title = "A",
   y_title = "Predicted number of faint bat passes"
 )
 
 p_moon_spkr <- plot_moon_effect(
-  pred_m11_s,
+  pred_moon_spkr,
   panel_title = "B",
   y_title = NULL
 )
+
+# -------------------------------------------------------------------------
+# Combine panels
+# -------------------------------------------------------------------------
 
 p_moon_combined <-
   p_moon_rob + p_moon_spkr +
   plot_layout(guides = "collect") +
   plot_annotation(
     title = paste(
-      "Faint bat passes at moth decoys (A) and speaker lures (B)",
+      "bat calls at moth decoys (A) and speaker lures (B)",
       "by treatment and moonlight"
     ),
     subtitle = paste(
-      "Lines show population-level model predictions;",
-      "shaded areas show 95% confidence intervals"
+      "Lines show community-average model predictions;",
+      "shaded areas show 95% confidence intervals;",
+      "models include offsets for sampling effort and species-specific background activity"
     )
   ) &
   theme(
@@ -2820,10 +3277,28 @@ p_moon_combined <-
 
 p_moon_combined
 
+# -------------------------------------------------------------------------
+# Save figure
+# -------------------------------------------------------------------------
+
+dir.create(
+  "figures/rob_spkr_model/v3",
+  recursive = TRUE,
+  showWarnings = FALSE
+)
+
+ggsave(
+  filename = "figures/rob_spkr_model/v3/moonlight_marginal_effects_m10_models.png",
+  plot = p_moon_combined,
+  width = 9,
+  height = 5,
+  dpi = 300
+)
+
 
 ggsave(
   plot = p_moon_combined,
-  filename = "figures/rob_spkr_model/v2/moon_effects_combined.tiff",
+  filename = "figures/rob_spkr_model/v3/moon_effects_combined.tiff",
   width = 8,
   height = 4,
   units = "in",
@@ -2834,6 +3309,42 @@ ggsave(
 
 
 # Old script  -------------------------------------------------------------
+# 
+# 
+# 
+# 
+
+# # currently the best model seems to be m10. but we still have to add the offset. 
+# 
+# m12 <- glmmTMB(
+#   n_calls ~ trmt_bin + jday_s + I(jday_s^2) +
+#     nit_avg_wspm_s_s + avg_moonlight_s + elev_max_s +
+#     yr_s + t_leps_s +
+#     offset(log(effort_hours)) +
+#     (1 | site) +
+#     (1 + trmt_bin | sp) +
+#     trmt_bin * jday_s +
+#     trmt_bin * I(jday_s^2) +
+#     trmt_bin * avg_moonlight_s,
+#   family = nbinom2,
+#   data = rob_db
+# )
+# 
+# check_singularity(m12)
+# m12$sdr$pdHess
+# m12$fit$message
+# check_zeroinflation(m12)
+# calculate_c_hat(m12)   
+# performance_mae(m12)
+# performance::r2(m12)
+# DHARMa::simulateResiduals(m12, n = 1000, plot = TRUE)
+# performance::check_collinearity(m12)
+# summary(m12)
+# anova( m10, m11, m12)
+# 
+
+
+
 # # the section below is an old part of the script and might be removed in future iterations 
 # 
 # # 

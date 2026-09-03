@@ -1308,5 +1308,10 @@ I decided to do the offset using the sm3 data as background and offset. I have u
 
 9/01/2026
 
-I modified the models for spekr and robomoth. these are almost ready to build a table of uncertainty and marginal effects plots. \
+I modified the models for spekr and robomoth. these are almost ready to build a table of uncertainty and marginal effects plots.\
 \
+9/02/2026\
+\
+I kept updating the plots and making sure the model were fit properly. \
+
+![](images/clipboard-3219067985.png)
