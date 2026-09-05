@@ -1324,7 +1324,9 @@ p_moon_levels <- ggplot(
 
 p_moon_levels
 
-# lepidoptera marginal effect. 
+
+# lepidoptera robmoth marginal effect  ------------------------------------
+
 
 
 # Sequence of observed Lepidoptera values on the scaled scale
@@ -1391,7 +1393,7 @@ p_leps_comm <- ggplot(
       "background activity held at ", round(typical_background, 1), " calls"
     ),
     x = "Total Lepidoptera abundance (scaled)",
-    y = "Predicted number of faint robomoth passes",
+    y = "Predicted robomoth bat passes",
     color = "Treatment",
     fill = "Treatment"
   ) +
@@ -2551,6 +2553,93 @@ ggsave(
 
 
 
+
+
+# lepidoptera spkr marginal effects plot ----------------------------------
+
+
+# Sequence of observed Lepidoptera values on the scaled scale
+leps_seq <- seq(
+  quantile(spkr_db$t_leps_s, 0.05, na.rm = TRUE),
+  quantile(spkr_db$t_leps_s, 0.95, na.rm = TRUE),
+  length.out = 100
+)
+
+# Prediction grid
+pred_grid_leps <- tidyr::expand_grid(
+  t_leps_s = leps_seq,
+  trmt_bin = c(-1, 1),
+  sp = spkr_species
+) %>%
+  mutate(
+    site = NA,
+    jday_s = 0,
+    nit_avg_wspm_s_s = 0,
+    avg_moonlight_s = 0,
+    elev_max_s = 0,
+    yr_s = 0,
+    
+    # Required offsets
+    effort_hours = typical_effort_hours,
+    log_background_offset = typical_log_background
+  )
+
+# Community-average predictions across species
+pred_leps_comm <- avg_predictions(
+  m10_s_bg,
+  newdata = pred_grid_leps,
+  by = c("t_leps_s", "trmt_bin"),
+  type = "response",
+  re.form = NULL,
+  allow.new.levels = TRUE
+) %>%
+  as_tibble() %>%
+  mutate(
+    treatment = factor(
+      if_else(trmt_bin == -1, "Dark", "Lit"),
+      levels = c("Dark", "Lit")
+    )
+  )
+
+# Plot
+p_leps_comm_spkr <- ggplot(
+  pred_leps_comm,
+  aes(x = t_leps_s, y = estimate, color = treatment, fill = treatment)
+) +
+  geom_ribbon(
+    aes(ymin = pmax(conf.low,0), ymax = conf.high),
+    alpha = 0.08,
+    color = NA
+  ) +
+  geom_line(linewidth = 1.2) +
+  scale_color_manual(values = trt_cols) +
+  scale_fill_manual(values = trt_cols) +
+  labs(
+    title = "Lepidoptera abundance modifies the effect of artificial light on faint spkr passes",
+    subtitle = paste0(
+      "Predictions from m10_s_bg; non-focal covariates held at mean scaled values; ",
+      "effort held at ", round(typical_effort_hours, 2), " h; ",
+      "background activity held at ", round(typical_background, 1), " calls"
+    ),
+    x = "Total Lepidoptera abundance (scaled)",
+    y = "Predicted number of bat acoustic lure passes",
+    color = "Treatment",
+    fill = "Treatment"
+  ) +
+  theme_minimal(base_size = 15) +
+  theme(
+    legend.position = "bottom",
+    panel.grid.minor = element_blank(),
+    plot.title = element_text(face = "bold"),
+    plot.subtitle = element_text(size = 12)
+  )
+
+p_leps_comm_spkr
+
+
+
+
+
 # both robomoth and speaker data ------------------------------------------
 
 # color for the two decoys and lures 
@@ -3075,8 +3164,44 @@ ggsave(
 )
 
 
+# lepidoptea with patwork
 
+leps_robomoth_spkr <-
+  (
+    p_leps_comm +
+      labs(title = NULL, subtitle = NULL) +
+      labs(y = "Predicted number of faint bat passes")
+    |
+      p_leps_comm_spkr +
+      labs(title = NULL, subtitle = NULL) +
+      labs(y = NULL)
+  ) +
+  plot_annotation(
+    title = "Bat calls at moth decoys (A) and speaker lures (B) by treatment and Lepidoptera abundance",
+    subtitle = paste(
+      "Lines show model predictions;",
+      "shaded areas show 95% confidence intervals"
+    ),
+    tag_levels = "A"
+  ) &
+  theme(
+    plot.title = element_text(face = "bold"),
+    plot.subtitle = element_text(size = 11),
+    plot.tag = element_text(face = "bold")
+  )
 
+leps_robomoth_spkr
+
+ggsave(
+  plot = leps_robomoth_spkr,
+  filename = "figures/rob_spkr_model/v3/leps_spkr_robomoth.tiff",
+  width = 12,
+  height = 6,
+  units = "in",
+  dpi = 600,
+  compression = "lzw", # this compression just works with tiff files. 
+  bg = "white"
+)
 
 # moon marginal effects for both robomoth and speakr moon
 moon_predictions <- function(model, data, experiment_label) {
