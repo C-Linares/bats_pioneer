@@ -1312,6 +1312,18 @@ I modified the models for spekr and robomoth. these are almost ready to build a 
 \
 9/02/2026\
 \
-I kept updating the plots and making sure the model were fit properly. \
+I kept updating the plots and making sure the model were fit properly.\
 
 ![](images/clipboard-3219067985.png)
+
+------------------------------------------------------------------------
+
+10/9/2026\
+I have been working on the oveelap analysis. I am trying to calcualte to see if bats curves overlap is significatly different betweeen lit and dark sites. I feel I habe to plot the lit site on top of the dark site in the graphs.\
+\
+
+------------------------------------------------------------------------
+
+10/28/2026
+
+I updated some of the graphs for the manuscript. Including the tables with the model estimates.

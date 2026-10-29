@@ -338,7 +338,7 @@ beep(sound = 4)
 
 m1.7_table <- gtsummary::tbl_regression(
   m1.7,
-  exponentiate = TRUE,
+  exponentiate = FALSE,
   label = list(
     trmt_bin ~ "Treatment (Lit vs Dark)",
     jday_s ~ "Julian Day (scaled)",
@@ -355,6 +355,78 @@ m1.7_table <- gtsummary::tbl_regression(
 )
 
 m1.7_table
+
+m1.7_flex <- m1.7_table %>%
+  gtsummary::as_flex_table() %>%
+  
+  # Manuscript formatting
+  flextable::theme_booktabs() %>%
+  
+  flextable::font(
+    fontname = "Times New Roman",
+    part = "all"
+  ) %>%
+  
+  flextable::fontsize(
+    size = 10,
+    part = "body"
+  ) %>%
+  
+  flextable::fontsize(
+    size = 10,
+    part = "header"
+  ) %>%
+  
+  flextable::bold(
+    part = "header"
+  ) %>%
+  
+  flextable::align(
+    j = 1,
+    align = "left",
+    part = "all"
+  ) %>%
+  
+  flextable::align(
+    j = 2:4,
+    align = "center",
+    part = "all"
+  ) %>%
+  
+  flextable::valign(
+    valign = "center",
+    part = "all"
+  ) %>%
+  
+  flextable::add_footer_lines(
+    values = paste0(
+      "Note: Estimates are exponentiated coefficients and ",
+      "represent rate ratios. CI = confidence interval. ",
+      "Bold p-values indicate p < 0.05. Continuous predictors ",
+      "were standardized before analysis."
+    )
+  ) %>%
+  
+  flextable::fontsize(
+    size = 9,
+    part = "footer"
+  ) %>%
+  
+  flextable::italic(
+    part = "footer"
+  ) %>%
+  
+  flextable::autofit()
+
+m1.7_flex
+
+flextable::save_as_docx(
+  "Table S1" = m1.7_flex,
+  path = "figures/glmm_v5/tables/ts1.docx"
+  )
+
+
+save_as_image(m1.7_flex, path = "figures/glmm_v5/tables/ts1.png")
 
 #now we try the interaction with year
 
@@ -633,13 +705,170 @@ ts6<-flextable(table_S1) %>%
   # hline_top(border = fp_border(color = "black", width = .5)) %>%
   # hline_bottom(border = fp_border(color = "black", width = .5))
 
+
+# here we modify the table 
+
+table_S1 <- model_comparison %>%
+  filter(term != "(Intercept)") %>%
+  transmute(
+    Predictor = predictor,
+    
+    `Call counts: β (SE)` = sprintf(
+      "%.3f (%.3f)",
+      estimate_counts,
+      SE_counts
+    ),
+    
+    `Call counts: 95% CI` = sprintf(
+      "[%.3f, %.3f]",
+      lower_CI_counts,
+      upper_CI_counts
+    ),
+    
+    `Call counts: p` = format_p(
+      p_value_counts
+    ),
+    
+    `Activity minutes: β (SE)` = sprintf(
+      "%.3f (%.3f)",
+      estimate_minutes,
+      SE_minutes
+    ),
+    
+    `Activity minutes: 95% CI` = sprintf(
+      "[%.3f, %.3f]",
+      lower_CI_minutes,
+      upper_CI_minutes
+    ),
+    
+    `Activity minutes: p` = format_p(
+      p_value_minutes
+    ),
+    
+    Comparison = pattern,
+    
+    # Keep logical indicators for formatting
+    significant_counts =
+      !is.na(p_value_counts) &
+      p_value_counts < 0.05,
+    
+    significant_minutes =
+      !is.na(p_value_minutes) &
+      p_value_minutes < 0.05
+  )
+
+significant_counts_rows <- which(
+  table_S1$significant_counts
+)
+
+significant_minutes_rows <- which(
+  table_S1$significant_minutes
+)
+
+
+table_S1_display <- table_S1 %>%
+  select(
+    -significant_counts,
+    -significant_minutes
+  )
+
+table_S1_display
+
+
+
+ts6 <- flextable::flextable(
+  table_S1_display
+) %>%
+  flextable::set_caption(
+    "Table S1. Comparison of fixed-effect estimates from the two models"
+  ) %>%
+  
+  flextable::theme_vanilla() %>%
+  
+  # Bold all column headings
+  flextable::bold(
+    part = "header"
+  ) %>%
+  
+  # Highlight significant call-count p-values
+  flextable::bold(
+    i = significant_counts_rows,
+    j = "Call counts: p",
+    bold = TRUE,
+    part = "body"
+  ) %>%
+  flextable::bg(
+    i = significant_counts_rows,
+    j = "Call counts: p",
+    bg = "white",
+    part = "body"
+  ) %>%
+  
+  # Highlight significant activity-minute p-values
+  flextable::bold(
+    i = significant_minutes_rows,
+    j = "Activity minutes: p",
+    bold = TRUE,
+    part = "body"
+  ) %>%
+  flextable::bg(
+    i = significant_minutes_rows,
+    j = "Activity minutes: p",
+    bg = "white",
+    part = "body"
+  ) %>%
+  
+  # Alignment
+  flextable::align(
+    j = "Predictor",
+    align = "left",
+    part = "all"
+  ) %>%
+  flextable::align(
+    j = setdiff(
+      names(table_S1_display),
+      "Predictor"
+    ),
+    align = "center",
+    part = "all"
+  ) %>%
+  
+  # Font formatting
+  flextable::font(
+    fontname = "Times New Roman",
+    part = "all"
+  ) %>%
+  flextable::fontsize(
+    size = 10,
+    part = "all"
+  ) %>%
+  
+  # Explain highlighting
+  flextable::add_footer_lines(
+    values = paste0(
+      "",
+      ""
+    )
+  ) %>%
+  flextable::fontsize(
+    size = 9,
+    part = "footer"
+  ) %>%
+  flextable::italic(
+    part = "footer"
+  ) %>%
+  
+  flextable::autofit()
+
+ts6
+
 # save the table (this has been saved.)
 
-# save_as_docx(
-#   "table.s6" = ts6,
-#   path = "figures/glmm_v5/tables/ts6.docx")
-# 
-# save_as_image(ts6, path = "figures/glmm_v5/tables/ts6.png")
+save_as_docx(
+  "table.s6" = ts6,
+  path = "figures/glmm_v5/tables/ts6.docx")
+
+save_as_image(ts6, path = "figures/glmm_v5/tables/ts6.png")
 # 
 #============================================================================
 # marginal effects m1.7 ---------------------------------------------------

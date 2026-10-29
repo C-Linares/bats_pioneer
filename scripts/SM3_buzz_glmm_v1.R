@@ -412,6 +412,140 @@ as_flex_table(t1) %>%
 
 # this model seems strong and it seems might be a good candidate for the final model. after runnin m1.9 it seems like this is the final model. 
 
+# lets create a table for the manuscript 
+
+tidy_conditional <- function(
+    x,
+    conf.level = 0.95,
+    exponentiate = FALSE,
+    ...
+) {
+  broom.mixed::tidy(
+    x,
+    effects = "fixed",
+    component = "cond",
+    conf.int = TRUE,
+    conf.level = conf.level,
+    exponentiate = exponentiate
+  ) %>%
+    select(
+      term,
+      estimate,
+      std.error,
+      statistic,
+      p.value,
+      conf.low,
+      conf.high
+    )
+}
+
+
+t1 <- gtsummary::tbl_regression(
+  m1.8,
+  tidy_fun = tidy_conditional,
+  exponentiate = FALSE,
+  conf.level = 0.95,
+  
+  label = list(
+    trmt_bin ~ "Treatment (Lit vs Dark)",
+    jday_s ~ "Julian day",
+    `I(jday_s^2)` ~ "Julian day squared",
+    avg_moonlight_s ~ "Moonlight",
+    nit_avg_temp_c_s ~ "Temperature",
+    nit_avg_wspm_s_s ~ "Wind speed",
+    yr_s ~ "Year",
+    t_lepidoptera_s ~ "Lepidoptera abundance",
+    `trmt_bin:jday_s` ~
+      "Treatment × Julian day",
+    `trmt_bin:avg_moonlight_s` ~
+      "Treatment × moonlight",
+    `trmt_bin:yr_s` ~
+      "Treatment × year"
+  )
+) %>%
+  
+  gtsummary::modify_header(
+    label = "**Predictor**",
+    estimate = "**estimate**",
+    conf.low = "**95% CI**",
+    p.value = "**p-value**"
+  ) %>%
+  
+  gtsummary::modify_fmt_fun(
+    estimate = gtsummary::label_style_sigfig(
+      digits = 3
+    ),
+    conf.low = gtsummary::label_style_sigfig(
+      digits = 3
+    ),
+    conf.high = gtsummary::label_style_sigfig(
+      digits = 3
+    ),
+    p.value = gtsummary::label_style_pvalue(
+      digits = 3
+    )
+  ) %>%
+  
+  gtsummary::bold_p(
+    t = 0.05
+  ) %>%
+  
+  gtsummary::modify_caption(
+    paste0(
+      "**Table S#. Fixed-effect estimates from the ",
+      "negative-binomial generalized linear mixed model ",
+      "of bat feeding-buzz activity.**"
+    )
+  )
+
+t1
+
+significant_rows <- which(
+  !is.na(t1$table_body$p.value) &
+    t1$table_body$p.value < 0.05
+)
+
+m1.8_flex <- gtsummary::as_flex_table(t1) %>%
+  flextable::theme_booktabs() %>%
+  flextable::font(
+    fontname = "Times New Roman",
+    part = "all"
+  ) %>%
+  flextable::fontsize(
+    size = 10,
+    part = "all"
+  ) %>%
+  flextable::bold(
+    part = "header"
+  ) %>%
+  flextable::bold(
+    i = significant_rows,
+    j = c("label", "p.value"),
+    part = "body"
+  ) %>%
+  flextable::align(
+    j = "label",
+    align = "left",
+    part = "all"
+  ) %>%
+  flextable::align(
+    j = c(
+      "estimate",
+      "conf.low",
+      "p.value"
+    ),
+    align = "center",
+    part = "all"
+  ) %>%
+  flextable::autofit()
+
+m1.8_flex
+
+save_as_docx(
+  "table.s1" = m1.8_flex,
+  path = "figures/sm3_glmm_v1/table//ts_m1.8.docx"
+)
+
 
 # lets try interaction with lepidptera
 
@@ -757,10 +891,171 @@ p_trmt <- ggplot() +
 
 p_trmt
 
+# change the order so it agrees with the other plots in the manuscript 
+
+desired_label_order <- c(
+  "M.yumanensis",
+  "M.thysanodes",
+  "M.evotis",
+  "A.pallidus",
+  "C.townsendii",
+  "E.fuscus",
+  "M.ciliolabrum",
+  "L.cinereus",
+  "L.noctivagans",
+  "M.lucifugus",
+  "M.volans"
+)
+
+species_effects %>%
+  distinct(
+    sp_clean,
+    sp_label
+  ) %>%
+  arrange(sp_label)
+
+species_order <- species_effects %>%
+  distinct(
+    sp_clean,
+    sp_label
+  ) %>%
+  mutate(
+    panel_order = match(
+      sp_label,
+      desired_label_order
+    )
+  ) %>%
+  arrange(panel_order) %>%
+  pull(sp_clean) %>%
+  as.character()
+
+pred_trmt <- species_effects %>%
+  select(
+    sp_clean,
+    sp_label,
+    predicted_dark,
+    predicted_lit,
+    percent_change,
+    evidence
+  ) %>%
+  pivot_longer(
+    cols = c(
+      predicted_dark,
+      predicted_lit
+    ),
+    names_to = "treatment",
+    values_to = "estimate"
+  ) %>%
+  mutate(
+    trmt_bin = if_else(
+      treatment == "predicted_dark",
+      -1,
+      1
+    ),
+    sp_clean = factor(
+      sp_clean,
+      levels = species_order
+    )
+  )
+
+raw_plot <- sm3_buzz_v2 %>%
+  mutate(
+    sp_clean = factor(
+      sp_clean,
+      levels = species_order
+    )
+  )
+
+p_trmt <- ggplot() +
+  
+  geom_jitter(
+    data = raw_plot,
+    aes(
+      x = trmt_bin,
+      y = t_buzzes
+    ),
+    width = 0.15,
+    alpha = 0.15,
+    size = 0.6,
+    color = "grey60"
+  ) +
+  
+  geom_line(
+    data = pred_trmt,
+    aes(
+      x = trmt_bin,
+      y = estimate,
+      group = sp_clean,
+      color = evidence
+    ),
+    linewidth = 1
+  ) +
+  
+  geom_point(
+    data = pred_trmt,
+    aes(
+      x = trmt_bin,
+      y = estimate,
+      color = evidence
+    ),
+    size = 2.4
+  ) +
+  
+  facet_wrap(
+    ~ sp_clean,
+    scales = "free_y",
+    ncol = 4,
+    labeller = as_labeller(
+      facet_labels
+    )
+  ) +
+  
+  scale_color_manual(
+    values = c(
+      "Supported increase" = "black",
+      "Supported decrease" = "red",
+      "Uncertain" = "grey75"
+    ),
+    drop = FALSE
+  ) +
+  
+  scale_x_continuous(
+    breaks = c(-1, 1),
+    labels = c("Dark", "Lit")
+  ) +
+  
+  scale_y_continuous(
+    trans = "log1p"
+  ) +
+  
+  labs(
+    x = "Treatment",
+    y = "Feeding buzzes per night",
+    color = "Estimated response"
+  ) +
+  
+  theme_minimal() +
+  
+  theme(
+    strip.text = element_text(
+      size = 13,
+      face = "italic"
+    ),
+    axis.text = element_text(
+      size = 9
+    ),
+    axis.title = element_text(
+      size = 11
+    ),
+    legend.position = "bottom"
+  )
+
+p_trmt
+
 
 
 ggsave(
-  filename = "figures/sm3_glmm_v1/buzz_species_treatment_m1.8.tiff",
+  filename = "figures/sm3_glmm_v1/figure_4_buzz_sp.tiff",,
   plot = p_trmt,
   width = 12,
   height = 8,

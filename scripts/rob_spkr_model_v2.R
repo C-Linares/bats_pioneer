@@ -2869,7 +2869,7 @@ raw_compare <- bind_rows(raw_comm, raw_species) %>%
 
 # color for the two decoys and lures 
 assay_cols <- c(
-  "Speaker"  = "green2",  # teal
+  "Speaker"  = "grey",  # teal
   "Robomoth" = "black"   # red/salmon
 )
 
