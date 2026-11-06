@@ -1001,7 +1001,7 @@ p_trmt
 
 # m1.7 treatment marginal -------------------------------------------------
 
-# here we improved the graph above orderign the responses and adding scientific names
+# here we improved the graph above ordering the responses and adding scientific names
 pred_trmt <- pred_trmt %>%
   mutate(
     trmt = factor(
@@ -1405,6 +1405,39 @@ pred_trmt %>%
   distinct(sp, plot_group)
 
 
+# here we add  modification to the sp labes to show 4 letter species codes.
+species_short_labels <- c(
+  antpal = "anpa",
+  cortow = "coto",
+  eptfus = "epfu",
+  lascin = "laci",
+  lasnoc = "lano",
+  myocil = "myci",
+  myoevo = "myev",
+  myoluc = "mylu",
+  myothy = "myth",
+  myovol = "myvo",
+  myoyum = "myyu"
+)
+
+species_labels_effect <- species_effects %>%
+  mutate(
+    sp = as.character(sp),
+    effect_text = sprintf(
+      "%s (%+.1f%%)",
+      species_short_labels[sp],
+      percent_change
+    )
+  ) %>%
+  select(
+    sp,
+    effect_text
+  ) %>%
+  deframe()
+
+
+
+
 p_trmt <- ggplot() +
   
   # Raw observations
@@ -1467,7 +1500,8 @@ p_trmt <- ggplot() +
   ) +
   
   scale_y_continuous(
-    trans = "log1p"
+    trans = "log1p",
+    n.breaks = 4
   ) +
   
   scale_x_continuous(
@@ -1486,20 +1520,20 @@ p_trmt <- ggplot() +
   theme(
     strip.text = element_text(
       size = 11,
-      face = "italic"
+      face = "bold"
     ),
-    axis.text = element_text(size = 9),
-    axis.title = element_text(size = 11),
-    legend.text = element_text(size = 9),
-    legend.title = element_text(size = 10),
+    axis.text = element_text(size = 12),
+    axis.title = element_text(size = 12),
+    legend.text = element_text(size = 12),
+    legend.title = element_text(size = 12),
     legend.position = "bottom"
   )
 
-p_trmt
+p_trmt #( figure 2 in manuscript) 
 
 # save new table. 
 ggsave(
-  filename = "figures/glmm_v5/bat_species_treatment_effect.tiff",
+  filename = "figures/glmm_v5/bat_species_treatment_effect_v2.tiff",
   plot = p_trmt,
   width = 12,
   height = 8,
@@ -1766,7 +1800,7 @@ p_jday <- ggplot() +
   facet_wrap(
     ~ sp,
     scales = "free_y",
-    labeller = labeller(sp = species_labels)
+    labeller = labeller(sp = species_short_labels)
   ) +
   
   scale_color_manual(
@@ -1777,7 +1811,8 @@ p_jday <- ggplot() +
   ) +
   
   scale_y_continuous(
-    trans = "log1p"
+    trans = "log1p",
+    n.breaks = 4
   ) +
   
   labs(
@@ -1791,13 +1826,20 @@ p_jday <- ggplot() +
   
   theme(
     strip.text = element_text(
-      size = 10,
-      face = "italic"
+      size = 11,
+      face = "bold"
     ),
-    axis.text = element_text(size = 9),
-    axis.title = element_text(size = 11),
+    axis.text.x = element_text(size = 12),
+    axis.text.y = element_text(size = 12),
+    axis.title = element_text(size = 12),
+    legend.text = element_text(size = 12),
+    legend.title = element_text(size = 12),
     legend.position = "bottom"
   )
+
+
+
+
 
 p_jday
 

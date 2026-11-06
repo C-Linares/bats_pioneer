@@ -593,59 +593,70 @@ species_scores_df %>%
 
 
 # mvGLM -----------------------------------------------------------------
-
-library(mvabund)
-# Prepare data -------------------------------------------------------------
-# Response = bat community abundance matrix (species × sites)
-# Convert comm_matrix_std into an mvabund object
-Y <- mvabund(comm_matrix)
-
-# Predictors = environmental variables and offset oftotal effort. 
-pred_matrix<- pred_matrix %>% left_join(total_effort) %>% 
-  mutate(log_nights= log(total_effort))
-
-X <- pred_matrix %>%
-  column_to_rownames("site") %>%
-  mutate(across(everything(), scale))   # center & scale predictors
-
-#add treatment
-X$treatmt<-ifelse(X$mean_mwatts > 0, "lit", "dark")
-
-# Ensure matching row order
-X <- X[rownames(comm_matrix), ]
-
-# Build mvGLM --------------------------------------------------------------
-# Negative binomial family is often best for overdispersed count data
-fit <- manyglm(Y ~ mean_mwatts + t.leps + elev_mean, offset("log_nights"),
-               data = X,
-               family = "negative.binomial")
-
-# Model diagnostics --------------------------------------------------------
-# Residual checks (optional but recommended)
-plot(fit)   # residual vs fitted, QQ plot etc.
-
-# Hypothesis tests ---------------------------------------------------------
-# Overall test: does the full predictor set explain variation in the community?
-anova_full <- anova.manyglm(fit, resamp = "pit.trap", nBoot = 999)
-anova_full
-
-# Marginal tests: importance of each predictor individually (Type III)
-anova_marginal <- anova.manyglm(fit, p.uni = "adjusted", resamp = "pit.trap", nBoot = 999)
-anova_marginal
-
-# Visualize effects --------------------------------------------------------
-# Turn fitted values into long format for plotting
-fitted_vals <- fitted(fit)
-fitted_df <- as.data.frame(fitted_vals)
-fitted_df$site <- rownames(comm_matrix)
-fitted_long <- pivot_longer(fitted_df, -site, names_to = "species", values_to = "fit")
-
-ggplot(fitted_long, aes(x = species, y = fit)) +
-  geom_boxplot() +
-  theme_minimal() +
-  labs(title = "Fitted bat abundances across species",
-       y = "Fitted abundance (calls)", x = "Species")
-
+# 
+# library(mvabund)
+# # Prepare data -------------------------------------------------------------
+# # Response = bat community abundance matrix (species × sites)
+# # Convert comm_matrix_std into an mvabund object
+# Y <- mvabund(comm_matrix)
+# 
+# # Predictors = environmental variables and offset of total effort. 
+# pred_matrix<- pred_matrix %>% left_join(total_effort) %>% 
+#   mutate(log_nights= log(total_effort))
+# 
+# # X <- pred_matrix %>%
+# #   column_to_rownames("site") %>%
+# #   mutate(across(everything(), scale))   # center & scale predictors
+# 
+# X <- pred_matrix %>%
+#   mutate(
+#     row_id = paste(site, yr, sep = "_")
+#   ) %>%
+#   column_to_rownames("row_id") %>%
+#   mutate(
+#     t_leps_s = as.numeric(scale(t_leps)),
+#     elev_mean_s = as.numeric(scale(elev_mean)),
+#     mean_mwatts_s = as.numeric(scale(mean_mwatts))
+#   )
+# 
+# #add treatment
+# X$treatmt<-ifelse(X$mean_mwatts > 0, "lit", "dark")
+# 
+# # Ensure matching row order
+# X <- X[rownames(comm_matrix), ]
+# 
+# # Build mvGLM --------------------------------------------------------------
+# # Negative binomial family is often best for overdispersed count data
+# fit <- manyglm(Y ~ mean_mwatts + t_leps_s + elev_mean_s, offset("log_nights"),
+#                data = X,
+#                family = "negative.binomial")
+# 
+# # Model diagnostics --------------------------------------------------------
+# # Residual checks (optional but recommended)
+# plot(fit)   # residual vs fitted, QQ plot etc.
+# 
+# # Hypothesis tests ---------------------------------------------------------
+# # Overall test: does the full predictor set explain variation in the community?
+# anova_full <- anova.manyglm(fit, resamp = "pit.trap", nBoot = 999)
+# anova_full
+# 
+# # Marginal tests: importance of each predictor individually (Type III)
+# anova_marginal <- anova.manyglm(fit, p.uni = "adjusted", resamp = "pit.trap", nBoot = 999)
+# anova_marginal
+# 
+# # Visualize effects --------------------------------------------------------
+# # Turn fitted values into long format for plotting
+# fitted_vals <- fitted(fit)
+# fitted_df <- as.data.frame(fitted_vals)
+# fitted_df$site <- rownames(comm_matrix)
+# fitted_long <- pivot_longer(fitted_df, -site, names_to = "species", values_to = "fit")
+# 
+# ggplot(fitted_long, aes(x = species, y = fit)) +
+#   geom_boxplot() +
+#   theme_minimal() +
+#   labs(title = "Fitted bat abundances across species",
+#        y = "Fitted abundance (calls)", x = "Species")
+# 
 
 
 
@@ -717,6 +728,12 @@ tab3<-flextable::flextable(mv_tab_manual) %>%
   flextable::autofit()
 
 library(flextable)
+
+save_as_docx(
+  tab3,
+  path = "figures/dbrd/mvglm_multivariate_results.docx"
+)
+
 save_as_image(
   tab3,
   path = "figures/dbrd/mvglm_multivariate_results.png"

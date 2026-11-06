@@ -1327,3 +1327,8 @@ I have been working on the oveelap analysis. I am trying to calcualte to see if 
 10/28/2026
 
 I updated some of the graphs for the manuscript. Including the tables with the model estimates.
+
+------------------------------------------------------------------------
+
+10/29/2026\
+Updated the dbrda analysis. onse section needs correction so it runs smoth. alos create a word editable table for the mvglm.
