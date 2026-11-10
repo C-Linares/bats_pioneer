@@ -990,14 +990,6 @@ p_trmt <- ggplot() +
 
 p_trmt
 
-# ggsave(
-#   filename = "figures/glmm_v5/trmt_v1.png",
-#   plot = p_trmt,
-#   width = 10,
-#   height = 8,
-#   dpi = 300
-# )
-
 
 # m1.7 treatment marginal -------------------------------------------------
 
@@ -1657,6 +1649,9 @@ ts2<-flextable(species_results_manuscript) %>%
 
 # jday 
 
+# jday marginal m1.7 ------------------------------------------------------
+
+
 
 jday_seq <- seq(
   min(bm2$jday_s, na.rm = TRUE),
@@ -1858,6 +1853,9 @@ ggsave(
 
 
 
+# moon margina m1.7 -------------------------------------------------------
+
+
 # marginal effects of light and moonlight interactions.
 # this this was not significant. so moon does decrease activity but we don't see a differenc between lit and dark sites. 
 
@@ -2022,6 +2020,82 @@ ggsave(
 
 # becasue moon was not ran inside the random slopes and even if the interaction was not significant we will still plot the interaction between year and treatment but for the whole community instead of the individual species response. 
 
+# Sequence across the observed standardized moonlight range
+moon_seq <- seq(
+  from = min(
+    bm2$avg_moonlight_s,
+    na.rm = TRUE
+  ),
+  to = max(
+    bm2$avg_moonlight_s,
+    na.rm = TRUE
+  ),
+  length.out = 100
+)
+
+# Community-level predictions
+pred_moon_overall <- predictions(
+  m1.7,
+  
+  newdata = datagrid(
+    model = m1.7,
+    
+    avg_moonlight_s = moon_seq,
+    trmt_bin = c(-1, 1),
+    
+    # Hold the other standardized predictors at their means
+    jday_s = 0,
+    nit_avg_temp_c_s = 0,
+    nit_avg_wspm_s_s = 0,
+    yr_s = 0,
+    t_lepidoptera_s = 0
+  ),
+  
+  # Exclude site and species random effects
+  re.form = NA,
+  
+  type = "response"
+) %>%
+  
+  # Convert the marginaleffects object into a regular data frame
+  as.data.frame() %>%
+  
+  mutate(
+    trmt = factor(
+      trmt_bin,
+      levels = c(-1, 1),
+      labels = c("Dark", "Illuminated")
+    )
+  ) %>%
+  
+  arrange(
+    trmt,
+    avg_moonlight_s
+  )
+
+# unstandardize the moonlight values for plotting
+
+avg_moonlight_s =
+  (bm2$avg_moonlight - mean(bm2$avg_moonlight)) /
+  (2 * sd(bm2$avg_moonlight))
+
+moon_center <- mean(
+  bm2$avg_moonlight,
+  na.rm = TRUE
+)
+
+moon_2sd <- 2 * sd(
+  bm2$avg_moonlight,
+  na.rm = TRUE
+)
+
+pred_moon_overall <- pred_moon_overall %>%
+  mutate(
+    avg_moonlight = avg_moonlight_s * moon_2sd +
+      moon_center
+  )
+
+
 p_moon_overall <- ggplot(
   pred_moon_overall,
   aes(
@@ -2060,23 +2134,23 @@ p_moon_overall <- ggplot(
     )
   ) +
   
-  scale_y_continuous(trans = "log1p") +
-  
   labs(
-    x = "Moonlight intensity (standardized)",
+    x = "Moonlight intensity",
     y = "Predicted nightly bat calls",
     color = "Treatment",
     fill = "Treatment",
     title = ""
   ) +
   
-  theme_classic(base_size = 11) 
+  theme_minimal(base_size = 11) +
   
-  # theme(
-  #   legend.position = "bottom",
-  #   legend.title = element_text(size = 10),
-  #   plot.title = element_text(face = "bold")
-  # )
+  theme(
+    legend.position = "bottom",
+    legend.title = element_text(size = 12),
+    plot.title = element_text(face = "bold"),
+    panel.grid = element_blank()
+    
+  )
 
 p_moon_overall
 
@@ -2094,6 +2168,9 @@ ggsave(
   bg = "white"
 )
 
+
+
+# year marginal m1.7 ------------------------------------------------------
 
 
 # now the year interaction 
@@ -2208,7 +2285,7 @@ p_year_alt <- ggplot() +
     x = "Year",
     y = "Predicted bat calls",
     color = "Treatment",
-    title = "Treatment × Year interaction in bat activity"
+    title = ""
   ) +
   
   scale_color_manual(
@@ -2216,15 +2293,202 @@ p_year_alt <- ggplot() +
   ) +
   
   scale_y_continuous(trans = "log1p") +
-  
   theme_minimal() +
+  
   theme(
-    strip.text = element_text(size = 8),
-    legend.position = "top"
+    strip.text = element_text(
+      size = 11,
+      face = "bold"
+    ),
+    axis.text = element_text(size = 9),
+    axis.title = element_text(size = 11),
+    plot.title = element_text(size = 14),
+    plot.subtitle = element_text(size = 10),
+    legend.text = element_text(size = 9),
+    legend.title = element_text(size = 10),
+    legend.position = "bottom"
   )
+
+
 
 p_year_alt
 
+
+# we improve the graph so we have the aesthetic as the rest of the graphs. 
+
+# Desired panel order from the example graph
+species_order <- c(
+  "myyu",
+  "myth",
+  "myev",
+  "anpa",
+  "coto",
+  "epfu",
+  "myci",
+  "laci",
+  "lano",
+  "mylu",
+  "myvo"
+)
+
+# Convert marginaleffects output into a regular data frame
+pred_year_plot <- pred_year %>%
+  as.data.frame() %>%
+  mutate(
+    # Six-letter code to four-letter code
+    sp4 = paste0(
+      substr(as.character(sp), 1, 2),
+      substr(as.character(sp), 4, 5)
+    ),
+    
+    # Set the panel order
+    sp4 = factor(
+      sp4,
+      levels = species_order
+    ),
+    
+    # Convert scaled year back to the actual year
+    year = factor(
+      case_when(
+        yr_s == -1 ~ "2021",
+        yr_s ==  0 ~ "2022",
+        yr_s ==  1 ~ "2023"
+      ),
+      levels = c("2021", "2022", "2023")
+    ),
+    
+    # Treatment labels and order
+    trmt = factor(
+      if_else(
+        trmt_bin == -1,
+        "Dark",
+        "Lit"
+      ),
+      levels = c("Dark", "Lit")
+    )
+  )
+
+# add observations to the data. 
+
+bm_year_plot <- bm2 %>%
+  mutate(
+    sp4 = paste0(
+      substr(as.character(sp), 1, 2),
+      substr(as.character(sp), 4, 5)
+    ),
+    
+    sp4 = factor(
+      sp4,
+      levels = species_order
+    ),
+    
+    year = factor(
+      as.character(yr),
+      levels = c("2021", "2022", "2023")
+    ),
+    
+    trmt = factor(
+      if_else(
+        trmt_bin == -1,
+        "Dark",
+        "Lit"
+      ),
+      levels = c("Dark", "Lit")
+    )
+  )
+
+
+
+p_year_alt <- ggplot(
+  pred_year_plot,
+  aes(
+    x = year,
+    y = estimate,
+    color = trmt,
+    group = trmt
+  )
+) +
+  geom_jitter(
+    data = bm_year_plot,
+    aes(
+      x = year,
+      y = n
+    ),
+    inherit.aes = FALSE,
+    width = 0.12,
+    alpha = 0.06,
+    size = 0.5,
+    color = "grey60"
+  ) +
+  
+  geom_line(
+    linewidth = 1.1
+  ) +
+  
+  geom_point(
+    size = 2.5
+  ) +
+  
+  facet_wrap(
+    ~ sp4,
+    scales = "free_y",
+    ncol = 4
+  ) +
+  
+  scale_color_manual(
+    values = c(
+      "Dark" = "grey20",
+      "Lit" = "grey70"
+    ),
+    breaks = c("Dark", "Lit")
+  ) +
+  
+  scale_y_continuous(
+    trans = "log1p",
+    n.breaks = 3,
+    guide = guide_axis(
+      check.overlap = TRUE
+    )
+  ) +
+  
+  labs(
+    x = "Year",
+    y = "Predicted bat calls",
+    color = "Treatment",
+    title = NULL
+  ) +
+  
+  theme_minimal() +
+  
+  theme(
+    strip.text = element_text(
+      size = 11,
+      face = "bold"
+    ),
+    axis.text.x = element_text(size = 11),
+    axis.text.y = element_text(size = 11),
+    axis.title = element_text(size = 11),
+    legend.text = element_text(size = 11),
+    legend.title = element_text(size = 11),
+    legend.position = "bottom",
+    panel.grid.minor = element_blank(),
+    panel.grid.major = element_blank()
+  )
+
+p_year_alt # this graph is figure S11. 
+
+# save graph. 
+
+ggsave(
+  filename = "figures/glmm_v5/bat_species_year_effect.tiff",
+  plot = p_year_alt,
+  width = 12,
+  height = 8,
+  units = "in",
+  dpi = 600,
+  compression = "lzw",
+  bg = "white"
+)
 
 # now we modify the year marginal effect because we don't want estimates by species. We want the estimates for the community as the fixed effect was significant 
 
@@ -2327,11 +2591,10 @@ p_year <- ggplot(
   theme_minimal() +
   
   theme(
-    axis.text = element_text(size = 10),
-    axis.title = element_text(size = 11),
-    legend.position = "top",
-    panel.grid.minor = element_blank()
-  )
+    axis.text = element_text(size = 12),
+    axis.title = element_text(size = 12),
+    legend.position = "bottom",
+    panel.grid = element_blank()  )
 
 p_year
 
@@ -2347,7 +2610,27 @@ ggsave(
 
 summary(m1.7)
 
-# now graphs for the temperature 
+
+# now we calculate the percent change
+
+beta_year <- glmmTMB::fixef(m1.7)$cond["yr_s"]
+
+# Percentage change for one year
+percent_change_annual <- 100 * (
+  exp(beta_year) - 1
+)
+
+# Percentage change from 2021 to 2023
+percent_change_three_years <- 100 * (
+  exp(2 * beta_year) - 1
+)
+
+percent_change_annual
+percent_change_three_years
+
+# temperature marginal m1.7 -----------------------------------------------
+
+
 
 
 temp_seq <- seq(
@@ -2396,7 +2679,17 @@ p_temp_comm <- ggplot(pred_temp_comm, aes(x = temp_c, y = estimate)) +
     y = "Predicted bat call counts",
     title = ""
   ) +
-  theme_minimal()
+  theme_minimal()+
+  theme(
+    strip.text = element_text(
+      size = 11,
+      face = "italic"
+    ),
+    axis.text = element_text(size = 12),
+    axis.title = element_text(size = 12),
+    panel.grid = element_blank()
+
+    )
 
 p_temp_comm
 
@@ -2409,6 +2702,9 @@ p_temp_comm
 # )
 
 # not lets do the wind 
+
+# wind mariginal m1.7 -----------------------------------------------------
+
 
 wind_seq <- seq(
   min(bm2$nit_avg_wspm_s_s, na.rm = TRUE),
@@ -2456,7 +2752,17 @@ p_wind_comm <- ggplot(pred_wind_comm, aes(x = windms, y = estimate)) +
     y = "Predicted bat call counts",
     title = ""
   ) +
-  theme_minimal()
+  theme_minimal()+
+  theme(
+    strip.text = element_text(
+      size = 11,
+      face = "italic"
+    ),
+    axis.text = element_text(size = 12),
+    axis.title = element_text(size = 12),
+    panel.grid = element_blank()
+    
+  )
 
 p_wind_comm
 
@@ -2478,6 +2784,8 @@ ggsave(
   dpi = 300
 )
 
+
+# now figure S 
 p_all_covariates <-
   (p_year | p_moon_overall) /
   (p_temp_comm | p_wind_comm) +
@@ -2494,9 +2802,15 @@ p_all_covariates <-
     plot.tag = element_text(face = "bold")
   )
 
-p_all_covariates
+p_all_covariates # figure S2
 
-ggsave("figures/glmm_v5/predictors_bat_activity_v1.tiff", plot = p_all_covariates, width = 10, height = 8, dpi = 300)
+ggsave(
+  "figures/glmm_v5/predictors_bat_activity_v1.tiff",
+  plot = p_all_covariates,
+  width = 10,
+  height = 8,
+  dpi = 300
+)
 
 # marginal effects m1.10 acoustic index -----------------------------------
 

@@ -124,8 +124,8 @@ calculate_c_hat(m1)  # now c_hat= 0.62 improved fromthe last model.
 performance::r2(m1)
 summary(m1)
 
-AIC(m1, m1.1)
-anova(m0, m1, m1.1) # the negattive binomial nb2 model is better thatn the nb1 and the poisson so we will chose that one. 
+AIC(m1)
+anova(m0, m1) # the negattive binomial nb2 model is better thatn the nb1 and the poisson so we will chose that one. 
 
 # model with a negative binomial has a better c_hat and AIC than the poisson model.
 # now we try adding seasonality as fixed effects. R conditional is around 0.14 and marginal 0.095
@@ -966,6 +966,22 @@ raw_plot <- sm3_buzz_v2 %>%
     )
   )
 
+facet_labels <- species_effects %>%
+  mutate(
+    sp_clean = as.character(sp_clean),
+    facet_text = sprintf(
+      "%s (%+.1f%%)",
+      sp_clean,
+      percent_change
+    )
+  ) %>%
+  select(
+    sp_clean,
+    facet_text
+  ) %>%
+  distinct() %>%
+  deframe()
+
 p_trmt <- ggplot() +
   
   geom_jitter(
@@ -1039,14 +1055,17 @@ p_trmt <- ggplot() +
   theme(
     strip.text = element_text(
       size = 13,
-      face = "italic"
+      face = "bold"
     ),
     axis.text = element_text(
-      size = 9
+      size = 11
     ),
     axis.title = element_text(
       size = 11
     ),
+    # Legend formatting
+    legend.text = element_text(size = 12),
+    legend.title = element_text(size = 12),
     legend.position = "bottom"
   )
 
@@ -1055,7 +1074,7 @@ p_trmt
 
 
 ggsave(
-  filename = "figures/sm3_glmm_v1/figure_4_buzz_sp.tiff",,
+  filename = "figures/sm3_glmm_v1/figure_4_buzz_sp_v2.tiff",,
   plot = p_trmt,
   width = 12,
   height = 8,

@@ -1332,3 +1332,8 @@ I updated some of the graphs for the manuscript. Including the tables with the m
 
 10/29/2026\
 Updated the dbrda analysis. onse section needs correction so it runs smoth. alos create a word editable table for the mvglm.
+
+------------------------------------------------------------------------
+
+11/09/2026\
+I did some updates to the graphs in glmm_v5 script. I updated these so they all have more or less the same asthetic and species order when looking at the panels of multiple species.
