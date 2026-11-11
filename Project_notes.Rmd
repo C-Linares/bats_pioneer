@@ -1337,3 +1337,11 @@ Updated the dbrda analysis. onse section needs correction so it runs smoth. alos
 
 11/09/2026\
 I did some updates to the graphs in glmm_v5 script. I updated these so they all have more or less the same asthetic and species order when looking at the panels of multiple species.
+
+------------------------------------------------------------------------
+
+11/10/2026
+
+I updated the graph for the delta sunset overlap analysis. I have removed myocal from the ovelap analysis because is not in any of the other analysis. I should double check my notes on the overall activity and if we remove it from the main analysis. \
+\
+![](images/clipboard-2839306597.png)

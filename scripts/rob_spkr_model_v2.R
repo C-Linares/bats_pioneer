@@ -497,9 +497,9 @@ save_as_image(m10_flex, path = "figures/rob_spkr_model/v3/tables/m10_bg_table.pn
 ####################################
 ####################################
 ####################################
-# Marginal effects robomoth -------------------------------------------------------
+# Marginal effects robomoth m10_bg-------------------------------------------------------
 
-# we are using the m11 model to produce marginal effects plots for the robomoth data.
+# we are using the m10_bg model to produce marginal effects plots for the robomoth data.
 
 # Treatment colors used in your previous figures
 trt_cols <- c(
@@ -692,72 +692,72 @@ rob_trt_grid <- tidyr::expand_grid(
 
 
 
-# Species-specific lit/dark ratios
-rob_species_ratio <- avg_comparisons(
-  m10_bg,
-  newdata = rob_trt_grid,
-  variables = list(trmt_bin = c(-1, 1)),
-  comparison = "lnratio",
-  by = "sp",
-  type = "response",
-  re.form = NULL,
-  allow.new.levels = TRUE
-) %>%
-  as_tibble() %>%
-  mutate(
-    percent_change_lit_vs_dark = 100 * (estimate - 1),
-    percent_conf_low = 100 * (conf.low - 1),
-    percent_conf_high = 100 * (conf.high - 1),
-    supported_response = case_when(
-      conf.low > 1 ~ "Higher in lit",
-      conf.high < 1 ~ "Lower in lit",
-      TRUE ~ "Uncertain"
-    )
-  ) %>%
-  arrange(desc(percent_change_lit_vs_dark))
+# # Species-specific lit/dark ratios
+# rob_species_ratio <- avg_comparisons(
+#   m10_bg,
+#   newdata = rob_trt_grid,
+#   variables = list(trmt_bin = c(-1, 1)),
+#   comparison = "lnratio",
+#   by = "sp",
+#   type = "response",
+#   re.form = NULL,
+#   allow.new.levels = TRUE
+# ) %>%
+#   as_tibble() %>%
+#   mutate(
+#     percent_change_lit_vs_dark = 100 * (estimate - 1), # there is an error here were we can't calculate the percent of a lot-ratio so this is an error we correct later. 
+#     percent_conf_low = 100 * (conf.low - 1),
+#     percent_conf_high = 100 * (conf.high - 1),
+#     supported_response = case_when(
+#       conf.low > 1 ~ "Higher in lit",
+#       conf.high < 1 ~ "Lower in lit",
+#       TRUE ~ "Uncertain"
+#     )
+#   ) %>%
+#   arrange(desc(percent_change_lit_vs_dark))
+# 
+# rob_species_ratio
+# 
+# rob_species_ratio_clean <- rob_species_ratio %>%
+#   transmute(
+#     species = sp,
+#     lit_dark_ratio = round(estimate, 2),
+#     ratio_CI = paste0(round(conf.low, 2), "–", round(conf.high, 2)),
+#     percent_change = round(percent_change_lit_vs_dark, 1),
+#     percent_CI = paste0(
+#       round(percent_conf_low, 1),
+#       " to ",
+#       round(percent_conf_high, 1),
+#       "%"
+#     ),
+#     p_value = signif(p.value, 3),
+#     supported_response
+#   )
+# 
+# rob_species_ratio_clean
+# 
+# ts4 <- flextable(rob_species_ratio_clean) %>%
+#   theme_booktabs() %>%
+#   font(fontname = "Times New Roman", part = "all") %>%
+#   fontsize(size = 10, part = "all") %>%
+#   bold(part = "header") %>%
+#   bold(
+#     i = ~ supported_response != "Uncertain",
+#     bold = TRUE,
+#     part = "body"
+#   ) %>%
+#   autofit() %>%
+#   set_caption(
+#     "Table S4. Species-specific lit/dark ratios for faint robomoth passes from the abundance-offset robomoth model."
+#   )
+# 
+# ts4
 
-rob_species_ratio
-
-rob_species_ratio_clean <- rob_species_ratio %>%
-  transmute(
-    species = sp,
-    lit_dark_ratio = round(estimate, 2),
-    ratio_CI = paste0(round(conf.low, 2), "–", round(conf.high, 2)),
-    percent_change = round(percent_change_lit_vs_dark, 1),
-    percent_CI = paste0(
-      round(percent_conf_low, 1),
-      " to ",
-      round(percent_conf_high, 1),
-      "%"
-    ),
-    p_value = signif(p.value, 3),
-    supported_response
-  )
-
-rob_species_ratio_clean
-
-ts4 <- flextable(rob_species_ratio_clean) %>%
-  theme_booktabs() %>%
-  font(fontname = "Times New Roman", part = "all") %>%
-  fontsize(size = 10, part = "all") %>%
-  bold(part = "header") %>%
-  bold(
-    i = ~ supported_response != "Uncertain",
-    bold = TRUE,
-    part = "body"
-  ) %>%
-  autofit() %>%
-  set_caption(
-    "Table S4. Species-specific lit/dark ratios for faint robomoth passes from the abundance-offset robomoth model."
-  )
-
-ts4
-
-save_as_docx(
-  "table.s4" = ts4,
-  path = "figures/rob_spkr_model/v3/tables/ts4_robomoth.docx")
-
-save_as_image(ts4, path = "figures/rob_spkr_model/v3/tables/ts4_robomoth.png")
+# save_as_docx(
+#   "table.s4" = ts4,
+#   path = "figures/rob_spkr_model/v3/tables/ts4_robomoth.docx")
+# 
+# save_as_image(ts4, path = "figures/rob_spkr_model/v3/tables/ts4_robomoth.png")
 
 # change to log ratio for the comparaison 
 
@@ -831,7 +831,7 @@ ts4 <- flextable(rob_species_ratio_clean) %>%
   ) %>%
   autofit() %>%
   set_caption(
-    "Table S4. Species-specific lit/dark ratios for faint robomoth passes from the abundance-offset robomoth model."
+    "Table S4. Species-specific lit/dark ratios for robomoth passes from the abundance-offset robomoth model."
   )
 
 ts4
@@ -2873,6 +2873,26 @@ assay_cols <- c(
   "Robomoth" = "black"   # red/salmon
 )
 
+
+# now we change the order of the species so these agree with the other plots in the manuscript. 
+
+# Species order from previous figure
+species_order <- c(
+  "myyu", "myth", "myev", "anpa",
+  "coto", "epfu", "myci", "laci",
+  "lano", "mylu", "myvo"
+)
+
+# Remove Community and order species
+pred_compare <- pred_compare %>%
+  filter(panel != "Community") %>%
+  mutate(panel = factor(as.character(panel), levels = species_order))
+
+raw_compare <- raw_compare %>%
+  filter(panel != "Community") %>%
+  mutate(panel = factor(as.character(panel), levels = species_order))
+
+
 # now we plot both analysis. 
 
 pd <- position_dodge(width = 0.18)
@@ -2937,7 +2957,8 @@ p_gomes_style_treatment <- ggplot() +
   facet_wrap(~ panel, scales = "free_y", ncol = 4) +
   scale_color_manual(values = assay_cols) +
   scale_y_continuous(
-    trans = scales::pseudo_log_trans(base = 10)
+    trans = scales::pseudo_log_trans(base = 10),
+    breaks = scales::breaks_pretty(n = 3)
   ) +
   labs(
     title = "Contrasting speaker and robomoth responses to artificial light",
@@ -2953,12 +2974,15 @@ p_gomes_style_treatment <- ggplot() +
   theme_minimal(base_size = 15) +
   theme(
     legend.position = "bottom",
-    strip.text = element_text(face = "bold"),
+    strip.text = element_text(face = "bold", size = 15),
     panel.grid.minor = element_blank(),
     plot.title = element_text(face = "bold")
   )
 
+
+
 p_gomes_style_treatment
+
 
 
 pd <- position_dodge(width = 0.25)
@@ -3019,8 +3043,15 @@ p_gomes_style_treatment <- ggplot() +
 p_gomes_style_treatment
 
 ggsave(
-  filename = "figures/rob_spkr_model/v3/rob_spkr_treatment.tiff",)
-
+  filename = "figures/rob_spkr_model/v3/rob_spkr_treatment_v2.tiff",
+  plot = p_gomes_style_treatment,
+  width = 12,
+  height = 8,
+  units = "in",
+  dpi = 600,
+  compression = "lzw",
+  bg = "white"
+)
 
 
 # trial for improved graph 
@@ -3118,7 +3149,7 @@ p_species_support <- ggplot(
   theme(
     legend.position = "bottom",
     strip.text = element_text(face = "bold"),
-    panel.grid.minor = element_blank(),
+    panel.grid = element_blank(),
     plot.title = element_text(face = "bold")
   )
 
